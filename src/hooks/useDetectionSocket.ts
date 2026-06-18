@@ -97,13 +97,21 @@ export function useDetectionSocket({
         video &&
         video.readyState >= 2
       ) {
-        const w = video.videoWidth || 1280;
-        const h = video.videoHeight || 720;
+        const vw = video.videoWidth || 1280;
+        const vh = video.videoHeight || 720;
+        // Latency: downscale to the YOLO input size before encoding. iacore
+        // resizes to imgsz anyway, so uploading more pixels only adds upload
+        // time for zero detection gain. (bbox coords are normalized, so the
+        // overlay is unaffected.)
+        const target = configRef.current.imgsz || 640;
+        const scale = Math.min(1, target / Math.max(vw, vh));
+        const w = Math.max(1, Math.round(vw * scale));
+        const h = Math.max(1, Math.round(vh * scale));
         if (grab.width !== w || grab.height !== h) {
           grab.width = w;
           grab.height = h;
         }
-        gctx.drawImage(video, 0, 0, grab.width, grab.height);
+        gctx.drawImage(video, 0, 0, w, h);
         grab.toBlob(
           (blob) => {
             if (blob && ws.readyState === WebSocket.OPEN) {

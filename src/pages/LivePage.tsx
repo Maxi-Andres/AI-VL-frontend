@@ -15,7 +15,8 @@ const BLUE = "#60a5fa";
 export function LivePage() {
   const { options, error: optionsError } = useOptions();
   const { setConnected } = useStatus();
-  const { videoRef, active, error: cameraError, start, stop } = useCamera();
+  const { videoRef, active, facing, error: cameraError, start, stop, flip } =
+    useCamera();
 
   // --- YOLO controls ---
   const [yoloModel, setYoloModel] = useState("");
@@ -165,10 +166,12 @@ export function LivePage() {
         objects={objects}
         overlayColor={overlayColor}
         active={active}
+        facing={facing}
         fps={fps}
         count={count}
         onStart={handleStart}
         onStop={handleStop}
+        onFlip={flip}
       />
 
       <aside className="rounded-lg border border-line bg-panel p-3.5">

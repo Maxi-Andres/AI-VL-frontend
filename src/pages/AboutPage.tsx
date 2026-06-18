@@ -16,7 +16,7 @@ export function AboutPage() {
         the iacore service exists. It is currently pointed at:
       </p>
       <pre className="rounded-md border border-line bg-[#0a0b0f] p-2 font-mono text-xs text-fg">
-        {BACKEND_URL}
+        {BACKEND_URL || "same origin (proxied to the backend by the dev server)"}
       </pre>
       <p className="text-muted">
         To change it, edit <code>public/config.js</code> (read at runtime, no

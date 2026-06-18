@@ -1,15 +1,23 @@
-// The single source of the backend gateway URL. Resolution order:
-//   1. window.APP_CONFIG.BACKEND_URL  (runtime, public/config.js — no rebuild)
-//   2. import.meta.env.VITE_BACKEND_URL  (build-time .env)
-//   3. http://localhost:8000  (default)
+// Where the frontend sends its REST/WS traffic.
 //
-// The frontend is a separate app and talks ONLY to the backend; it never knows
-// the iacore service exists.
-export const BACKEND_URL = (
-  window.APP_CONFIG?.BACKEND_URL ||
-  import.meta.env.VITE_BACKEND_URL ||
-  "http://localhost:8000"
-).replace(/\/$/, "");
+//   - DEV (vite dev server): talk DIRECTLY to the backend gateway on :8000 (its
+//     CORS is open). import.meta.env.DEV is set by the command (dev vs build), so
+//     this is deterministic and never leaks into a production build.
+//   - PRODUCTION build: same origin ("") — the backend serves this app together
+//     with /api and /ws (phone mode, ./run-phone.sh), one secure origin.
+//   - A non-empty BACKEND_URL in public/config.js overrides both (deploy escape
+//     hatch).
+//
+// The frontend still talks ONLY to the backend, never to the iacore service.
+const fromRuntime = window.APP_CONFIG?.BACKEND_URL;
+const devDefault = import.meta.env.DEV ? `http://${location.hostname}:8000` : "";
+const raw = (fromRuntime || devDefault).replace(/\/$/, "");
 
-/** WebSocket endpoint derived from the backend URL (http -> ws, https -> wss). */
-export const WS_URL = BACKEND_URL.replace(/^http/, "ws") + "/ws/detect";
+export const BACKEND_URL = raw;
+
+/** WebSocket endpoint. Same-origin (default in prod) derives ws/wss from the page. */
+export const WS_URL = (() => {
+  if (BACKEND_URL) return BACKEND_URL.replace(/^http/, "ws") + "/ws/detect";
+  const { protocol, host } = location;
+  return `${protocol === "https:" ? "wss" : "ws"}://${host}/ws/detect`;
+})();
