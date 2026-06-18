@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Vite / TS cache
+*.tsbuildinfo
+
+# Editor / OS cruft
+.DS_Store
+*.log
+
+# Local env overrides
+.env.local
+.env.*.local
+
+# If you ever add a local config override
+config.local.js

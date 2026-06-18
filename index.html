@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VL PoC — live</title>
+    <!--
+      Runtime per-deployment config. Edit public/config.js to point at the
+      backend gateway without rebuilding. Loaded BEFORE the app bundle so
+      window.APP_CONFIG is available when the app reads it.
+    -->
+    <script src="/config.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

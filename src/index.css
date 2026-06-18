@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+/* Dark minimalist theme. These map to Tailwind utilities: --color-bg -> bg-bg,
+   --color-muted -> text-muted, --color-line -> border-line, etc. */
+@theme {
+  --color-bg: #0e0f13;
+  --color-panel: #171922;
+  --color-line: #262a36;
+  --color-fg: #e6e8ee;
+  --color-muted: #8b90a0;
+  --color-accent: #4ade80;
+  --color-accent2: #60a5fa;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
