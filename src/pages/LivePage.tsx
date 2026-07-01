@@ -9,7 +9,8 @@ import { useDetectionSocket } from "../hooks/useDetectionSocket";
 import { useOptions } from "../hooks/useOptions";
 import type { DetectedObject, DetectionMessage, YoloConfig } from "../types";
 
-const GREEN = "#4ade80";
+// VLM overlay boxes are drawn one flat color (they aren't YOLO classes). YOLO
+// boxes are colored per-class by the palette in draw.ts (no override).
 const BLUE = "#60a5fa";
 
 export function LivePage() {
@@ -21,7 +22,7 @@ export function LivePage() {
   // --- YOLO controls ---
   const [yoloModel, setYoloModel] = useState("");
   const [conf, setConf] = useState(0.25);
-  const [imgsz, setImgsz] = useState(640);
+  const [imgsz, setImgsz] = useState(320);
   const [classes, setClasses] = useState<string[]>([]);
   const [classOptions, setClassOptions] = useState<string[]>([]);
 
@@ -32,7 +33,10 @@ export function LivePage() {
 
   // --- Overlay + metrics ---
   const [objects, setObjects] = useState<DetectedObject[]>([]);
-  const [overlayColor, setOverlayColor] = useState(GREEN);
+  // undefined => per-class YOLO colors; set to a color to force it (VLM overlay).
+  const [overrideColor, setOverrideColor] = useState<string | undefined>(
+    undefined,
+  );
   const [fps, setFps] = useState("— ms/frame");
   const [count, setCount] = useState("0 objects");
 
@@ -65,7 +69,7 @@ export function LivePage() {
 
   const onResult = useCallback((msg: DetectionMessage) => {
     setObjects(msg.objects);
-    setOverlayColor(GREEN);
+    setOverrideColor(undefined); // YOLO: color each box by its class
     setFps(`${msg.elapsed_ms} ms/frame`);
     setCount(`${msg.n} objects`);
   }, []);
@@ -134,7 +138,7 @@ export function LivePage() {
       // Overlay the VLM boxes (blue) on top of the still frame.
       if (res.ok && Array.isArray(res.parsed?.objects)) {
         setObjects(res.parsed.objects);
-        setOverlayColor(BLUE);
+        setOverrideColor(BLUE);
       }
     } catch (e) {
       setVlmStatus(`Request failed: ${e instanceof Error ? e.message : e}`);
@@ -164,7 +168,7 @@ export function LivePage() {
       <VideoStage
         videoRef={videoRef}
         objects={objects}
-        overlayColor={overlayColor}
+        overrideColor={overrideColor}
         active={active}
         facing={facing}
         fps={fps}

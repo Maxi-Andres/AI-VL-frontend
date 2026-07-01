@@ -4,16 +4,19 @@ import type { DetectedObject } from "../../types";
 
 interface Props {
   objects: DetectedObject[];
-  color: string;
+  /** Force one color for all boxes (VLM overlay). Omit for per-class YOLO colors. */
+  overrideColor?: string;
   videoRef: React.RefObject<HTMLVideoElement | null>;
 }
 
 /**
  * Transparent canvas layered over the <video>, redrawing boxes whenever the
- * objects (or color) change. Its intrinsic size tracks the video so normalized
- * bbox coords map correctly; CSS stretches it to fill the wrapper.
+ * objects (or color) change. Its intrinsic size tracks the video's native
+ * resolution and it uses the SAME `object-contain` CSS as the video, so both
+ * letterbox identically and normalized bbox coords stay aligned for any camera
+ * aspect ratio.
  */
-export function DetectionOverlay({ objects, color, videoRef }: Props) {
+export function DetectionOverlay({ objects, overrideColor, videoRef }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -24,13 +27,13 @@ export function DetectionOverlay({ objects, color, videoRef }: Props) {
     const h = video?.videoHeight || 720;
     if (canvas.width !== w) canvas.width = w;
     if (canvas.height !== h) canvas.height = h;
-    drawBoxes(canvas, objects, color);
-  }, [objects, color, videoRef]);
+    drawBoxes(canvas, objects, overrideColor);
+  }, [objects, overrideColor, videoRef]);
 
   return (
     <canvas
       ref={canvasRef}
-      className="pointer-events-none absolute inset-0 h-full w-full"
+      className="pointer-events-none absolute inset-0 h-full w-full object-contain"
     />
   );
 }

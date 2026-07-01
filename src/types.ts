@@ -5,6 +5,8 @@ export interface DetectedObject {
   type: string;
   confidence?: number | null;
   bbox: [number, number, number, number];
+  /** YOLO class id (present on YOLO detections); used to pick the box color. */
+  class_id?: number | null;
 }
 
 /** Server-provided defaults for every control. */

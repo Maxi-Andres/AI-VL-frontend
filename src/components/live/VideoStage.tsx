@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { DetectionOverlay } from "./DetectionOverlay";
 import { ControlBar } from "./ControlBar";
 import type { DetectedObject } from "../../types";
@@ -6,7 +7,8 @@ import type { Facing } from "../../hooks/useCamera";
 interface Props {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   objects: DetectedObject[];
-  overlayColor: string;
+  /** Force one box color (VLM overlay); omit for per-class YOLO colors. */
+  overrideColor?: string;
   active: boolean;
   facing: Facing;
   fps: string;
@@ -16,11 +18,11 @@ interface Props {
   onFlip: () => void;
 }
 
-/** The video viewport: <video> + detection overlay + control bar. */
+/** The video viewport: <video> + detection overlay + fullscreen + control bar. */
 export function VideoStage({
   videoRef,
   objects,
-  overlayColor,
+  overrideColor,
   active,
   facing,
   fps,
@@ -29,9 +31,24 @@ export function VideoStage({
   onStop,
   onFlip,
 }: Props) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  const toggleFullscreen = () => {
+    const el = wrapRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      el.requestFullscreen?.();
+    }
+  };
+
   return (
     <section className="min-w-0">
-      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-line bg-black">
+      <div
+        ref={wrapRef}
+        className="relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-line bg-black"
+      >
         <video
           ref={videoRef}
           autoPlay
@@ -41,9 +58,18 @@ export function VideoStage({
         />
         <DetectionOverlay
           objects={objects}
-          color={overlayColor}
+          overrideColor={overrideColor}
           videoRef={videoRef}
         />
+        <button
+          type="button"
+          onClick={toggleFullscreen}
+          title="Fullscreen"
+          aria-label="Toggle fullscreen"
+          className="absolute right-2 top-2 rounded bg-black/50 px-2.5 py-1.5 text-base leading-none text-white hover:bg-black/70"
+        >
+          ⛶
+        </button>
       </div>
       <ControlBar
         active={active}
