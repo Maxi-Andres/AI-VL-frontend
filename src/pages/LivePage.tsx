@@ -7,7 +7,12 @@ import { useStatus } from "../components/layout/StatusContext";
 import { useCamera } from "../hooks/useCamera";
 import { useDetectionSocket } from "../hooks/useDetectionSocket";
 import { useOptions } from "../hooks/useOptions";
-import type { DetectedObject, DetectionMessage, YoloConfig } from "../types";
+import type {
+  ConfigState,
+  DetectedObject,
+  DetectionMessage,
+  YoloConfig,
+} from "../types";
 
 // VLM overlay boxes are drawn one flat color (they aren't YOLO classes). YOLO
 // boxes are colored per-class by the palette in draw.ts (no override).
@@ -74,12 +79,28 @@ export function LivePage() {
     setCount(`${msg.n} objects`);
   }, []);
 
+  // Adopt config the server pushes (e.g. changed from the monitor) so the phone's
+  // controls stay in sync. Only refetch classes when the model actually changes.
+  const applyServerConfig = useCallback(
+    (state: ConfigState) => {
+      if (state.model != null && state.model !== yoloModel) {
+        setYoloModel(state.model);
+        fetchClasses(state.model).then(setClassOptions).catch(console.error);
+      }
+      if (state.conf != null) setConf(state.conf);
+      if (state.imgsz != null) setImgsz(state.imgsz);
+      if (state.classes != null) setClasses(state.classes);
+    },
+    [yoloModel],
+  );
+
   const { connected } = useDetectionSocket({
     active,
     videoRef,
     config,
     onResult,
     onError: (m) => console.warn("server:", m),
+    onConfig: applyServerConfig,
   });
 
   useEffect(() => setConnected(connected), [connected, setConnected]);
@@ -147,6 +168,39 @@ export function LivePage() {
     }
   }, [videoRef, vlmModel, scope, variant]);
 
+  // Free-form question about the current frame -> plain-text answer.
+  const handleAskPrompt = useCallback(
+    async (prompt: string) => {
+      const video = videoRef.current;
+      if (!video?.videoWidth) return;
+      const { captureFrame } = await import("../lib/capture");
+      const image = captureFrame(video);
+      if (!image) return;
+
+      setVlmBusy(true);
+      setVlmStatus("Asking the VLM… (this can take several seconds)");
+      setVlmOutput("");
+      try {
+        const res = await askVlm({ image, model: vlmModel, prompt });
+        if (res.error) {
+          setVlmStatus(`Error: ${res.error}`);
+          return;
+        }
+        setVlmStatus(
+          `${res.model} · ${res.elapsed_ms} ms · ${
+            res.did_think ? "reasoned" : "no reasoning"
+          }`,
+        );
+        setVlmOutput(res.content?.trim() || "(no answer)");
+      } catch (e) {
+        setVlmStatus(`Request failed: ${e instanceof Error ? e.message : e}`);
+      } finally {
+        setVlmBusy(false);
+      }
+    },
+    [videoRef, vlmModel],
+  );
+
   if (optionsError) {
     return (
       <main className="p-4 text-[#ff9aa6]">
@@ -213,6 +267,7 @@ export function LivePage() {
           onScopeChange={handleScopeChange}
           onVariantChange={setVariant}
           onAsk={handleAsk}
+          onAskPrompt={handleAskPrompt}
         />
       </aside>
     </main>

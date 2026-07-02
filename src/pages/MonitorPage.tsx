@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { askVlm, fetchClasses } from "../api/backend";
 import { WS_VIEW_URL } from "../config";
 import { YoloPanel } from "../components/live/YoloPanel";
@@ -7,7 +7,7 @@ import { Button } from "../components/ui/Button";
 import { useStatus } from "../components/layout/StatusContext";
 import { useOptions } from "../hooks/useOptions";
 import { drawBoxes } from "../lib/draw";
-import type { DetectedObject, YoloConfig } from "../types";
+import type { ConfigState, DetectedObject, YoloConfig } from "../types";
 
 // VLM overlay boxes are drawn one flat color (see LivePage).
 const BLUE = "#60a5fa";
@@ -23,7 +23,7 @@ interface FrameMsg {
 }
 type ViewMsg =
   | FrameMsg
-  | { type: "config"; state: unknown }
+  | { type: "config"; state: ConfigState }
   | { type: "error"; message: string };
 
 /**
@@ -86,18 +86,34 @@ export function MonitorPage() {
     fetchClasses(d.yolo_model).then(setClassOptions).catch(console.error);
   }, [options]);
 
-  const config = useMemo<YoloConfig>(
-    () => ({ model: yoloModel, conf, imgsz, classes }),
-    [yoloModel, conf, imgsz, classes],
-  );
-
-  // Push config into the shared session whenever it changes (while activated).
-  useEffect(() => {
+  // Push a config change into the shared session. The backend merges partials, so
+  // we send only the field that changed. Called from the control handlers — NOT on
+  // activation — so adopting the phone's config never echoes back and clobbers it.
+  const pushConfig = useCallback((patch: Partial<YoloConfig>) => {
     const ws = wsRef.current;
-    if (activated && ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(config));
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(patch));
     }
-  }, [config, activated]);
+  }, []);
+
+  // Adopt config the server pushes (from the phone or another monitor). Sets state
+  // directly (no echo). Refetch the class list only when the model changes.
+  const applyServerConfig = useCallback(
+    (state: ConfigState) => {
+      if (state.model != null && state.model !== yoloModel) {
+        setYoloModel(state.model);
+        fetchClasses(state.model).then(setClassOptions).catch(console.error);
+      }
+      if (state.conf != null) setConf(state.conf);
+      if (state.imgsz != null) setImgsz(state.imgsz);
+      if (state.classes != null) setClasses(state.classes);
+    },
+    [yoloModel],
+  );
+  const applyServerConfigRef = useRef(applyServerConfig);
+  useEffect(() => {
+    applyServerConfigRef.current = applyServerConfig;
+  }, [applyServerConfig]);
 
   // Redraw the overlay on top of the mirrored frame. The canvas tracks the
   // frame's native size and uses the same object-contain CSS, so normalized
@@ -137,7 +153,7 @@ export function MonitorPage() {
     wsRef.current = ws;
     setWaiting(true);
     ws.onopen = () => {
-      setActivated(true); // the config-change effect then pushes current config
+      setActivated(true); // then we just adopt the server's seeded config
       setConnected(true);
     };
     ws.onclose = () => {
@@ -159,8 +175,9 @@ export function MonitorPage() {
         setWaiting(false);
       } else if (m.type === "error") {
         console.warn("server:", m.message);
+      } else if (m.type === "config") {
+        applyServerConfigRef.current(m.state); // keep controls in sync with phone
       }
-      // "config" is informational; the controls are seeded from /api/options.
     };
   }, [setConnected]);
 
@@ -212,6 +229,35 @@ export function MonitorPage() {
     }
   }, [vlmModel, scope, variant]);
 
+  // Free-form question about the last mirrored frame -> plain-text answer.
+  const handleAskPrompt = useCallback(
+    async (prompt: string) => {
+      const image = lastFrameRef.current;
+      if (!image) return;
+      setVlmBusy(true);
+      setVlmStatus("Asking the VLM… (this can take several seconds)");
+      setVlmOutput("");
+      try {
+        const res = await askVlm({ image, model: vlmModel, prompt });
+        if (res.error) {
+          setVlmStatus(`Error: ${res.error}`);
+          return;
+        }
+        setVlmStatus(
+          `${res.model} · ${res.elapsed_ms} ms · ${
+            res.did_think ? "reasoned" : "no reasoning"
+          }`,
+        );
+        setVlmOutput(res.content?.trim() || "(no answer)");
+      } catch (e) {
+        setVlmStatus(`Request failed: ${e instanceof Error ? e.message : e}`);
+      } finally {
+        setVlmBusy(false);
+      }
+    },
+    [vlmModel],
+  );
+
   if (optionsError) {
     return (
       <main className="p-4 text-[#ff9aa6]">
@@ -230,15 +276,14 @@ export function MonitorPage() {
   if (!activated) {
     return (
       <main className="flex min-h-[60vh] flex-col items-center justify-center gap-4 p-6 text-center">
-        <h2 className="m-0 text-lg font-semibold">Monitor del server</h2>
+        <h2 className="m-0 text-lg font-semibold">Server monitor</h2>
         <p className="m-0 max-w-md text-sm text-muted">
-          Espeja en vivo lo que ve el celular (video + detecciones) y te deja
-          controlar las opciones desde acá. El celular sigue siendo la única
-          cámara. Mientras esté desactivado no se transmite nada, así que no
-          consume ancho de banda hasta que lo actives.
+          Mirrors what the phone sees (video + detections) and lets you drive the
+          same controls from here. The phone stays the only camera. While inactive
+          nothing is streamed, so it uses no bandwidth until you activate it.
         </p>
         <Button onClick={activate} className="text-base">
-          Activar monitor
+          Activate monitor
         </Button>
       </main>
     );
@@ -262,8 +307,8 @@ export function MonitorPage() {
           ) : (
             <div className="absolute inset-0 flex items-center justify-center text-sm text-muted">
               {waiting
-                ? "Esperando frames del celular…"
-                : "Sin señal del celular"}
+                ? "Waiting for frames from the phone…"
+                : "No signal from the phone"}
             </div>
           )}
           <canvas
@@ -274,7 +319,7 @@ export function MonitorPage() {
 
         <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
           <Button variant="secondary" onClick={deactivate}>
-            Desactivar
+            Deactivate
           </Button>
           <span className="text-muted tabular-nums">{fps}</span>
           <span className="text-muted tabular-nums">{count}</span>
@@ -289,10 +334,22 @@ export function MonitorPage() {
           conf={conf}
           imgsz={imgsz}
           classes={classes}
-          onModelChange={handleModelChange}
-          onConfChange={setConf}
-          onImgszChange={setImgsz}
-          onClassesChange={setClasses}
+          onModelChange={(m) => {
+            handleModelChange(m);
+            pushConfig({ model: m, classes: [] });
+          }}
+          onConfChange={(v) => {
+            setConf(v);
+            pushConfig({ conf: v });
+          }}
+          onImgszChange={(v) => {
+            setImgsz(v);
+            pushConfig({ imgsz: v });
+          }}
+          onClassesChange={(v) => {
+            setClasses(v);
+            pushConfig({ classes: v });
+          }}
         />
 
         <hr className="my-4 border-0 border-t border-line" />
@@ -312,6 +369,7 @@ export function MonitorPage() {
           onScopeChange={handleScopeChange}
           onVariantChange={setVariant}
           onAsk={handleAsk}
+          onAskPrompt={handleAskPrompt}
         />
       </aside>
     </main>

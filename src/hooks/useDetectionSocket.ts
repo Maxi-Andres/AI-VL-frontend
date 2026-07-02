@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { WS_URL } from "../config";
-import type { DetectionMessage, ServerMessage, YoloConfig } from "../types";
+import type {
+  ConfigState,
+  DetectionMessage,
+  ServerMessage,
+  YoloConfig,
+} from "../types";
 
 interface Params {
   /** When true, open the socket and start the frame pump. */
@@ -10,6 +15,9 @@ interface Params {
   config: YoloConfig;
   onResult: (msg: DetectionMessage) => void;
   onError?: (message: string) => void;
+  /** Called when the server pushes a shared-config change (e.g. from the monitor)
+   * so this client can update its own controls. */
+  onConfig?: (state: ConfigState) => void;
 }
 
 /**
@@ -26,6 +34,7 @@ export function useDetectionSocket({
   config,
   onResult,
   onError,
+  onConfig,
 }: Params) {
   const [connected, setConnected] = useState(false);
 
@@ -37,6 +46,7 @@ export function useDetectionSocket({
   const configRef = useRef(config);
   const onResultRef = useRef(onResult);
   const onErrorRef = useRef(onError);
+  const onConfigRef = useRef(onConfig);
   useEffect(() => {
     configRef.current = config;
   }, [config]);
@@ -46,6 +56,9 @@ export function useDetectionSocket({
   useEffect(() => {
     onErrorRef.current = onError;
   }, [onError]);
+  useEffect(() => {
+    onConfigRef.current = onConfig;
+  }, [onConfig]);
 
   const sendConfig = useCallback(() => {
     const ws = wsRef.current;
@@ -84,6 +97,8 @@ export function useDetectionSocket({
       } else if (msg.type === "error") {
         onErrorRef.current?.(msg.message);
         inFlightRef.current = false;
+      } else if (msg.type === "config") {
+        onConfigRef.current?.(msg.state);
       }
     };
 

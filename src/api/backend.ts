@@ -21,8 +21,11 @@ export async function fetchClasses(model: string): Promise<string[]> {
 export interface VlmRequest {
   image: string; // JPEG data URL
   model: string;
-  scope: string;
-  variant: string;
+  // Either the canned scope/variant prompt, OR a free-form `prompt` (ask anything
+  // about the image). When `prompt` is set the server answers in plain text.
+  scope?: string;
+  variant?: string;
+  prompt?: string;
 }
 
 export async function askVlm(req: VlmRequest): Promise<VlmResponse> {

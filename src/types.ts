@@ -51,9 +51,17 @@ export interface ErrorMessage {
   type: "error";
   message: string;
 }
+/** Shared YOLO config the server broadcasts so every client stays in sync.
+ * Fields can be null when nobody has set them yet. */
+export interface ConfigState {
+  model?: string | null;
+  conf?: number | null;
+  imgsz?: number | null;
+  classes?: string[] | null;
+}
 export interface ConfigAckMessage {
   type: "config";
-  state: unknown;
+  state: ConfigState;
 }
 export type ServerMessage = DetectionMessage | ErrorMessage | ConfigAckMessage;
 
@@ -65,4 +73,6 @@ export interface VlmResponse {
   elapsed_ms: number;
   did_think: boolean;
   parsed: { objects?: DetectedObject[] } & Record<string, unknown>;
+  /** Raw text answer — present (and what to show) for free-form prompts. */
+  content?: string;
 }
