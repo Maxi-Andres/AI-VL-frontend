@@ -15,9 +15,16 @@ const raw = (fromRuntime || devDefault).replace(/\/$/, "");
 
 export const BACKEND_URL = raw;
 
-/** WebSocket endpoint. Same-origin (default in prod) derives ws/wss from the page. */
-export const WS_URL = (() => {
-  if (BACKEND_URL) return BACKEND_URL.replace(/^http/, "ws") + "/ws/detect";
+/** Build a ws/wss URL for a backend path. Same-origin (default in prod) derives
+ * the scheme from the page; an explicit BACKEND_URL overrides. */
+function wsUrl(path: string): string {
+  if (BACKEND_URL) return BACKEND_URL.replace(/^http/, "ws") + path;
   const { protocol, host } = location;
-  return `${protocol === "https:" ? "wss" : "ws"}://${host}/ws/detect`;
-})();
+  return `${protocol === "https:" ? "wss" : "ws"}://${host}${path}`;
+}
+
+/** Live detection socket (the phone streams frames here). */
+export const WS_URL = wsUrl("/ws/detect");
+
+/** Read-only monitor socket (the server mirrors the phone's frames + boxes). */
+export const WS_VIEW_URL = wsUrl("/ws/view");
