@@ -42,6 +42,7 @@ export function useDetectionSocket({
   const inFlightRef = useRef(false);
   const rafRef = useRef(0);
   const grabRef = useRef<HTMLCanvasElement | null>(null);
+  const lastSentRef = useRef(0); // performance.now() of the last frame sent (FPS cap)
 
   const configRef = useRef(config);
   const onResultRef = useRef(onResult);
@@ -105,13 +106,19 @@ export function useDetectionSocket({
     // Send one frame whenever the previous one has been answered.
     const pump = () => {
       const video = videoRef.current;
+      // Optional FPS cap: don't send the next frame until enough time has passed.
+      const maxFps = configRef.current.max_fps ?? 0;
+      const minInterval = maxFps > 0 ? 1000 / maxFps : 0;
+      const now = performance.now();
       if (
         gctx &&
         ws.readyState === WebSocket.OPEN &&
         !inFlightRef.current &&
         video &&
-        video.readyState >= 2
+        video.readyState >= 2 &&
+        now - lastSentRef.current >= minInterval
       ) {
+        lastSentRef.current = now;
         const vw = video.videoWidth || 1280;
         const vh = video.videoHeight || 720;
         // Latency: downscale to the YOLO input size before encoding. iacore

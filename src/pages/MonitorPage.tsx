@@ -46,6 +46,7 @@ export function MonitorPage() {
   const [imgsz, setImgsz] = useState(320);
   const [classes, setClasses] = useState<string[]>([]);
   const [classOptions, setClassOptions] = useState<string[]>([]);
+  const [maxFps, setMaxFps] = useState(15); // default cap; 0 = unlimited (caps the phone)
 
   // --- VLM controls ---
   const [vlmModel, setVlmModel] = useState("");
@@ -57,10 +58,12 @@ export function MonitorPage() {
   const [overrideColor, setOverrideColor] = useState<string | undefined>(
     undefined,
   );
-  const [fps, setFps] = useState("— ms/frame");
+  const [fps, setFps] = useState("— fps");
   const [count, setCount] = useState("0 objects");
   const [frameUrl, setFrameUrl] = useState("");
   const lastFrameRef = useRef(""); // last JPEG data URL, for the VLM request
+  const lastFrameTsRef = useRef(0); // for measuring actual mirrored FPS
+  const fpsEmaRef = useRef(0);
 
   // --- VLM request state ---
   const [vlmBusy, setVlmBusy] = useState(false);
@@ -107,6 +110,7 @@ export function MonitorPage() {
       if (state.conf != null) setConf(state.conf);
       if (state.imgsz != null) setImgsz(state.imgsz);
       if (state.classes != null) setClasses(state.classes);
+      if (state.max_fps != null) setMaxFps(state.max_fps);
     },
     [yoloModel],
   );
@@ -143,8 +147,10 @@ export function MonitorPage() {
     setFrameUrl("");
     lastFrameRef.current = "";
     setObjects([]);
-    setFps("— ms/frame");
+    setFps("— fps");
     setCount("0 objects");
+    fpsEmaRef.current = 0;
+    lastFrameTsRef.current = 0;
   }, [setConnected]);
 
   const activate = useCallback(() => {
@@ -170,7 +176,18 @@ export function MonitorPage() {
         setFrameUrl(url);
         setObjects(m.objects ?? []);
         setOverrideColor(undefined); // YOLO: color each box by class
-        setFps(`${m.elapsed_ms} ms/frame`);
+        const now = performance.now();
+        const dt = now - lastFrameTsRef.current;
+        lastFrameTsRef.current = now;
+        if (dt > 0 && dt < 5000) {
+          const inst = 1000 / dt;
+          fpsEmaRef.current = fpsEmaRef.current
+            ? fpsEmaRef.current * 0.8 + inst * 0.2
+            : inst;
+          setFps(`${fpsEmaRef.current.toFixed(1)} fps · ${m.elapsed_ms} ms`);
+        } else {
+          setFps(`${m.elapsed_ms} ms`);
+        }
         setCount(`${m.n} objects`);
         setWaiting(false);
       } else if (m.type === "error") {
@@ -334,6 +351,7 @@ export function MonitorPage() {
           conf={conf}
           imgsz={imgsz}
           classes={classes}
+          maxFps={maxFps}
           onModelChange={(m) => {
             handleModelChange(m);
             pushConfig({ model: m, classes: [] });
@@ -349,6 +367,10 @@ export function MonitorPage() {
           onClassesChange={(v) => {
             setClasses(v);
             pushConfig({ classes: v });
+          }}
+          onMaxFpsChange={(v) => {
+            setMaxFps(v);
+            pushConfig({ max_fps: v });
           }}
         />
 

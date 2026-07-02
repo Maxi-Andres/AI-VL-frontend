@@ -30,6 +30,7 @@ export function LivePage() {
   const [imgsz, setImgsz] = useState(320);
   const [classes, setClasses] = useState<string[]>([]);
   const [classOptions, setClassOptions] = useState<string[]>([]);
+  const [maxFps, setMaxFps] = useState(15); // default cap; 0 = unlimited
 
   // --- VLM controls ---
   const [vlmModel, setVlmModel] = useState("");
@@ -42,7 +43,7 @@ export function LivePage() {
   const [overrideColor, setOverrideColor] = useState<string | undefined>(
     undefined,
   );
-  const [fps, setFps] = useState("— ms/frame");
+  const [fps, setFps] = useState("— fps");
   const [count, setCount] = useState("0 objects");
 
   // --- VLM request state ---
@@ -51,6 +52,8 @@ export function LivePage() {
   const [vlmOutput, setVlmOutput] = useState("");
 
   const initialized = useRef(false);
+  const lastFrameTsRef = useRef(0); // for measuring the actual processed FPS
+  const fpsEmaRef = useRef(0);
 
   // Seed all controls from the server defaults once options arrive.
   useEffect(() => {
@@ -68,14 +71,27 @@ export function LivePage() {
   }, [options]);
 
   const config = useMemo<YoloConfig>(
-    () => ({ model: yoloModel, conf, imgsz, classes }),
-    [yoloModel, conf, imgsz, classes],
+    () => ({ model: yoloModel, conf, imgsz, classes, max_fps: maxFps }),
+    [yoloModel, conf, imgsz, classes, maxFps],
   );
 
   const onResult = useCallback((msg: DetectionMessage) => {
     setObjects(msg.objects);
     setOverrideColor(undefined); // YOLO: color each box by its class
-    setFps(`${msg.elapsed_ms} ms/frame`);
+    // Actual processed FPS from the cadence of replies (smoothed), plus the
+    // server-side inference time per frame.
+    const now = performance.now();
+    const dt = now - lastFrameTsRef.current;
+    lastFrameTsRef.current = now;
+    if (dt > 0 && dt < 5000) {
+      const inst = 1000 / dt;
+      fpsEmaRef.current = fpsEmaRef.current
+        ? fpsEmaRef.current * 0.8 + inst * 0.2
+        : inst;
+      setFps(`${fpsEmaRef.current.toFixed(1)} fps · ${msg.elapsed_ms} ms`);
+    } else {
+      setFps(`${msg.elapsed_ms} ms`);
+    }
     setCount(`${msg.n} objects`);
   }, []);
 
@@ -90,6 +106,7 @@ export function LivePage() {
       if (state.conf != null) setConf(state.conf);
       if (state.imgsz != null) setImgsz(state.imgsz);
       if (state.classes != null) setClasses(state.classes);
+      if (state.max_fps != null) setMaxFps(state.max_fps);
     },
     [yoloModel],
   );
@@ -115,8 +132,10 @@ export function LivePage() {
   const handleStop = useCallback(() => {
     stop();
     setObjects([]);
-    setFps("— ms/frame");
+    setFps("— fps");
     setCount("0 objects");
+    fpsEmaRef.current = 0;
+    lastFrameTsRef.current = 0;
   }, [stop]);
 
   const handleModelChange = useCallback((model: string) => {
@@ -244,10 +263,12 @@ export function LivePage() {
           conf={conf}
           imgsz={imgsz}
           classes={classes}
+          maxFps={maxFps}
           onModelChange={handleModelChange}
           onConfChange={setConf}
           onImgszChange={setImgsz}
           onClassesChange={setClasses}
+          onMaxFpsChange={setMaxFps}
         />
 
         <hr className="my-4 border-0 border-t border-line" />

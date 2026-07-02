@@ -2,6 +2,7 @@ import { Field } from "../ui/Field";
 import { MultiSelect, Select } from "../ui/Select";
 
 const IMG_SIZES = ["320", "640", "960", "1280"];
+const FPS_CAPS = ["Unlimited", "1", "2", "5", "10", "15", "30"];
 
 interface Props {
   models: string[];
@@ -10,10 +11,13 @@ interface Props {
   conf: number;
   imgsz: number;
   classes: string[];
+  /** Max frames/sec to send. 0 = unlimited. */
+  maxFps: number;
   onModelChange: (v: string) => void;
   onConfChange: (v: number) => void;
   onImgszChange: (v: number) => void;
   onClassesChange: (v: string[]) => void;
+  onMaxFpsChange: (v: number) => void;
 }
 
 /** Live YOLO controls: model, confidence, image size, class filter. */
@@ -24,10 +28,12 @@ export function YoloPanel({
   conf,
   imgsz,
   classes,
+  maxFps,
   onModelChange,
   onConfChange,
   onImgszChange,
   onClassesChange,
+  onMaxFpsChange,
 }: Props) {
   return (
     <div>
@@ -60,6 +66,18 @@ export function YoloPanel({
           options={IMG_SIZES}
           value={String(imgsz)}
           onChange={(e) => onImgszChange(parseInt(e.target.value, 10))}
+        />
+      </Field>
+
+      <Field label="Max FPS" hint="Cap the frames/sec sent to save CPU/bandwidth.">
+        <Select
+          options={FPS_CAPS}
+          value={maxFps > 0 ? String(maxFps) : "Unlimited"}
+          onChange={(e) =>
+            onMaxFpsChange(
+              e.target.value === "Unlimited" ? 0 : parseInt(e.target.value, 10),
+            )
+          }
         />
       </Field>
 

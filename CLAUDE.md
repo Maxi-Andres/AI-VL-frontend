@@ -59,7 +59,10 @@ hosts elsewhere.
 
 ## Conventions
 
-- **Everything in English** — comments, identifiers, UI strings.
+- **Everything in English — absolutely everything**: comments, identifiers,
+  UI strings, config keys, any shell scripts (`*.sh`/`*.ps1`), and docs. The user
+  converses in Spanish (Rioplatense) — that is fine for chat ONLY; never put
+  Spanish into code, scripts, or docs.
 - **NEVER run `git commit` or `git push`.** The user commits.
 
 ## Run

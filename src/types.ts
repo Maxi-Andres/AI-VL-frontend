@@ -38,6 +38,9 @@ export interface YoloConfig {
   conf: number;
   imgsz: number;
   classes: string[];
+  /** Client-side capture cap: max frames/sec the phone sends. 0 = unlimited.
+   * Relayed through the shared config so it can be set from the monitor too. */
+  max_fps?: number;
 }
 
 // --- WebSocket server -> client messages ---------------------------------- //
@@ -58,6 +61,7 @@ export interface ConfigState {
   conf?: number | null;
   imgsz?: number | null;
   classes?: string[] | null;
+  max_fps?: number | null;
 }
 export interface ConfigAckMessage {
   type: "config";
