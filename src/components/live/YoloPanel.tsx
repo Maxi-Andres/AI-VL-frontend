@@ -83,7 +83,7 @@ export function YoloPanel({
 
       <Field
         label="Classes filter (empty = all)"
-        hint="Ctrl/Cmd-click to select several. Empty = detect everything."
+        hint="Tap to toggle each class. Empty = detect everything."
       >
         <MultiSelect
           options={classOptions}
