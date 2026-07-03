@@ -1,17 +1,24 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
+import type { VoicePhase } from "../../types";
 
 interface StatusContextValue {
   connected: boolean;
   setConnected: (v: boolean) => void;
+  voicePhase: VoicePhase;
+  setVoicePhase: (v: VoicePhase) => void;
 }
 
 const StatusContext = createContext<StatusContextValue | null>(null);
 
-/** Shares the live connection state between the Header and the active page. */
+/** Shares the live connection + voice-assistant state between the Header and the
+ * active page. */
 export function StatusProvider({ children }: { children: ReactNode }) {
   const [connected, setConnected] = useState(false);
+  const [voicePhase, setVoicePhase] = useState<VoicePhase>("off");
   return (
-    <StatusContext value={{ connected, setConnected }}>
+    <StatusContext
+      value={{ connected, setConnected, voicePhase, setVoicePhase }}
+    >
       {children}
     </StatusContext>
   );

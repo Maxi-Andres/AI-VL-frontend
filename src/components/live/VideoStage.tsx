@@ -1,3 +1,4 @@
+import { IconMaximize } from "@tabler/icons-react";
 import { useRef } from "react";
 import { DetectionOverlay } from "./DetectionOverlay";
 import { ControlBar } from "./ControlBar";
@@ -66,9 +67,9 @@ export function VideoStage({
           onClick={toggleFullscreen}
           title="Fullscreen"
           aria-label="Toggle fullscreen"
-          className="absolute right-2 top-2 rounded bg-black/50 px-2.5 py-1.5 text-base leading-none text-white hover:bg-black/70"
+          className="absolute right-2 top-2 flex items-center justify-center rounded bg-black/50 p-1.5 text-white hover:bg-black/70"
         >
-          ⛶
+          <IconMaximize size={18} stroke={2} />
         </button>
       </div>
       <ControlBar

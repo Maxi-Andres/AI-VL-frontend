@@ -6,6 +6,7 @@ import { VlmPanel } from "../components/live/VlmPanel";
 import { Button } from "../components/ui/Button";
 import { useStatus } from "../components/layout/StatusContext";
 import { useOptions } from "../hooks/useOptions";
+import { useVoiceAssistant } from "../hooks/useVoiceAssistant";
 import { drawBoxes } from "../lib/draw";
 import type { ConfigState, DetectedObject, YoloConfig } from "../types";
 
@@ -34,7 +35,7 @@ type ViewMsg =
  */
 export function MonitorPage() {
   const { options, error: optionsError } = useOptions();
-  const { setConnected } = useStatus();
+  const { setConnected, setVoicePhase } = useStatus();
 
   const [activated, setActivated] = useState(false);
   const [waiting, setWaiting] = useState(false); // socket open, no frame yet
@@ -69,6 +70,8 @@ export function MonitorPage() {
   const [vlmBusy, setVlmBusy] = useState(false);
   const [vlmStatus, setVlmStatus] = useState("");
   const [vlmOutput, setVlmOutput] = useState("");
+  // Free-prompt text (lifted here so dictation can populate it).
+  const [prompt, setPrompt] = useState("");
 
   const imgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -247,10 +250,14 @@ export function MonitorPage() {
   }, [vlmModel, scope, variant]);
 
   // Free-form question about the last mirrored frame -> plain-text answer.
-  const handleAskPrompt = useCallback(
-    async (prompt: string) => {
+  // Free-form question about the mirrored frame -> plain-text answer. Returns the
+  // answer text (or null) so the voice assistant can read it aloud.
+  const askPrompt = useCallback(
+    async (prompt: string): Promise<string | null> => {
+      // Reflect what we're about to send in the prompt box (esp. voice dictation).
+      setPrompt(prompt);
       const image = lastFrameRef.current;
-      if (!image) return;
+      if (!image) return null;
       setVlmBusy(true);
       setVlmStatus("Asking the VLM… (this can take several seconds)");
       setVlmOutput("");
@@ -258,21 +265,41 @@ export function MonitorPage() {
         const res = await askVlm({ image, model: vlmModel, prompt });
         if (res.error) {
           setVlmStatus(`Error: ${res.error}`);
-          return;
+          return null;
         }
         setVlmStatus(
           `${res.model} · ${res.elapsed_ms} ms · ${
             res.did_think ? "reasoned" : "no reasoning"
           }`,
         );
-        setVlmOutput(res.content?.trim() || "(no answer)");
+        const answer = res.content?.trim() || "(no answer)";
+        setVlmOutput(answer);
+        return answer;
       } catch (e) {
         setVlmStatus(`Request failed: ${e instanceof Error ? e.message : e}`);
+        return null;
       } finally {
         setVlmBusy(false);
       }
     },
     [vlmModel],
+  );
+
+  // Hands-free voice assistant (wake word "robot", auto-submit, spoken answers).
+  const va = useVoiceAssistant({ askPrompt });
+
+  // Surface the voice-assistant state in the header (next to the connection pill).
+  useEffect(() => setVoicePhase(va.phase), [va.phase, setVoicePhase]);
+
+  const handleAskPrompt = useCallback(
+    (prompt: string) => {
+      setPrompt(prompt);
+      // In spoken mode, read the answer aloud even for typed/tapped questions.
+      askPrompt(prompt).then((answer) => {
+        if (answer && va.spokenMode) va.speak(answer);
+      });
+    },
+    [askPrompt, va],
   );
 
   if (optionsError) {
@@ -387,11 +414,28 @@ export function MonitorPage() {
           busy={vlmBusy}
           status={vlmStatus}
           output={vlmOutput}
+          prompt={prompt}
+          onPromptChange={setPrompt}
           onModelChange={setVlmModel}
           onScopeChange={handleScopeChange}
           onVariantChange={setVariant}
           onAsk={handleAsk}
           onAskPrompt={handleAskPrompt}
+          voice={{
+            micSupported: va.micSupported,
+            voiceMode: va.voiceMode,
+            onToggleVoiceMode: va.toggleVoiceMode,
+            speechSupported: va.speechSupported,
+            spokenMode: va.spokenMode,
+            onToggleSpokenMode: va.toggleSpokenMode,
+            status: va.status,
+            speaking: va.speaking,
+            onSpeak: () => va.speak(vlmOutput),
+            onStopSpeak: va.stopSpeak,
+            voices: va.voices,
+            voiceURI: va.voiceURI,
+            onVoiceChange: va.onVoiceChange,
+          }}
         />
       </aside>
     </main>

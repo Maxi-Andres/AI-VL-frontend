@@ -1,5 +1,14 @@
 // Shared types mirroring the backend gateway's JSON contract.
 
+/** Current state of the hands-free voice assistant (shown in the header). */
+export type VoicePhase =
+  | "off"
+  | "listening"
+  | "recording"
+  | "transcribing"
+  | "thinking"
+  | "speaking";
+
 /** A single detected object. bbox is normalized [x1, y1, x2, y2] in 0..1. */
 export interface DetectedObject {
   type: string;
@@ -68,6 +77,16 @@ export interface ConfigAckMessage {
   state: ConfigState;
 }
 export type ServerMessage = DetectionMessage | ErrorMessage | ConfigAckMessage;
+
+/** Payload of POST /api/transcribe (speech-to-text of a dictated clip). */
+export interface TranscribeResponse {
+  error?: string;
+  /** The transcribed text (empty string if nothing was recognized). */
+  text: string;
+  /** Detected (or forced) language code, e.g. "es"/"en". */
+  language: string | null;
+  elapsed_ms: number;
+}
 
 /** Payload of POST /api/vlm. */
 export interface VlmResponse {

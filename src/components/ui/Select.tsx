@@ -1,3 +1,4 @@
+import { IconCheck } from "@tabler/icons-react";
 import type { SelectHTMLAttributes } from "react";
 
 interface Props extends SelectHTMLAttributes<HTMLSelectElement> {
@@ -68,13 +69,13 @@ export function MultiSelect({
             }`}
           >
             <span
-              className={`flex h-4 w-4 flex-none items-center justify-center rounded border text-[10px] leading-none ${
+              className={`flex h-4 w-4 flex-none items-center justify-center rounded border ${
                 isSelected
                   ? "border-accent bg-accent text-bg"
                   : "border-line bg-transparent text-transparent"
               }`}
             >
-              ✓
+              <IconCheck size={12} stroke={3} />
             </span>
             <span className="truncate">{o}</span>
           </button>
