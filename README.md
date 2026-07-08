@@ -9,28 +9,33 @@ frontend (this repo)  ──HTTP/WS──▶  backend (gateway)  ──HTTP─�
 ```
 
 Captures the webcam, streams frames over a WebSocket to the **backend**, draws the
-returned boxes over the video, and can ask the VLM about the current frame. It
-talks **only** to the backend.
+returned boxes over the video, can ask the VLM about the current frame, and has a
+**voice-assistant** flow (record → transcribe → speak, with wake-word). A read-only
+**`/monitor`** page mirrors the phone's stream. It talks **only** to the backend.
 
 ## Stack
 
 - **React 19** + **TypeScript** (strict)
 - **Tailwind CSS v4** (via the official Vite plugin — theme lives in `src/index.css`)
-- **React Router v7** (`/` live page, `/about`)
+- **React Router v7** (`/` live page, `/monitor`, `/about`)
 - **Vite** dev server / bundler
 - **bun** as the package manager and runtime
 
 ## Configure
 
-The backend gateway URL is resolved at runtime from `public/config.js` (no rebuild
-needed):
+The backend gateway URL is resolved in `src/config.ts`:
+
+- **Dev** (`bun run dev`): the frontend talks directly to the backend at
+  `http://<hostname>:8000`.
+- **Production build**: same origin (`""`) — the backend serves this app together
+  with `/api` and `/ws` (phone mode, HTTPS), so there is nothing to configure.
+
+To override (e.g. a separately deployed backend), set a non-empty `BACKEND_URL` in
+`public/config.js` — read at runtime, no rebuild:
 
 ```js
-window.APP_CONFIG = { BACKEND_URL: "http://localhost:8000" };
+window.APP_CONFIG = { BACKEND_URL: "http://10.0.0.4:8000" };
 ```
-
-On another machine, use that host, e.g. `http://10.0.0.4:8000`. Alternatively set
-`VITE_BACKEND_URL` at build time.
 
 ## Develop
 
@@ -55,17 +60,20 @@ bun run preview  # serve the production build locally
 
 ```
 src/
-  api/        backend REST helpers (the only place that knows backend URLs, with the WS hook)
+  api/        backend REST helpers
   components/
-    layout/   Header, StatusBadge, Layout, status context
+    layout/   Header, StatusBadge, VoiceStatusBadge, Layout, status context
     live/     VideoStage, DetectionOverlay, ControlBar, YoloPanel, VlmPanel
     ui/       Button, Field, Select / MultiSelect primitives
-  hooks/      useCamera, useDetectionSocket (frame pacing), useOptions
-  lib/        draw (canvas boxes), capture (frame -> JPEG)
-  pages/      LivePage (container), AboutPage
-  config.ts   backend URL resolution
+  hooks/      useCamera, useDetectionSocket (frame pacing), useOptions,
+              useAudioRecorder, useSpeech, useVoiceAssistant, useWakeWord
+  lib/        draw (canvas boxes), capture (frame -> JPEG), speechQueue, format
+  pages/      LivePage (live container), MonitorPage (read-only), AboutPage
+  config.ts   backend URL resolution (the single source)
   types.ts    shared backend contract types
 ```
+
+For an always-current map, query the codebase-memory graph rather than this tree.
 
 Make sure the backend (and, behind it, the iacore service + Ollama for the VLM)
 are running and that `CORS_ORIGINS` on the backend allows this page's origin
