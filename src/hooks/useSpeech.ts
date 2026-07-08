@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchTtsVoices, synthesizeSpeech } from "../api/backend";
+import { SpeechQueue, type Player } from "../lib/speechQueue";
 
 /**
  * Text-to-speech with two back-ends:
@@ -78,14 +79,88 @@ export function useSpeech() {
       localStorage.setItem(LS_VOICE_URI, uri);
   }, []);
 
+  const queueRef = useRef<SpeechQueue | null>(null);
+
   const cancel = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
     }
+    if (queueRef.current) {
+      queueRef.current.cancel();
+      queueRef.current = null;
+    }
     if (browserSupported) window.speechSynthesis.cancel();
     setSpeaking(false);
   }, [browserSupported]);
+
+  // Prepare ONE sentence for playback, using the chosen voice (Piper or browser).
+  const synthSentence = useCallback(
+    async (text: string): Promise<Player> => {
+      const uri = effectiveURI;
+      if (uri && uri.startsWith("piper:")) {
+        const blob = await synthesizeSpeech(text, uri.slice("piper:".length));
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        return {
+          play: () =>
+            new Promise<void>((res) => {
+              audio.onended = () => {
+                URL.revokeObjectURL(url);
+                res();
+              };
+              audio.onerror = () => {
+                URL.revokeObjectURL(url);
+                res();
+              };
+              audio.play().catch(() => res());
+            }),
+          stop: () => {
+            audio.pause();
+            URL.revokeObjectURL(url);
+          },
+        };
+      }
+      // Browser voice.
+      return {
+        play: () =>
+          new Promise<void>((res) => {
+            const u = new SpeechSynthesisUtterance(text);
+            const v = uri
+              ? window.speechSynthesis.getVoices().find((x) => x.voiceURI === uri)
+              : undefined;
+            if (v) {
+              u.voice = v;
+              u.lang = v.lang;
+            }
+            u.onend = () => res();
+            u.onerror = () => res();
+            window.speechSynthesis.speak(u);
+          }),
+        stop: () => window.speechSynthesis.cancel(),
+      };
+    },
+    [effectiveURI],
+  );
+
+  /**
+   * Open a streaming speech session: push text as it is generated, call end()
+   * when the answer is complete. Sentences are spoken in order as they land, so
+   * playback starts on the first sentence instead of after the whole answer.
+   */
+  const createStream = useCallback(() => {
+    cancel(); // stop anything already playing
+    const q = new SpeechQueue(synthSentence, {
+      onStart: () => setSpeaking(true),
+      onDone: () => setSpeaking(false),
+    });
+    queueRef.current = q;
+    return {
+      push: (delta: string) => q.push(delta),
+      end: () => q.end(),
+      cancel: () => q.cancel(),
+    };
+  }, [cancel, synthSentence]);
 
   const speakBrowser = useCallback(
     (text: string, uri: string | null, onEnd?: () => void) => {
@@ -158,6 +233,7 @@ export function useSpeech() {
 
   return {
     speak,
+    createStream,
     cancel,
     speaking,
     supported,

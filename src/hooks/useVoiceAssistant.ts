@@ -25,13 +25,20 @@ function readFlag(key: string): boolean {
 }
 
 interface Args {
-  /** Submit a prompt to the VLM and resolve with the plain-text answer. */
-  askPrompt: (prompt: string) => Promise<string | null>;
+  /**
+   * Submit a prompt to the VLM. `onDelta` is called with each streamed text
+   * chunk (so the answer can be spoken sentence by sentence and shown live);
+   * resolves with the full answer, or null on failure.
+   */
+  askPromptStream: (
+    prompt: string,
+    onDelta: (piece: string) => void,
+  ) => Promise<string | null>;
   /** Wake word; defaults to "robot". */
   phrase?: string;
 }
 
-export function useVoiceAssistant({ askPrompt, phrase = "robot" }: Args) {
+export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
   const recorder = useAudioRecorder();
   const speech = useSpeech();
 
@@ -45,8 +52,8 @@ export function useVoiceAssistant({ askPrompt, phrase = "robot" }: Args) {
   voiceModeRef.current = voiceMode;
   const spokenModeRef = useRef(spokenMode);
   spokenModeRef.current = spokenMode;
-  const askPromptRef = useRef(askPrompt);
-  askPromptRef.current = askPrompt;
+  const askPromptStreamRef = useRef(askPromptStream);
+  askPromptStreamRef.current = askPromptStream;
   const busyRef = useRef(false); // one command at a time
 
   const wake = useWakeWord({
@@ -87,22 +94,31 @@ export function useVoiceAssistant({ askPrompt, phrase = "robot" }: Args) {
       }
       setPhase("thinking");
       setStatus("Thinking…");
-      const answer = await askPromptRef.current(text);
-      // Fire-and-forget: the answer is spoken while we already go back to listening.
-      if (answer && spokenModeRef.current) {
-        spoke = true;
-        setPhase("speaking");
-        speech.speak(answer, undefined, () => {
-          if (voiceModeRef.current) setPhase("listening");
-        });
-      }
+      // Stream the answer: speak each sentence as soon as it lands, so the reply
+      // starts playing while the model is still generating the rest.
+      const stream = spokenModeRef.current ? speech.createStream() : null;
+      let first = true;
+      await askPromptStreamRef.current(text, (piece) => {
+        if (first) {
+          first = false;
+          if (stream) {
+            spoke = true;
+            setPhase("speaking");
+          }
+        }
+        stream?.push(piece);
+      });
+      stream?.end();
     } catch (e) {
       setStatus(`Voice error: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       // ALWAYS return to listening so the wake word keeps working every time.
+      // (We resume even while the answer is still being spoken, so "robot"
+      // interrupts it — the barge-in in speech.cancel() above.)
       busyRef.current = false;
       if (voiceModeRef.current) {
         setStatus(LISTENING);
+        // If still speaking, let the queue's onDone flip the phase back later.
         if (!spoke) setPhase("listening");
         wake.start();
       } else {
@@ -127,6 +143,13 @@ export function useVoiceAssistant({ askPrompt, phrase = "robot" }: Args) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voiceMode, micSupported]);
+
+  // When the spoken answer finishes (queue drained), drop back to "listening".
+  useEffect(() => {
+    if (!speech.speaking && phase === "speaking" && voiceMode) {
+      setPhase("listening");
+    }
+  }, [speech.speaking, phase, voiceMode]);
 
   const toggleVoiceMode = useCallback(() => {
     setVoiceMode((v) => {
@@ -157,6 +180,7 @@ export function useVoiceAssistant({ askPrompt, phrase = "robot" }: Args) {
     phase,
     speaking: speech.speaking,
     speak: speech.speak,
+    createStream: speech.createStream,
     stopSpeak: speech.cancel,
     // TTS voice selection (Piper neural voices + the browser's own).
     voices: speech.voices,

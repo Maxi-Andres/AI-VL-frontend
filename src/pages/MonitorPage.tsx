@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { askVlm, fetchClasses } from "../api/backend";
+import { askVlm, askVlmStream, fetchClasses } from "../api/backend";
 import { WS_VIEW_URL } from "../config";
 import { YoloPanel } from "../components/live/YoloPanel";
 import { VlmPanel } from "../components/live/VlmPanel";
 import { Button } from "../components/ui/Button";
+import { fmtMs } from "../lib/format";
 import { useStatus } from "../components/layout/StatusContext";
 import { useOptions } from "../hooks/useOptions";
 import { useVoiceAssistant } from "../hooks/useVoiceAssistant";
@@ -233,7 +234,7 @@ export function MonitorPage() {
         return;
       }
       setVlmStatus(
-        `${res.model} · ${res.elapsed_ms} ms · ${
+        `${res.model} · ${fmtMs(res.elapsed_ms)} · ${
           res.did_think ? "reasoned" : "no reasoning"
         }${res.ok ? "" : " · (invalid JSON)"}`,
       );
@@ -250,31 +251,39 @@ export function MonitorPage() {
   }, [vlmModel, scope, variant]);
 
   // Free-form question about the last mirrored frame -> plain-text answer.
-  // Free-form question about the mirrored frame -> plain-text answer. Returns the
-  // answer text (or null) so the voice assistant can read it aloud.
-  const askPrompt = useCallback(
-    async (prompt: string): Promise<string | null> => {
+  // Free-form question about the mirrored frame, STREAMED (shown live + spoken
+  // sentence by sentence). Resolves with the full answer, or null on failure.
+  const askPromptStream = useCallback(
+    async (
+      prompt: string,
+      onDelta: (piece: string) => void,
+    ): Promise<string | null> => {
       // Reflect what we're about to send in the prompt box (esp. voice dictation).
       setPrompt(prompt);
       const image = lastFrameRef.current;
       if (!image) return null;
       setVlmBusy(true);
-      setVlmStatus("Asking the VLM… (this can take several seconds)");
+      setVlmStatus("Asking the VLM…");
       setVlmOutput("");
+      const t0 = performance.now();
+      let tFirst: number | null = null;
       try {
-        const res = await askVlm({ image, model: vlmModel, prompt });
-        if (res.error) {
-          setVlmStatus(`Error: ${res.error}`);
-          return null;
-        }
-        setVlmStatus(
-          `${res.model} · ${res.elapsed_ms} ms · ${
-            res.did_think ? "reasoned" : "no reasoning"
-          }`,
+        let acc = "";
+        const answer = await askVlmStream(
+          { image, model: vlmModel, prompt },
+          (piece) => {
+            if (tFirst === null) tFirst = performance.now();
+            acc += piece;
+            setVlmOutput(acc);
+            onDelta(piece);
+          },
         );
-        const answer = res.content?.trim() || "(no answer)";
-        setVlmOutput(answer);
-        return answer;
+        const total = performance.now() - t0;
+        const firstMs = tFirst !== null ? tFirst - t0 : total;
+        setVlmStatus(`${fmtMs(total)} · first reply ${fmtMs(firstMs)}`);
+        const text = answer.trim() || "(no answer)";
+        setVlmOutput(text);
+        return text;
       } catch (e) {
         setVlmStatus(`Request failed: ${e instanceof Error ? e.message : e}`);
         return null;
@@ -285,8 +294,8 @@ export function MonitorPage() {
     [vlmModel],
   );
 
-  // Hands-free voice assistant (wake word "robot", auto-submit, spoken answers).
-  const va = useVoiceAssistant({ askPrompt });
+  // Hands-free voice assistant (wake word "robot", auto-submit, streamed spoken answers).
+  const va = useVoiceAssistant({ askPromptStream });
 
   // Surface the voice-assistant state in the header (next to the connection pill).
   useEffect(() => setVoicePhase(va.phase), [va.phase, setVoicePhase]);
@@ -294,12 +303,13 @@ export function MonitorPage() {
   const handleAskPrompt = useCallback(
     (prompt: string) => {
       setPrompt(prompt);
-      // In spoken mode, read the answer aloud even for typed/tapped questions.
-      askPrompt(prompt).then((answer) => {
-        if (answer && va.spokenMode) va.speak(answer);
-      });
+      // In spoken mode, speak the answer as it streams (else just show it).
+      const stream = va.spokenMode ? va.createStream() : null;
+      askPromptStream(prompt, (piece) => stream?.push(piece)).then(() =>
+        stream?.end(),
+      );
     },
-    [askPrompt, va],
+    [askPromptStream, va],
   );
 
   if (optionsError) {

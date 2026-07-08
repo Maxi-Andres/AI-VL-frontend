@@ -37,6 +37,36 @@ export async function askVlm(req: VlmRequest): Promise<VlmResponse> {
   return r.json();
 }
 
+/**
+ * Stream a free-prompt answer. Calls `onDelta(piece)` for each text chunk as the
+ * model generates it, and resolves with the full answer once the stream ends.
+ * Lets the UI show the reply live and speak it sentence by sentence.
+ */
+export async function askVlmStream(
+  req: { image: string; model: string; prompt: string },
+  onDelta: (piece: string) => void,
+): Promise<string> {
+  const r = await fetch(`${BACKEND_URL}/api/vlm/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!r.ok || !r.body) throw new Error(`POST /api/vlm/stream -> ${r.status}`);
+  const reader = r.body.getReader();
+  const decoder = new TextDecoder();
+  let full = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const piece = decoder.decode(value, { stream: true });
+    if (piece) {
+      full += piece;
+      onDelta(piece);
+    }
+  }
+  return full;
+}
+
 /** Speech-to-text: send a recorded audio clip and get back the transcript. The
  * raw blob is the request body (Content-Type = the recorder's mime); Whisper runs
  * server-side in iacore. `translate` asks Whisper to translate to English. */
