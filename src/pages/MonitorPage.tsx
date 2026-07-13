@@ -441,6 +441,8 @@ export function MonitorPage() {
             speechSupported: va.speechSupported,
             spokenMode: va.spokenMode,
             onToggleSpokenMode: va.toggleSpokenMode,
+            fillerMode: va.fillerMode,
+            onToggleFillerMode: va.toggleFillerMode,
             status: va.status,
             speaking: va.speaking,
             onSpeak: () => va.speak(vlmOutput),

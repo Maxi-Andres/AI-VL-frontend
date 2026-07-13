@@ -38,6 +38,8 @@ export function LivePage() {
   const [vlmModel, setVlmModel] = useState("");
   const [scope, setScope] = useState("");
   const [variant, setVariant] = useState("");
+  // Longer-side px of the frame sent to the VLM (0 = native). Smaller = faster.
+  const [vlmMaxSize, setVlmMaxSize] = useState(768);
 
   // --- Overlay + metrics ---
   const [objects, setObjects] = useState<DetectedObject[]>([]);
@@ -165,7 +167,7 @@ export function LivePage() {
     const video = videoRef.current;
     if (!video?.videoWidth) return;
     const { captureFrame } = await import("../lib/capture");
-    const image = captureFrame(video);
+    const image = captureFrame(video, 0.85, vlmMaxSize);
     if (!image) return;
 
     vlmAbortRef.current?.abort();
@@ -197,7 +199,7 @@ export function LivePage() {
     } finally {
       setVlmBusy(false);
     }
-  }, [videoRef, vlmModel, scope, variant]);
+  }, [videoRef, vlmModel, scope, variant, vlmMaxSize]);
 
   // Free-form question about the current frame, STREAMED. `onDelta` receives each
   // text chunk as the model generates it (shown live + spoken sentence by
@@ -212,7 +214,7 @@ export function LivePage() {
       const video = videoRef.current;
       if (!video?.videoWidth) return null;
       const { captureFrame } = await import("../lib/capture");
-      const image = captureFrame(video);
+      const image = captureFrame(video, 0.85, vlmMaxSize);
       if (!image) return null;
 
       vlmAbortRef.current?.abort();
@@ -249,7 +251,7 @@ export function LivePage() {
         setVlmBusy(false);
       }
     },
-    [videoRef, vlmModel],
+    [videoRef, vlmModel, vlmMaxSize],
   );
 
   // Hands-free voice: say "robot", speak the question, it auto-submits and (in
@@ -337,6 +339,8 @@ export function LivePage() {
           status={vlmStatus}
           output={vlmOutput}
           prompt={prompt}
+          imageMaxSize={vlmMaxSize}
+          onImageMaxSizeChange={setVlmMaxSize}
           onPromptChange={setPrompt}
           onModelChange={setVlmModel}
           onScopeChange={handleScopeChange}
@@ -350,6 +354,8 @@ export function LivePage() {
             speechSupported: va.speechSupported,
             spokenMode: va.spokenMode,
             onToggleSpokenMode: va.toggleSpokenMode,
+            fillerMode: va.fillerMode,
+            onToggleFillerMode: va.toggleFillerMode,
             status: va.status,
             speaking: va.speaking,
             onSpeak: () => va.speak(vlmOutput),
