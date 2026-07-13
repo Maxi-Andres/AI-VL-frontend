@@ -134,11 +134,22 @@ export function useDetectionSocket({
           grab.height = h;
         }
         gctx.drawImage(video, 0, 0, w, h);
+        // Claim the in-flight slot SYNCHRONOUSLY, before the async toBlob callback:
+        // otherwise the next requestAnimationFrame could pass the guard and encode
+        // a second frame before this one is marked in flight (breaking the
+        // one-frame-in-flight invariant). Released again if nothing gets sent.
+        inFlightRef.current = true;
         grab.toBlob(
           (blob) => {
             if (blob && ws.readyState === WebSocket.OPEN) {
-              inFlightRef.current = true;
-              blob.arrayBuffer().then((buf) => ws.send(buf));
+              blob
+                .arrayBuffer()
+                .then((buf) => ws.send(buf))
+                .catch(() => {
+                  inFlightRef.current = false;
+                });
+            } else {
+              inFlightRef.current = false;
             }
           },
           "image/jpeg",

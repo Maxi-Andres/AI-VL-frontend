@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * Microphone capture for dictating the VLM prompt. Two modes:
@@ -38,6 +38,7 @@ interface UtteranceOptions {
 export function useAudioRecorder() {
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const [recording, setRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,105 +98,156 @@ export function useAudioRecorder() {
    * the recorded Blob, or null if nothing was said before the start timeout.
    */
   const recordUtterance = useCallback(
-    ({
-      silenceMs = 900,
-      maxMs = 12000,
-      startTimeoutMs = 6000,
-      threshold = 0.02,
-    }: UtteranceOptions = {}): Promise<Blob | null> => {
-      return new Promise(async (resolve, reject) => {
-        let stream: MediaStream;
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        } catch (e) {
-          setError(
-            `Microphone error: ${e instanceof Error ? e.message : String(e)}`,
-          );
-          reject(e);
-          return;
-        }
-        streamRef.current = stream;
-
-        const mimeType = pickMimeType();
-        const recorder = new MediaRecorder(
-          stream,
-          mimeType ? { mimeType } : undefined,
-        );
-        recorderRef.current = recorder;
-        const chunks: Blob[] = [];
-        recorder.ondataavailable = (e) => {
-          if (e.data.size > 0) chunks.push(e.data);
-        };
-
-        // Voice-activity detection over the same stream.
-        const AudioCtx =
-          window.AudioContext ||
-          (window as unknown as { webkitAudioContext: typeof AudioContext })
-            .webkitAudioContext;
-        const audioCtx = new AudioCtx();
-        void audioCtx.resume();
-        const source = audioCtx.createMediaStreamSource(stream);
-        const analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 1024;
-        source.connect(analyser);
-        const buf = new Float32Array(analyser.fftSize);
-
-        const t0 = Date.now();
-        let speechStarted = false;
-        let lastLoud = t0;
-        let poll: ReturnType<typeof setInterval> | null = null;
-        let settled = false;
-
-        const cleanup = () => {
-          if (poll) clearInterval(poll);
-          poll = null;
-          source.disconnect();
-          void audioCtx.close();
-          stream.getTracks().forEach((t) => t.stop());
-          streamRef.current = null;
-          recorderRef.current = null;
-          setRecording(false);
-        };
-
-        recorder.onstop = () => {
-          if (settled) return;
-          settled = true;
-          const type = recorder.mimeType || "audio/webm";
-          const blob = new Blob(chunks, { type });
-          cleanup();
-          // If we never actually heard speech, tell the caller (resolve null).
-          resolve(speechStarted ? blob : null);
-        };
-
-        const finish = () => {
-          if (recorder.state !== "inactive") recorder.stop();
-        };
-
-        recorder.start();
-        setRecording(true);
-
-        poll = setInterval(() => {
-          analyser.getFloatTimeDomainData(buf);
-          let sum = 0;
-          for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
-          const rms = Math.sqrt(sum / buf.length);
-          const now = Date.now();
-
-          if (rms >= threshold) {
-            speechStarted = true;
-            lastLoud = now;
+    (opts: UtteranceOptions = {}): Promise<Blob | null> => {
+      const {
+        silenceMs = 900,
+        maxMs = 12000,
+        startTimeoutMs = 6000,
+        threshold = 0.02,
+      } = opts;
+      // The executor stays synchronous; the async work runs in an inner function
+      // whose failures reject explicitly. (An `async` executor would swallow a
+      // throw between getUserMedia and recorder.start() and never settle, hanging
+      // the wake-word loop that awaits this.)
+      return new Promise((resolve, reject) => {
+        void (async () => {
+          let stream: MediaStream;
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          } catch (e) {
+            setError(
+              `Microphone error: ${e instanceof Error ? e.message : String(e)}`,
+            );
+            reject(e);
+            return;
           }
-          if (now - t0 >= maxMs) return finish();
-          if (!speechStarted) {
-            if (now - t0 >= startTimeoutMs) return finish(); // nobody spoke
-          } else if (now - lastLoud >= silenceMs) {
-            return finish(); // trailing silence -> utterance complete
+
+          try {
+            streamRef.current = stream;
+
+            const mimeType = pickMimeType();
+            const recorder = new MediaRecorder(
+              stream,
+              mimeType ? { mimeType } : undefined,
+            );
+            recorderRef.current = recorder;
+            const chunks: Blob[] = [];
+            recorder.ondataavailable = (e) => {
+              if (e.data.size > 0) chunks.push(e.data);
+            };
+
+            // Voice-activity detection over the same stream.
+            const AudioCtx =
+              window.AudioContext ||
+              (window as unknown as { webkitAudioContext: typeof AudioContext })
+                .webkitAudioContext;
+            const audioCtx = new AudioCtx();
+            audioCtxRef.current = audioCtx;
+            void audioCtx.resume();
+            const source = audioCtx.createMediaStreamSource(stream);
+            const analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 1024;
+            source.connect(analyser);
+            const buf = new Float32Array(analyser.fftSize);
+
+            const t0 = Date.now();
+            let speechStarted = false;
+            let lastLoud = t0;
+            let poll: ReturnType<typeof setInterval> | null = null;
+            let settled = false;
+
+            const cleanup = () => {
+              if (poll) clearInterval(poll);
+              poll = null;
+              source.disconnect();
+              void audioCtx.close();
+              if (audioCtxRef.current === audioCtx) audioCtxRef.current = null;
+              stream.getTracks().forEach((t) => t.stop());
+              streamRef.current = null;
+              recorderRef.current = null;
+              setRecording(false);
+            };
+
+            recorder.onstop = () => {
+              if (settled) return;
+              settled = true;
+              const type = recorder.mimeType || "audio/webm";
+              const blob = new Blob(chunks, { type });
+              cleanup();
+              // If we never actually heard speech, tell the caller (resolve null).
+              resolve(speechStarted ? blob : null);
+            };
+
+            const finish = () => {
+              if (recorder.state !== "inactive") recorder.stop();
+            };
+
+            recorder.start();
+            setRecording(true);
+
+            poll = setInterval(() => {
+              analyser.getFloatTimeDomainData(buf);
+              let sum = 0;
+              for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+              const rms = Math.sqrt(sum / buf.length);
+              const now = Date.now();
+
+              if (rms >= threshold) {
+                speechStarted = true;
+                lastLoud = now;
+              }
+              if (now - t0 >= maxMs) return finish();
+              if (!speechStarted) {
+                if (now - t0 >= startTimeoutMs) return finish(); // nobody spoke
+              } else if (now - lastLoud >= silenceMs) {
+                return finish(); // trailing silence -> utterance complete
+              }
+            }, 60);
+          } catch (e) {
+            // Anything after getUserMedia succeeded (AudioContext, MediaRecorder,
+            // wiring) threw: tear down what we opened and reject so the caller
+            // doesn't await forever.
+            try {
+              stream.getTracks().forEach((t) => t.stop());
+            } catch {
+              /* already stopped */
+            }
+            if (audioCtxRef.current) {
+              void audioCtxRef.current.close();
+              audioCtxRef.current = null;
+            }
+            streamRef.current = null;
+            recorderRef.current = null;
+            setRecording(false);
+            setError(
+              `Microphone error: ${e instanceof Error ? e.message : String(e)}`,
+            );
+            reject(e);
           }
-        }, 60);
+        })();
       });
     },
     [],
   );
+
+  // Release the mic/recorder/AudioContext if the hook unmounts mid-recording.
+  useEffect(() => {
+    return () => {
+      try {
+        if (recorderRef.current && recorderRef.current.state !== "inactive")
+          recorderRef.current.stop();
+      } catch {
+        /* already stopped */
+      }
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      recorderRef.current = null;
+      if (audioCtxRef.current) {
+        void audioCtxRef.current.close();
+        audioCtxRef.current = null;
+      }
+    };
+  }, []);
 
   return { recording, error, supported, start, stop, recordUtterance };
 }

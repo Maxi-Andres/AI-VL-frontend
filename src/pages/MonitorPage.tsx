@@ -9,24 +9,15 @@ import { useStatus } from "../components/layout/StatusContext";
 import { useOptions } from "../hooks/useOptions";
 import { useVoiceAssistant } from "../hooks/useVoiceAssistant";
 import { drawBoxes } from "../lib/draw";
-import type { ConfigState, DetectedObject, YoloConfig } from "../types";
+import type {
+  ConfigState,
+  DetectedObject,
+  ViewMessage,
+  YoloConfig,
+} from "../types";
 
 // VLM overlay boxes are drawn one flat color (see LivePage).
 const BLUE = "#60a5fa";
-
-// The frame fan-out message the backend sends over /ws/view: the same detection
-// payload as /ws/detect, plus the JPEG the phone uploaded (base64).
-interface FrameMsg {
-  type: "frame";
-  jpeg_b64: string;
-  objects: DetectedObject[];
-  elapsed_ms: number;
-  n: number;
-}
-type ViewMsg =
-  | FrameMsg
-  | { type: "config"; state: ConfigState }
-  | { type: "error"; message: string };
 
 /**
  * Server-side monitor: mirrors what the phone sees (live video + detections)
@@ -77,6 +68,9 @@ export function MonitorPage() {
   const imgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const initialized = useRef(false);
+  // Aborts the in-flight VLM request/stream on a new ask or on unmount.
+  const vlmAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => vlmAbortRef.current?.abort(), []);
 
   // Seed all controls from the server defaults once options arrive.
   useEffect(() => {
@@ -173,7 +167,7 @@ export function MonitorPage() {
     };
     ws.onerror = () => setConnected(false);
     ws.onmessage = (ev) => {
-      const m = JSON.parse(ev.data as string) as ViewMsg;
+      const m = JSON.parse(ev.data as string) as ViewMessage;
       if (m.type === "frame") {
         const url = `data:image/jpeg;base64,${m.jpeg_b64}`;
         lastFrameRef.current = url;
@@ -224,11 +218,14 @@ export function MonitorPage() {
   const handleAsk = useCallback(async () => {
     const image = lastFrameRef.current;
     if (!image) return;
+    vlmAbortRef.current?.abort();
+    const ac = new AbortController();
+    vlmAbortRef.current = ac;
     setVlmBusy(true);
     setVlmStatus("Asking the VLM… (this can take several seconds)");
     setVlmOutput("");
     try {
-      const res = await askVlm({ image, model: vlmModel, scope, variant });
+      const res = await askVlm({ image, model: vlmModel, scope, variant }, ac.signal);
       if (res.error) {
         setVlmStatus(`Error: ${res.error}`);
         return;
@@ -244,6 +241,7 @@ export function MonitorPage() {
         setOverrideColor(BLUE);
       }
     } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
       setVlmStatus(`Request failed: ${e instanceof Error ? e.message : e}`);
     } finally {
       setVlmBusy(false);
@@ -262,6 +260,9 @@ export function MonitorPage() {
       setPrompt(prompt);
       const image = lastFrameRef.current;
       if (!image) return null;
+      vlmAbortRef.current?.abort();
+      const ac = new AbortController();
+      vlmAbortRef.current = ac;
       setVlmBusy(true);
       setVlmStatus("Asking the VLM…");
       setVlmOutput("");
@@ -277,6 +278,7 @@ export function MonitorPage() {
             setVlmOutput(acc);
             onDelta(piece);
           },
+          ac.signal,
         );
         const total = performance.now() - t0;
         const firstMs = tFirst !== null ? tFirst - t0 : total;
@@ -285,6 +287,7 @@ export function MonitorPage() {
         setVlmOutput(text);
         return text;
       } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return null;
         setVlmStatus(`Request failed: ${e instanceof Error ? e.message : e}`);
         return null;
       } finally {

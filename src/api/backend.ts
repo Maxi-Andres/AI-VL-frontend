@@ -28,12 +28,17 @@ export interface VlmRequest {
   prompt?: string;
 }
 
-export async function askVlm(req: VlmRequest): Promise<VlmResponse> {
+export async function askVlm(
+  req: VlmRequest,
+  signal?: AbortSignal,
+): Promise<VlmResponse> {
   const r = await fetch(`${BACKEND_URL}/api/vlm`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
+    signal,
   });
+  if (!r.ok) throw new Error(`POST /api/vlm -> ${r.status}`);
   return r.json();
 }
 
@@ -45,11 +50,13 @@ export async function askVlm(req: VlmRequest): Promise<VlmResponse> {
 export async function askVlmStream(
   req: { image: string; model: string; prompt: string },
   onDelta: (piece: string) => void,
+  signal?: AbortSignal,
 ): Promise<string> {
   const r = await fetch(`${BACKEND_URL}/api/vlm/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
+    signal,
   });
   if (!r.ok || !r.body) throw new Error(`POST /api/vlm/stream -> ${r.status}`);
   const reader = r.body.getReader();

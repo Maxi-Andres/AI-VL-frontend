@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /** Which camera to request: rear ("environment") or front ("user"). */
 export type Facing = "environment" | "user";
@@ -65,6 +65,10 @@ export function useCamera() {
       setError(`Camera error: ${e instanceof Error ? e.message : String(e)}`);
     }
   }, [facing, active, acquire]);
+
+  // Release the camera when the hook unmounts (e.g. navigating away with the
+  // camera still active), so the webcam/tracks don't stay live. `stop` is stable.
+  useEffect(() => stop, [stop]);
 
   return { videoRef, active, facing, error, start, stop, flip };
 }

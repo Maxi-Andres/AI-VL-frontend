@@ -5,13 +5,16 @@
 //     this is deterministic and never leaks into a production build.
 //   - PRODUCTION build: same origin ("") — the backend serves this app together
 //     with /api and /ws (phone mode, ./run-phone.sh), one secure origin.
-//   - A non-empty BACKEND_URL in public/config.js overrides both (deploy escape
-//     hatch).
+//   - A non-empty BACKEND_URL in public/config.js overrides everything (runtime
+//     deploy escape hatch).
+//   - Otherwise a build-time VITE_BACKEND_URL (e.g. in .env.development) is used
+//     if set, before falling back to the dev/same-origin defaults.
 //
 // The frontend still talks ONLY to the backend, never to the iacore service.
 const fromRuntime = window.APP_CONFIG?.BACKEND_URL;
+const fromBuild = import.meta.env.VITE_BACKEND_URL;
 const devDefault = import.meta.env.DEV ? `http://${location.hostname}:8000` : "";
-const raw = (fromRuntime || devDefault).replace(/\/$/, "");
+const raw = (fromRuntime || fromBuild || devDefault).replace(/\/$/, "");
 
 export const BACKEND_URL = raw;
 

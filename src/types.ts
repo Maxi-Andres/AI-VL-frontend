@@ -78,6 +78,18 @@ export interface ConfigAckMessage {
 }
 export type ServerMessage = DetectionMessage | ErrorMessage | ConfigAckMessage;
 
+/** Frame fan-out over /ws/view: the same detection payload as /ws/detect plus the
+ * JPEG the phone uploaded (base64). */
+export interface FrameMessage {
+  type: "frame";
+  jpeg_b64: string;
+  objects: DetectedObject[];
+  elapsed_ms: number;
+  n: number;
+}
+/** Messages the read-only monitor (/ws/view) receives. */
+export type ViewMessage = FrameMessage | ConfigAckMessage | ErrorMessage;
+
 /** Payload of POST /api/transcribe (speech-to-text of a dictated clip). */
 export interface TranscribeResponse {
   error?: string;

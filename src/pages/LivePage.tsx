@@ -58,6 +58,10 @@ export function LivePage() {
   const initialized = useRef(false);
   const lastFrameTsRef = useRef(0); // for measuring the actual processed FPS
   const fpsEmaRef = useRef(0);
+  // Aborts the in-flight VLM request/stream on a new ask or on unmount, so a slow
+  // answer never resolves into an unmounted page.
+  const vlmAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => vlmAbortRef.current?.abort(), []);
 
   // Seed all controls from the server defaults once options arrive.
   useEffect(() => {
@@ -164,11 +168,14 @@ export function LivePage() {
     const image = captureFrame(video);
     if (!image) return;
 
+    vlmAbortRef.current?.abort();
+    const ac = new AbortController();
+    vlmAbortRef.current = ac;
     setVlmBusy(true);
     setVlmStatus("Asking the VLM… (this can take several seconds)");
     setVlmOutput("");
     try {
-      const res = await askVlm({ image, model: vlmModel, scope, variant });
+      const res = await askVlm({ image, model: vlmModel, scope, variant }, ac.signal);
       if (res.error) {
         setVlmStatus(`Error: ${res.error}`);
         return;
@@ -185,6 +192,7 @@ export function LivePage() {
         setOverrideColor(BLUE);
       }
     } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
       setVlmStatus(`Request failed: ${e instanceof Error ? e.message : e}`);
     } finally {
       setVlmBusy(false);
@@ -207,6 +215,9 @@ export function LivePage() {
       const image = captureFrame(video);
       if (!image) return null;
 
+      vlmAbortRef.current?.abort();
+      const ac = new AbortController();
+      vlmAbortRef.current = ac;
       setVlmBusy(true);
       setVlmStatus("Asking the VLM…");
       setVlmOutput("");
@@ -222,6 +233,7 @@ export function LivePage() {
             setVlmOutput(acc); // live, token by token
             onDelta(piece);
           },
+          ac.signal,
         );
         const total = performance.now() - t0;
         const firstMs = tFirst !== null ? tFirst - t0 : total;
@@ -230,6 +242,7 @@ export function LivePage() {
         setVlmOutput(text);
         return text;
       } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return null;
         setVlmStatus(`Request failed: ${e instanceof Error ? e.message : e}`);
         return null;
       } finally {

@@ -32,6 +32,9 @@ export function useSpeech() {
       : null,
   );
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Object URL of the one-shot Piper clip currently playing (via speak()), so we
+  // can revoke it if playback is cancelled before onended/onerror fires.
+  const currentUrlRef = useRef<string | null>(null);
 
   const browserSupported =
     typeof window !== "undefined" && "speechSynthesis" in window;
@@ -86,6 +89,12 @@ export function useSpeech() {
       audioRef.current.pause();
       audioRef.current = null;
     }
+    // Pausing doesn't fire onended/onerror, so revoke the blob URL here to avoid
+    // leaking it on a barge-in mid-clip.
+    if (currentUrlRef.current) {
+      URL.revokeObjectURL(currentUrlRef.current);
+      currentUrlRef.current = null;
+    }
     if (queueRef.current) {
       queueRef.current.cancel();
       queueRef.current = null;
@@ -93,6 +102,10 @@ export function useSpeech() {
     if (browserSupported) window.speechSynthesis.cancel();
     setSpeaking(false);
   }, [browserSupported]);
+
+  // Stop any playback (Piper audio, the streaming queue, browser speech) and free
+  // its resources when the hook unmounts.
+  useEffect(() => () => cancel(), [cancel]);
 
   // Prepare ONE sentence for playback, using the chosen voice (Piper or browser).
   const synthSentence = useCallback(
@@ -208,9 +221,11 @@ export function useSpeech() {
             const url = URL.createObjectURL(blob);
             const audio = new Audio(url);
             audioRef.current = audio;
+            currentUrlRef.current = url;
             const done = () => {
               setSpeaking(false);
               URL.revokeObjectURL(url);
+              if (currentUrlRef.current === url) currentUrlRef.current = null;
               if (audioRef.current === audio) audioRef.current = null;
               onEnd?.();
             };
