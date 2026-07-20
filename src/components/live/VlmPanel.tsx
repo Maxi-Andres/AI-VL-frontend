@@ -105,7 +105,7 @@ export function VlmPanel({
         />
       </Field>
 
-      <Field label="Scope">
+      <Field label="Scope" inline>
         <Select
           options={scopes}
           value={scope}
@@ -113,7 +113,7 @@ export function VlmPanel({
         />
       </Field>
 
-      <Field label="Prompt variant">
+      <Field label="Prompt variant" inline>
         <Select
           options={variants}
           value={variant}
@@ -125,6 +125,7 @@ export function VlmPanel({
         <Field
           label="Image quality (VLM)"
           hint="Bigger = more detail but slower; smaller = faster answers."
+          inline
         >
           <Select
             options={VLM_IMG_SIZES}
@@ -160,57 +161,63 @@ export function VlmPanel({
         />
       </Field>
 
-      {/* Hands-free voice toggles: mic (wake word) + spoken answers. */}
+      {/* Hands-free voice toggles: mic (wake word) + spoken answers. Compact so
+          all three fit on one row; on/off is shown by the icon + color. The
+          status sits on its own line below so it never pushes a button down. */}
       {(voice.micSupported || voice.speechSupported) && (
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          {voice.micSupported && (
-            <Button
-              variant={voice.voiceMode ? "primary" : "secondary"}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs"
-              aria-pressed={voice.voiceMode}
-              onClick={voice.onToggleVoiceMode}
-            >
-              {voice.voiceMode ? (
-                <IconMicrophone size={16} stroke={2} />
-              ) : (
-                <IconMicrophoneOff size={16} stroke={2} />
-              )}
-              Voice {voice.voiceMode ? "on" : "off"}
-            </Button>
-          )}
-          {voice.speechSupported && (
-            <Button
-              variant={voice.spokenMode ? "primary" : "secondary"}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs"
-              aria-pressed={voice.spokenMode}
-              onClick={voice.onToggleSpokenMode}
-            >
-              {voice.spokenMode ? (
-                <IconVolume size={16} stroke={2} />
-              ) : (
-                <IconVolumeOff size={16} stroke={2} />
-              )}
-              Speak {voice.spokenMode ? "on" : "off"}
-            </Button>
-          )}
-          {voice.speechSupported && (
-            <Button
-              variant={voice.fillerMode ? "primary" : "secondary"}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs"
-              aria-pressed={voice.fillerMode}
-              onClick={voice.onToggleFillerMode}
-              title="Speak a short filler if the answer is slow to start (needs Speak on)"
-            >
-              {voice.fillerMode ? (
-                <IconMessage size={16} stroke={2} />
-              ) : (
-                <IconMessageOff size={16} stroke={2} />
-              )}
-              Filler {voice.fillerMode ? "on" : "off"}
-            </Button>
-          )}
+        <div className="mb-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {voice.micSupported && (
+              <Button
+                variant={voice.voiceMode ? "primary" : "secondary"}
+                className="inline-flex items-center gap-1 px-2 py-1 text-[11px]"
+                aria-pressed={voice.voiceMode}
+                title={`Voice ${voice.voiceMode ? "on" : "off"}`}
+                onClick={voice.onToggleVoiceMode}
+              >
+                {voice.voiceMode ? (
+                  <IconMicrophone size={14} stroke={2} />
+                ) : (
+                  <IconMicrophoneOff size={14} stroke={2} />
+                )}
+                Voice
+              </Button>
+            )}
+            {voice.speechSupported && (
+              <Button
+                variant={voice.spokenMode ? "primary" : "secondary"}
+                className="inline-flex items-center gap-1 px-2 py-1 text-[11px]"
+                aria-pressed={voice.spokenMode}
+                title={`Speak ${voice.spokenMode ? "on" : "off"}`}
+                onClick={voice.onToggleSpokenMode}
+              >
+                {voice.spokenMode ? (
+                  <IconVolume size={14} stroke={2} />
+                ) : (
+                  <IconVolumeOff size={14} stroke={2} />
+                )}
+                Speak
+              </Button>
+            )}
+            {voice.speechSupported && (
+              <Button
+                variant={voice.fillerMode ? "primary" : "secondary"}
+                className="inline-flex items-center gap-1 px-2 py-1 text-[11px]"
+                aria-pressed={voice.fillerMode}
+                onClick={voice.onToggleFillerMode}
+                title="Speak a short filler if the answer is slow to start (needs Speak on)"
+              >
+                {voice.fillerMode ? (
+                  <IconMessage size={14} stroke={2} />
+                ) : (
+                  <IconMessageOff size={14} stroke={2} />
+                )}
+                Filler
+              </Button>
+            )}
+          </div>
           {voice.status && (
-            <span className="text-xs text-muted">{voice.status}</span>
+            <span className="mt-1 block text-xs text-muted">{voice.status}</span>
           )}
         </div>
       )}

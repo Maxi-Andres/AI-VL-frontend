@@ -4,6 +4,7 @@ import { BACKEND_URL } from "../config";
 import type {
   CommandResponse,
   Options,
+  RobotInfo,
   TranscribeResponse,
   VlmResponse,
 } from "../types";
@@ -87,16 +88,25 @@ export async function askVlmStream(
 export async function interpretCommand(
   text: string,
   model?: string,
+  robot?: string,
   signal?: AbortSignal,
 ): Promise<CommandResponse> {
   const r = await fetch(`${BACKEND_URL}/api/command`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, model }),
+    body: JSON.stringify({ text, model, robot }),
     signal,
   });
   if (!r.ok) throw new Error(`POST /api/command -> ${r.status}`);
   return r.json();
+}
+
+/** List the robots the command interpreter can target (for the robot selector). */
+export async function fetchRobots(): Promise<RobotInfo[]> {
+  const r = await fetch(`${BACKEND_URL}/api/skills`);
+  if (!r.ok) throw new Error(`GET /api/skills -> ${r.status}`);
+  const data = (await r.json()) as { robots?: RobotInfo[] };
+  return data.robots ?? [];
 }
 
 /** Speech-to-text: send a recorded audio clip and get back the transcript. The

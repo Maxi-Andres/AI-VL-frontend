@@ -49,7 +49,10 @@ export function YoloPanel({
         />
       </Field>
 
-      <Field label={<>conf <span className="text-fg">{conf.toFixed(2)}</span></>}>
+      <Field
+        label={<>conf <span className="text-fg">{conf.toFixed(2)}</span></>}
+        inline
+      >
         <input
           type="range"
           min={0.05}
@@ -61,7 +64,7 @@ export function YoloPanel({
         />
       </Field>
 
-      <Field label="imgsz">
+      <Field label="imgsz" inline>
         <Select
           options={IMG_SIZES}
           value={String(imgsz)}
@@ -69,7 +72,11 @@ export function YoloPanel({
         />
       </Field>
 
-      <Field label="Max FPS" hint="Cap the frames/sec sent to save CPU/bandwidth.">
+      <Field
+        label="Max FPS"
+        hint="Cap the frames/sec sent to save CPU/bandwidth."
+        inline
+      >
         <Select
           options={FPS_CAPS}
           value={maxFps > 0 ? String(maxFps) : "Unlimited"}
@@ -89,6 +96,7 @@ export function YoloPanel({
           options={classOptions}
           selected={classes}
           onSelectionChange={onClassesChange}
+          rows={3}
         />
       </Field>
     </div>

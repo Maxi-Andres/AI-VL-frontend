@@ -100,7 +100,13 @@ export interface TranscribeResponse {
   elapsed_ms: number;
 }
 
-/** Payload of POST /api/command — the Unitree G1 command interpreter.
+/** A robot the command interpreter can target (from GET /api/skills). */
+export interface RobotInfo {
+  id: string;
+  label: string;
+}
+
+/** Payload of POST /api/command — the Unitree command interpreter.
  * Maps a spoken/typed command to ONE skill + params (what the robot should do).
  * This is the interpreter's decision only; no motion happens yet. */
 export interface CommandResponse {
@@ -109,6 +115,8 @@ export interface CommandResponse {
    * "unknown"). */
   ok: boolean;
   model: string;
+  /** Which robot's catalog was used ("g1" | "go2"). */
+  robot: string;
   /** Chosen skill name (e.g. "walk", "stop", "arm_action", "unknown"). */
   skill: string;
   /** Skill-specific parameters (e.g. {direction, speed} for "walk"). */

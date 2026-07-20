@@ -3,6 +3,7 @@ import {
   askVlm,
   askVlmStream,
   fetchClasses,
+  fetchRobots,
   interpretCommand,
   transcribeAudio,
 } from "../api/backend";
@@ -22,6 +23,7 @@ import type {
   ConfigState,
   DetectedObject,
   DetectionMessage,
+  RobotInfo,
   YoloConfig,
 } from "../types";
 
@@ -68,6 +70,8 @@ export function LivePage() {
 
   // --- Robot command interpreter state (verification view) ---
   const cmdRecorder = useAudioRecorder();
+  const [robots, setRobots] = useState<RobotInfo[]>([]);
+  const [cmdRobot, setCmdRobot] = useState("g1");
   const [cmdModel, setCmdModel] = useState("");
   const [cmdText, setCmdText] = useState("");
   const [cmdBusy, setCmdBusy] = useState(false);
@@ -75,6 +79,10 @@ export function LivePage() {
   const [cmdResult, setCmdResult] = useState<CommandResponse | null>(null);
   const cmdAbortRef = useRef<AbortController | null>(null);
   useEffect(() => () => cmdAbortRef.current?.abort(), []);
+  // Load the robot list (G1, Go2) once for the command interpreter's selector.
+  useEffect(() => {
+    fetchRobots().then(setRobots).catch(console.error);
+  }, []);
 
   const initialized = useRef(false);
   const lastFrameTsRef = useRef(0); // for measuring the actual processed FPS
@@ -309,7 +317,7 @@ export function LivePage() {
       setCmdBusy(true);
       setCmdStatus("Interpreting…");
       try {
-        const res = await interpretCommand(t, cmdModel, ac.signal);
+        const res = await interpretCommand(t, cmdModel, cmdRobot, ac.signal);
         if (res.error) {
           setCmdStatus(`Error: ${res.error}`);
           return;
@@ -327,7 +335,7 @@ export function LivePage() {
         setCmdBusy(false);
       }
     },
-    [cmdModel],
+    [cmdModel, cmdRobot],
   );
 
   const handleInterpret = useCallback(
@@ -422,6 +430,9 @@ export function LivePage() {
             <hr className="my-4 border-0 border-t border-line" />
 
             <CommandPanel
+              robots={robots}
+              robot={cmdRobot}
+              onRobotChange={setCmdRobot}
               models={options.vlm_models}
               model={cmdModel}
               onModelChange={setCmdModel}
