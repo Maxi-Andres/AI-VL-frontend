@@ -1,7 +1,12 @@
 // REST helpers for the backend gateway. All network knowledge of the backend
 // lives here (plus the WebSocket in useDetectionSocket).
 import { BACKEND_URL } from "../config";
-import type { Options, TranscribeResponse, VlmResponse } from "../types";
+import type {
+  CommandResponse,
+  Options,
+  TranscribeResponse,
+  VlmResponse,
+} from "../types";
 
 export async function fetchOptions(): Promise<Options> {
   const r = await fetch(`${BACKEND_URL}/api/options`);
@@ -72,6 +77,26 @@ export async function askVlmStream(
     }
   }
   return full;
+}
+
+/**
+ * Interpret a spoken/typed command into a Unitree G1 skill JSON. Returns the
+ * chosen skill + params (the interpreter's decision only — nothing moves yet), so
+ * the UI can show whether the command was understood correctly.
+ */
+export async function interpretCommand(
+  text: string,
+  model?: string,
+  signal?: AbortSignal,
+): Promise<CommandResponse> {
+  const r = await fetch(`${BACKEND_URL}/api/command`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, model }),
+    signal,
+  });
+  if (!r.ok) throw new Error(`POST /api/command -> ${r.status}`);
+  return r.json();
 }
 
 /** Speech-to-text: send a recorded audio clip and get back the transcript. The

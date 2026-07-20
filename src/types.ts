@@ -100,6 +100,28 @@ export interface TranscribeResponse {
   elapsed_ms: number;
 }
 
+/** Payload of POST /api/command — the Unitree G1 command interpreter.
+ * Maps a spoken/typed command to ONE skill + params (what the robot should do).
+ * This is the interpreter's decision only; no motion happens yet. */
+export interface CommandResponse {
+  error?: string;
+  /** False only when the model returned no parseable JSON (skill falls back to
+   * "unknown"). */
+  ok: boolean;
+  model: string;
+  /** Chosen skill name (e.g. "walk", "stop", "arm_action", "unknown"). */
+  skill: string;
+  /** Skill-specific parameters (e.g. {direction, speed} for "walk"). */
+  params: Record<string, unknown>;
+  /** Short spoken confirmation, in the command's language (for TTS). */
+  say: string;
+  /** The command text the interpreter received (the transcript). */
+  understood: string;
+  /** Raw model output (for debugging when ok is false). */
+  content: string;
+  elapsed_ms: number;
+}
+
 /** Payload of POST /api/vlm. */
 export interface VlmResponse {
   error?: string;
