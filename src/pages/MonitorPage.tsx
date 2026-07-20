@@ -1,15 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { askVlm, askVlmStream, fetchClasses } from "../api/backend";
+import {
+  askVlm,
+  askVlmStream,
+  fetchClasses,
+  interpretCommand,
+  transcribeAudio,
+} from "../api/backend";
 import { WS_VIEW_URL } from "../config";
 import { YoloPanel } from "../components/live/YoloPanel";
 import { VlmPanel } from "../components/live/VlmPanel";
+import { CommandPanel } from "../components/live/CommandPanel";
 import { Button } from "../components/ui/Button";
 import { fmtMs } from "../lib/format";
+import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { useStatus } from "../components/layout/StatusContext";
 import { useOptions } from "../hooks/useOptions";
 import { useVoiceAssistant } from "../hooks/useVoiceAssistant";
 import { drawBoxes } from "../lib/draw";
 import type {
+  CommandResponse,
   ConfigState,
   DetectedObject,
   ViewMessage,
@@ -65,6 +74,16 @@ export function MonitorPage() {
   // Free-prompt text (lifted here so dictation can populate it).
   const [prompt, setPrompt] = useState("");
 
+  // --- Robot command interpreter state (verification view; same as LivePage) ---
+  const cmdRecorder = useAudioRecorder();
+  const [cmdModel, setCmdModel] = useState("");
+  const [cmdText, setCmdText] = useState("");
+  const [cmdBusy, setCmdBusy] = useState(false);
+  const [cmdStatus, setCmdStatus] = useState("");
+  const [cmdResult, setCmdResult] = useState<CommandResponse | null>(null);
+  const cmdAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => cmdAbortRef.current?.abort(), []);
+
   const imgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const initialized = useRef(false);
@@ -84,6 +103,9 @@ export function MonitorPage() {
     setVlmModel(d.vlm_model);
     setScope(d.scope);
     setVariant(d.variant);
+    // Command parsing needs no reasoning: prefer an *-instruct model when present.
+    const instruct = options.vlm_models.find((m) => m.includes("instruct"));
+    setCmdModel(instruct ?? d.vlm_model);
     fetchClasses(d.yolo_model).then(setClassOptions).catch(console.error);
   }, [options]);
 
@@ -315,6 +337,70 @@ export function MonitorPage() {
     [askPromptStream, va],
   );
 
+  // --- Robot command interpreter (verification; independent of the video) ---
+  const runInterpret = useCallback(
+    async (text: string) => {
+      const t = text.trim();
+      if (!t) return;
+      cmdAbortRef.current?.abort();
+      const ac = new AbortController();
+      cmdAbortRef.current = ac;
+      setCmdBusy(true);
+      setCmdStatus("Interpreting…");
+      try {
+        const res = await interpretCommand(t, cmdModel, ac.signal);
+        if (res.error) {
+          setCmdStatus(`Error: ${res.error}`);
+          return;
+        }
+        setCmdResult(res);
+        setCmdStatus(
+          `${res.model} · ${fmtMs(res.elapsed_ms)}${
+            res.ok ? "" : " · (invalid JSON — fell back to unknown)"
+          }`,
+        );
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        setCmdStatus(`Request failed: ${e instanceof Error ? e.message : e}`);
+      } finally {
+        setCmdBusy(false);
+      }
+    },
+    [cmdModel],
+  );
+
+  const handleInterpret = useCallback(
+    () => void runInterpret(cmdText),
+    [runInterpret, cmdText],
+  );
+
+  // Speak one command: record → transcribe → interpret (feeds the interpreter).
+  const handleRecordCommand = useCallback(async () => {
+    if (cmdBusy || cmdRecorder.recording) return;
+    setCmdBusy(true);
+    setCmdStatus("Listening… speak a command");
+    try {
+      const blob = await cmdRecorder.recordUtterance();
+      if (!blob) {
+        setCmdStatus("Didn't catch that — try again");
+        return;
+      }
+      setCmdStatus("Transcribing…");
+      const res = await transcribeAudio(blob);
+      const text = res.text?.trim();
+      if (res.error || !text) {
+        setCmdStatus(res.error ? `Error: ${res.error}` : "Nothing recognized");
+        return;
+      }
+      setCmdText(text);
+      await runInterpret(text);
+    } catch (e) {
+      setCmdStatus(`Voice error: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setCmdBusy(false);
+    }
+  }, [cmdBusy, cmdRecorder, runInterpret]);
+
   if (optionsError) {
     return (
       <main className="p-4 text-[#ff9aa6]">
@@ -451,6 +537,23 @@ export function MonitorPage() {
             voiceURI: va.voiceURI,
             onVoiceChange: va.onVoiceChange,
           }}
+        />
+
+        <hr className="my-4 border-0 border-t border-line" />
+
+        <CommandPanel
+          models={options.vlm_models}
+          model={cmdModel}
+          onModelChange={setCmdModel}
+          text={cmdText}
+          onTextChange={setCmdText}
+          busy={cmdBusy}
+          status={cmdStatus}
+          result={cmdResult}
+          micSupported={cmdRecorder.supported}
+          recording={cmdRecorder.recording}
+          onInterpret={handleInterpret}
+          onRecord={handleRecordCommand}
         />
       </aside>
     </main>
