@@ -130,6 +130,21 @@ export interface CommandResponse {
   elapsed_ms: number;
 }
 
+/** Payload of POST /api/execute — the robot executor's result for one skill. */
+export interface ExecuteResponse {
+  ok: boolean;
+  robot?: string;
+  skill?: string;
+  /** Human-readable description of what was sent (e.g. "sport api_id=1009"). */
+  detail?: string;
+  error?: string;
+  /** True when SAFE_MODE blocked an acrobatic skill. */
+  blocked?: boolean;
+  /** True when the executor only logged the command (did not move the robot). */
+  dry_run?: boolean;
+  api_id?: number;
+}
+
 /** Payload of POST /api/vlm. */
 export interface VlmResponse {
   error?: string;

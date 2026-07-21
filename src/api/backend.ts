@@ -3,6 +3,7 @@
 import { BACKEND_URL } from "../config";
 import type {
   CommandResponse,
+  ExecuteResponse,
   Options,
   RobotInfo,
   TranscribeResponse,
@@ -98,6 +99,24 @@ export async function interpretCommand(
     signal,
   });
   if (!r.ok) throw new Error(`POST /api/command -> ${r.status}`);
+  return r.json();
+}
+
+/**
+ * Send a chosen skill to the robot executor so the robot acts on it. Does NOT throw
+ * on a 4xx/5xx — the executor returns a JSON body (e.g. SAFE_MODE block, unreachable)
+ * that the UI shows as-is.
+ */
+export async function executeCommand(
+  robot: string,
+  skill: string,
+  params: Record<string, unknown>,
+): Promise<ExecuteResponse> {
+  const r = await fetch(`${BACKEND_URL}/api/execute`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ robot, skill, params }),
+  });
   return r.json();
 }
 

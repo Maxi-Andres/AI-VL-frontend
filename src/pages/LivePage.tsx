@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   askVlm,
   askVlmStream,
+  executeCommand,
   fetchClasses,
   fetchRobots,
   interpretCommand,
@@ -77,6 +78,8 @@ export function LivePage() {
   const [cmdBusy, setCmdBusy] = useState(false);
   const [cmdStatus, setCmdStatus] = useState("");
   const [cmdResult, setCmdResult] = useState<CommandResponse | null>(null);
+  const [executing, setExecuting] = useState(false);
+  const [executeStatus, setExecuteStatus] = useState("");
   const cmdAbortRef = useRef<AbortController | null>(null);
   useEffect(() => () => cmdAbortRef.current?.abort(), []);
   // Load the robot list (G1, Go2) once for the command interpreter's selector.
@@ -371,6 +374,29 @@ export function LivePage() {
     }
   }, [cmdBusy, cmdRecorder, runInterpret]);
 
+  // Send the interpreted skill to the robot executor (explicit — never automatic).
+  const handleExecuteOnRobot = useCallback(async () => {
+    if (!cmdResult || cmdResult.skill === "unknown") return;
+    setExecuting(true);
+    setExecuteStatus("Sending to the robot…");
+    try {
+      const res = await executeCommand(
+        cmdResult.robot, cmdResult.skill, cmdResult.params);
+      if (res.ok) {
+        setExecuteStatus(
+          `✓ ${res.detail ?? "sent"}${res.dry_run ? " (dry-run, not moved)" : ""}`);
+      } else if (res.blocked) {
+        setExecuteStatus(`⛔ ${res.error ?? "blocked by SAFE_MODE"}`);
+      } else {
+        setExecuteStatus(`✗ ${res.error ?? res.detail ?? "failed"}`);
+      }
+    } catch (e) {
+      setExecuteStatus(`Request failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setExecuting(false);
+    }
+  }, [cmdResult]);
+
   if (optionsError) {
     return (
       <main className="p-4 text-[#ff9aa6]">
@@ -445,6 +471,9 @@ export function LivePage() {
               recording={cmdRecorder.recording}
               onInterpret={handleInterpret}
               onRecord={handleRecordCommand}
+              onExecuteOnRobot={handleExecuteOnRobot}
+              executing={executing}
+              executeStatus={executeStatus}
             />
           </div>
 

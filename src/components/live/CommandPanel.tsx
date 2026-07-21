@@ -26,6 +26,11 @@ interface Props {
   onInterpret: () => void;
   /** Record one spoken command, transcribe it, then interpret it. */
   onRecord: () => void;
+  /** Send the last interpreted skill to the robot executor (makes the robot act). */
+  onExecuteOnRobot: () => void;
+  executing: boolean;
+  /** One-line result of the last execute (sent / blocked / error). */
+  executeStatus: string;
 }
 
 /**
@@ -50,7 +55,11 @@ export function CommandPanel({
   recording,
   onInterpret,
   onRecord,
+  onExecuteOnRobot,
+  executing,
+  executeStatus,
 }: Props) {
+  const canExecute = !!result && result.skill !== "unknown";
   // Show only the robot-facing decision (not the raw model/debug fields).
   const decision = result
     ? { skill: result.skill, params: result.params, say: result.say }
@@ -162,10 +171,24 @@ export function CommandPanel({
         </p>
       )}
 
-      {/* Exact JSON the robot executor (Phase 2) would receive. */}
+      {/* Exact JSON the robot executor receives. */}
       <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-md border border-line bg-[#0a0b0f] p-2 font-mono text-xs leading-[1.4]">
         {decision ? JSON.stringify(decision, null, 2) : ""}
       </pre>
+
+      {/* Send the chosen skill to the real robot (explicit — never automatic). */}
+      <Button
+        variant="primary"
+        className="mt-2 w-full"
+        disabled={!canExecute || executing}
+        onClick={onExecuteOnRobot}
+        title="Send this skill to the robot executor (the robot acts)"
+      >
+        {executing ? "Sending to robot…" : "Execute on robot"}
+      </Button>
+      {executeStatus && (
+        <p className="m-0 mt-1 text-xs text-muted">{executeStatus}</p>
+      )}
     </div>
   );
 }
