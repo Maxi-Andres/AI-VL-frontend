@@ -111,11 +111,12 @@ export async function executeCommand(
   robot: string,
   skill: string,
   params: Record<string, unknown>,
+  safeMode: boolean,
 ): Promise<ExecuteResponse> {
   const r = await fetch(`${BACKEND_URL}/api/execute`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ robot, skill, params }),
+    body: JSON.stringify({ robot, skill, params, safe_mode: safeMode }),
   });
   return r.json();
 }

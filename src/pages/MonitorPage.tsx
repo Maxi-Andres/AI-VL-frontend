@@ -88,6 +88,23 @@ export function MonitorPage() {
   const [cmdResult, setCmdResult] = useState<CommandResponse | null>(null);
   const [executing, setExecuting] = useState(false);
   const [executeStatus, setExecuteStatus] = useState("");
+  // Execution switches (persisted): master arm + auto-run. Default OFF (safe).
+  const [execEnabled, setExecEnabled] = useState(
+    () => typeof localStorage !== "undefined" &&
+      localStorage.getItem("aivl.execEnabled") === "1");
+  const [autoRun, setAutoRun] = useState(
+    () => typeof localStorage !== "undefined" &&
+      localStorage.getItem("aivl.autoRun") === "1");
+  // SAFE_MODE (blocks acrobatics), controllable from here. Default OFF.
+  const [safeMode, setSafeMode] = useState(
+    () => typeof localStorage !== "undefined" &&
+      localStorage.getItem("aivl.safeMode") === "1");
+  const execEnabledRef = useRef(execEnabled);
+  execEnabledRef.current = execEnabled;
+  const autoRunRef = useRef(autoRun);
+  autoRunRef.current = autoRun;
+  const safeModeRef = useRef(safeMode);
+  safeModeRef.current = safeMode;
   const cmdAbortRef = useRef<AbortController | null>(null);
   useEffect(() => () => cmdAbortRef.current?.abort(), []);
   // Load the robot list (G1, Go2) once for the command interpreter's selector.
@@ -348,6 +365,55 @@ export function MonitorPage() {
     [askPromptStream, va],
   );
 
+  const toggleExecEnabled = useCallback(() => {
+    setExecEnabled((v) => {
+      const next = !v;
+      if (typeof localStorage !== "undefined")
+        localStorage.setItem("aivl.execEnabled", next ? "1" : "0");
+      return next;
+    });
+  }, []);
+  const toggleAutoRun = useCallback(() => {
+    setAutoRun((v) => {
+      const next = !v;
+      if (typeof localStorage !== "undefined")
+        localStorage.setItem("aivl.autoRun", next ? "1" : "0");
+      return next;
+    });
+  }, []);
+  const toggleSafeMode = useCallback(() => {
+    setSafeMode((v) => {
+      const next = !v;
+      if (typeof localStorage !== "undefined")
+        localStorage.setItem("aivl.safeMode", next ? "1" : "0");
+      return next;
+    });
+  }, []);
+
+  // Send ONE interpreted result to the robot executor. Shared by the manual button
+  // and auto-run. No-op unless execution is armed (checked by callers).
+  const executeResult = useCallback(async (res: CommandResponse | null) => {
+    if (!res || res.skill === "unknown") return;
+    setExecuting(true);
+    setExecuteStatus("Sending to the robot…");
+    try {
+      const r = await executeCommand(
+        res.robot, res.skill, res.params, safeModeRef.current);
+      if (r.ok) {
+        setExecuteStatus(
+          `✓ ${r.detail ?? "sent"}${r.dry_run ? " (dry-run, not moved)" : ""}`);
+      } else if (r.blocked) {
+        setExecuteStatus(`⛔ ${r.error ?? "blocked by SAFE_MODE"}`);
+      } else {
+        setExecuteStatus(`✗ ${r.error ?? r.detail ?? "failed"}`);
+      }
+    } catch (e) {
+      setExecuteStatus(`Request failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setExecuting(false);
+    }
+  }, []);
+
   // --- Robot command interpreter (verification; independent of the video) ---
   const runInterpret = useCallback(
     async (text: string) => {
@@ -370,6 +436,8 @@ export function MonitorPage() {
             res.ok ? "" : " · (invalid JSON — fell back to unknown)"
           }`,
         );
+        // Auto-run: fire immediately when armed + auto (no button needed).
+        if (execEnabledRef.current && autoRunRef.current) void executeResult(res);
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") return;
         setCmdStatus(`Request failed: ${e instanceof Error ? e.message : e}`);
@@ -377,7 +445,7 @@ export function MonitorPage() {
         setCmdBusy(false);
       }
     },
-    [cmdModel, cmdRobot],
+    [cmdModel, cmdRobot, executeResult],
   );
 
   const handleInterpret = useCallback(
@@ -412,28 +480,9 @@ export function MonitorPage() {
     }
   }, [cmdBusy, cmdRecorder, runInterpret]);
 
-  // Send the interpreted skill to the robot executor (explicit — never automatic).
-  const handleExecuteOnRobot = useCallback(async () => {
-    if (!cmdResult || cmdResult.skill === "unknown") return;
-    setExecuting(true);
-    setExecuteStatus("Sending to the robot…");
-    try {
-      const res = await executeCommand(
-        cmdResult.robot, cmdResult.skill, cmdResult.params);
-      if (res.ok) {
-        setExecuteStatus(
-          `✓ ${res.detail ?? "sent"}${res.dry_run ? " (dry-run, not moved)" : ""}`);
-      } else if (res.blocked) {
-        setExecuteStatus(`⛔ ${res.error ?? "blocked by SAFE_MODE"}`);
-      } else {
-        setExecuteStatus(`✗ ${res.error ?? res.detail ?? "failed"}`);
-      }
-    } catch (e) {
-      setExecuteStatus(`Request failed: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setExecuting(false);
-    }
-  }, [cmdResult]);
+  // Manual trigger: send the current interpreted skill to the robot.
+  const handleExecuteOnRobot = useCallback(
+    () => void executeResult(cmdResult), [executeResult, cmdResult]);
 
   if (optionsError) {
     return (
@@ -560,6 +609,12 @@ export function MonitorPage() {
               onExecuteOnRobot={handleExecuteOnRobot}
               executing={executing}
               executeStatus={executeStatus}
+              execEnabled={execEnabled}
+              onToggleExecEnabled={toggleExecEnabled}
+              autoRun={autoRun}
+              onToggleAutoRun={toggleAutoRun}
+              safeMode={safeMode}
+              onToggleSafeMode={toggleSafeMode}
             />
           </div>
 

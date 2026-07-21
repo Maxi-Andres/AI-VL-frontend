@@ -31,6 +31,15 @@ interface Props {
   executing: boolean;
   /** One-line result of the last execute (sent / blocked / error). */
   executeStatus: string;
+  /** Master arm switch: while off, nothing is ever sent to the robot. */
+  execEnabled: boolean;
+  onToggleExecEnabled: () => void;
+  /** Auto-run: when on, an interpreted command fires automatically (no button). */
+  autoRun: boolean;
+  onToggleAutoRun: () => void;
+  /** SAFE_MODE: when on, the executor blocks acrobatic skills (flips, handstand…). */
+  safeMode: boolean;
+  onToggleSafeMode: () => void;
 }
 
 /**
@@ -58,6 +67,12 @@ export function CommandPanel({
   onExecuteOnRobot,
   executing,
   executeStatus,
+  execEnabled,
+  onToggleExecEnabled,
+  autoRun,
+  onToggleAutoRun,
+  safeMode,
+  onToggleSafeMode,
 }: Props) {
   const canExecute = !!result && result.skill !== "unknown";
   // Show only the robot-facing decision (not the raw model/debug fields).
@@ -176,13 +191,51 @@ export function CommandPanel({
         {decision ? JSON.stringify(decision, null, 2) : ""}
       </pre>
 
-      {/* Send the chosen skill to the real robot (explicit — never automatic). */}
+      {/* Execution switches. "Robot" is the master arm switch (off = nothing ever
+          reaches the robot). "Auto" fires an interpreted command without the button. */}
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <Button
+          variant={execEnabled ? "primary" : "secondary"}
+          className="px-2 py-1 text-[11px]"
+          aria-pressed={execEnabled}
+          title="Master switch: while off, no command is ever sent to the robot"
+          onClick={onToggleExecEnabled}
+        >
+          Robot {execEnabled ? "ON" : "OFF"}
+        </Button>
+        <Button
+          variant={autoRun ? "primary" : "secondary"}
+          className="px-2 py-1 text-[11px]"
+          aria-pressed={autoRun}
+          disabled={!execEnabled}
+          title="When on, an interpreted command runs automatically (no button)"
+          onClick={onToggleAutoRun}
+        >
+          Auto {autoRun ? "ON" : "OFF"}
+        </Button>
+        <Button
+          variant={safeMode ? "primary" : "secondary"}
+          className="px-2 py-1 text-[11px]"
+          aria-pressed={safeMode}
+          title="SAFE_MODE: block acrobatic skills (flips, handstand, walk-upright)"
+          onClick={onToggleSafeMode}
+        >
+          Safe {safeMode ? "ON" : "OFF"}
+        </Button>
+        {execEnabled && autoRun && (
+          <span className="text-[11px] text-[#ff9aa6]">auto-runs on interpret</span>
+        )}
+      </div>
+
+      {/* Manual trigger (used when Auto is off, or to re-fire). */}
       <Button
         variant="primary"
         className="mt-2 w-full"
-        disabled={!canExecute || executing}
+        disabled={!execEnabled || !canExecute || executing}
         onClick={onExecuteOnRobot}
-        title="Send this skill to the robot executor (the robot acts)"
+        title={execEnabled
+          ? "Send this skill to the robot executor (the robot acts)"
+          : "Turn Robot ON to enable execution"}
       >
         {executing ? "Sending to robot…" : "Execute on robot"}
       </Button>
