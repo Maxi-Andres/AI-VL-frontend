@@ -92,13 +92,10 @@ export function MonitorPage() {
   const [execEnabled, setExecEnabled] = useState(
     () => typeof localStorage !== "undefined" &&
       localStorage.getItem("aivl.execEnabled") === "1");
-  const [autoRun, setAutoRun] = useState(
-    () => typeof localStorage !== "undefined" &&
-      localStorage.getItem("aivl.autoRun") === "1");
-  // SAFE_MODE (blocks acrobatics), controllable from here. Default OFF.
-  const [safeMode, setSafeMode] = useState(
-    () => typeof localStorage !== "undefined" &&
-      localStorage.getItem("aivl.safeMode") === "1");
+  // Always start each session SAFE ON / AUTO OFF (not persisted on purpose): never
+  // dangerous and never automatic until you explicitly enable it.
+  const [autoRun, setAutoRun] = useState(false);
+  const [safeMode, setSafeMode] = useState(true);
   const execEnabledRef = useRef(execEnabled);
   execEnabledRef.current = execEnabled;
   const autoRunRef = useRef(autoRun);
@@ -373,22 +370,8 @@ export function MonitorPage() {
       return next;
     });
   }, []);
-  const toggleAutoRun = useCallback(() => {
-    setAutoRun((v) => {
-      const next = !v;
-      if (typeof localStorage !== "undefined")
-        localStorage.setItem("aivl.autoRun", next ? "1" : "0");
-      return next;
-    });
-  }, []);
-  const toggleSafeMode = useCallback(() => {
-    setSafeMode((v) => {
-      const next = !v;
-      if (typeof localStorage !== "undefined")
-        localStorage.setItem("aivl.safeMode", next ? "1" : "0");
-      return next;
-    });
-  }, []);
+  const toggleAutoRun = useCallback(() => setAutoRun((v) => !v), []);
+  const toggleSafeMode = useCallback(() => setSafeMode((v) => !v), []);
 
   // Send ONE interpreted result to the robot executor. Shared by the manual button
   // and auto-run. No-op unless execution is armed (checked by callers).
@@ -483,6 +466,20 @@ export function MonitorPage() {
   // Manual trigger: send the current interpreted skill to the robot.
   const handleExecuteOnRobot = useCallback(
     () => void executeResult(cmdResult), [executeResult, cmdResult]);
+
+  // Emergency stop: halt the robot NOW, regardless of the switches.
+  const handleStopRobot = useCallback(async () => {
+    setExecuting(true);
+    setExecuteStatus("⏹ Stopping the robot…");
+    try {
+      const r = await executeCommand(cmdRobot, "stop", {}, false);
+      setExecuteStatus(r.ok ? "⏹ Stopped" : `✗ ${r.error ?? "stop failed"}`);
+    } catch (e) {
+      setExecuteStatus(`Stop failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setExecuting(false);
+    }
+  }, [cmdRobot]);
 
   if (optionsError) {
     return (
@@ -607,6 +604,7 @@ export function MonitorPage() {
               onInterpret={handleInterpret}
               onRecord={handleRecordCommand}
               onExecuteOnRobot={handleExecuteOnRobot}
+              onStop={handleStopRobot}
               executing={executing}
               executeStatus={executeStatus}
               execEnabled={execEnabled}

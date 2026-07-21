@@ -28,6 +28,8 @@ interface Props {
   onRecord: () => void;
   /** Send the last interpreted skill to the robot executor (makes the robot act). */
   onExecuteOnRobot: () => void;
+  /** Emergency stop: tell the server to halt all motion NOW (always available). */
+  onStop: () => void;
   executing: boolean;
   /** One-line result of the last execute (sent / blocked / error). */
   executeStatus: string;
@@ -65,6 +67,7 @@ export function CommandPanel({
   onInterpret,
   onRecord,
   onExecuteOnRobot,
+  onStop,
   executing,
   executeStatus,
   execEnabled,
@@ -191,12 +194,24 @@ export function CommandPanel({
         {decision ? JSON.stringify(decision, null, 2) : ""}
       </pre>
 
-      {/* Execution switches. "Robot" is the master arm switch (off = nothing ever
-          reaches the robot). "Auto" fires an interpreted command without the button. */}
+      {/* EMERGENCY STOP — always available. Tells the server to halt all motion
+          now (cancels any move loop + StopMove), independent of the switches. */}
+      <Button
+        variant="secondary"
+        className="mt-3 w-full !bg-[#ef4444] !text-white py-2 text-sm font-bold hover:brightness-110"
+        onClick={onStop}
+        title="Halt the robot NOW — stop sending any movement"
+      >
+        ■ STOP — quedate quieto
+      </Button>
+
+      {/* Execution switches, color-coded: green = safe, red = dangerous/acting,
+          amber = armed. "Robot" arms execution; "Auto" fires without the button;
+          "Safe" blocks acrobatics. */}
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <Button
-          variant={execEnabled ? "primary" : "secondary"}
-          className="px-2 py-1 text-[11px]"
+          variant="secondary"
+          className={`px-2 py-1 text-[11px] ${execEnabled ? "!bg-[#f59e0b] !text-black" : ""}`}
           aria-pressed={execEnabled}
           title="Master switch: while off, no command is ever sent to the robot"
           onClick={onToggleExecEnabled}
@@ -204,8 +219,8 @@ export function CommandPanel({
           Robot {execEnabled ? "ON" : "OFF"}
         </Button>
         <Button
-          variant={autoRun ? "primary" : "secondary"}
-          className="px-2 py-1 text-[11px]"
+          variant="secondary"
+          className={`px-2 py-1 text-[11px] ${autoRun ? "!bg-[#ef4444] !text-white" : ""}`}
           aria-pressed={autoRun}
           disabled={!execEnabled}
           title="When on, an interpreted command runs automatically (no button)"
@@ -214,18 +229,27 @@ export function CommandPanel({
           Auto {autoRun ? "ON" : "OFF"}
         </Button>
         <Button
-          variant={safeMode ? "primary" : "secondary"}
-          className="px-2 py-1 text-[11px]"
+          variant="secondary"
+          className={`px-2 py-1 text-[11px] ${
+            safeMode ? "!bg-[#22c55e] !text-black" : "!bg-[#ef4444] !text-white"}`}
           aria-pressed={safeMode}
           title="SAFE_MODE: block acrobatic skills (flips, handstand, walk-upright)"
           onClick={onToggleSafeMode}
         >
           Safe {safeMode ? "ON" : "OFF"}
         </Button>
-        {execEnabled && autoRun && (
-          <span className="text-[11px] text-[#ff9aa6]">auto-runs on interpret</span>
-        )}
       </div>
+      {/* Loud warnings when a dangerous mode is on. */}
+      {!safeMode && (
+        <p className="m-0 mt-1 text-[11px] font-semibold text-[#ff5a5f]">
+          ⚠ Safe OFF — acrobacias (flips/handstand) habilitadas
+        </p>
+      )}
+      {execEnabled && autoRun && (
+        <p className="m-0 mt-1 text-[11px] font-semibold text-[#ff5a5f]">
+          ⚠ Auto ON — se ejecuta solo al interpretar (sin botón)
+        </p>
+      )}
 
       {/* Manual trigger (used when Auto is off, or to re-fire). */}
       <Button
