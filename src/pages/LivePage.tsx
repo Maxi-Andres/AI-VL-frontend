@@ -6,18 +6,22 @@ import {
   fetchClasses,
   fetchRobots,
   interpretCommand,
+  setRobotCamera,
   transcribeAudio,
 } from "../api/backend";
 import { VideoStage } from "../components/live/VideoStage";
+import { RobotCameraStage } from "../components/live/RobotCameraStage";
 import { YoloPanel } from "../components/live/YoloPanel";
 import { VlmPanel } from "../components/live/VlmPanel";
 import { CommandPanel } from "../components/live/CommandPanel";
+import { Button } from "../components/ui/Button";
 import { useStatus } from "../components/layout/StatusContext";
 import { fmtMs } from "../lib/format";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { useCamera } from "../hooks/useCamera";
 import { useDetectionSocket } from "../hooks/useDetectionSocket";
 import { useOptions } from "../hooks/useOptions";
+import { useRobotCameraView } from "../hooks/useRobotCameraView";
 import { useVoiceAssistant } from "../hooks/useVoiceAssistant";
 import type {
   CommandResponse,
@@ -37,6 +41,13 @@ export function LivePage() {
   const { setConnected, setVoicePhase } = useStatus();
   const { videoRef, active, facing, error: cameraError, start, stop, flip } =
     useCamera();
+
+  // Camera source is EXCLUSIVE: this device's own webcam, or the robot's camera
+  // (viewed via the shared /ws/view fan-out). Turning one on turns the other off.
+  const [robotCamMode, setRobotCamMode] = useState(false);
+  const [robotCamStatus, setRobotCamStatus] = useState("");
+  const { frameUrl: robotFrameUrl, connected: robotViewConnected } =
+    useRobotCameraView(robotCamMode);
 
   // --- YOLO controls ---
   const [yoloModel, setYoloModel] = useState("");
@@ -196,6 +207,31 @@ export function LivePage() {
     fpsEmaRef.current = 0;
     lastFrameTsRef.current = 0;
   }, [stop]);
+
+  // Switch to the robot camera (exclusive): stop our own webcam, then start the
+  // robot camera stream and view it via /ws/view (see the render + hook).
+  const enterRobotCam = useCallback(async () => {
+    handleStop();
+    setRobotCamMode(true);
+    setRobotCamStatus("Starting robot camera…");
+    try {
+      const r = await setRobotCamera("start");
+      setRobotCamStatus(r.error ? `✗ ${r.error}` : "");
+    } catch (e) {
+      setRobotCamStatus(`Error: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }, [handleStop]);
+
+  // Back to our own camera (exclusive): stop the robot camera stream.
+  const exitRobotCam = useCallback(async () => {
+    setRobotCamMode(false);
+    setRobotCamStatus("");
+    try {
+      await setRobotCamera("stop");
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   const handleModelChange = useCallback((model: string) => {
     setYoloModel(model);
@@ -464,18 +500,40 @@ export function LivePage() {
 
   return (
     <main className="grid grid-cols-1 items-start gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_640px]">
-      <VideoStage
-        videoRef={videoRef}
-        objects={objects}
-        overrideColor={overrideColor}
-        active={active}
-        facing={facing}
-        fps={fps}
-        count={count}
-        onStart={handleStart}
-        onStop={handleStop}
-        onFlip={flip}
-      />
+      <div className="min-w-0">
+        {robotCamMode ? (
+          <RobotCameraStage
+            frameUrl={robotFrameUrl}
+            connected={robotViewConnected}
+            onExit={exitRobotCam}
+          />
+        ) : (
+          <>
+            <VideoStage
+              videoRef={videoRef}
+              objects={objects}
+              overrideColor={overrideColor}
+              active={active}
+              facing={facing}
+              fps={fps}
+              count={count}
+              onStart={handleStart}
+              onStop={handleStop}
+              onFlip={flip}
+            />
+            {/* Turn this device into a remote monitor of the robot camera
+                (exclusive with the own webcam above). */}
+            <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
+              <Button variant="secondary" onClick={enterRobotCam}>
+                Use robot camera
+              </Button>
+              {robotCamStatus && (
+                <span className="text-xs text-muted">{robotCamStatus}</span>
+              )}
+            </div>
+          </>
+        )}
+      </div>
 
       <aside className="rounded-lg border border-line bg-panel p-3.5">
         {cameraError && (
