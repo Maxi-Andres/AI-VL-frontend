@@ -121,6 +121,26 @@ export async function executeCommand(
   return r.json();
 }
 
+/** Status of the robot camera bridge (from /api/robot-camera/*). */
+export interface RobotCameraStatus {
+  ok?: boolean;
+  robot?: string;
+  streaming?: boolean;
+  connected?: boolean;
+  frames_sent?: number;
+  error?: string;
+}
+
+/** Start/stop the robot camera stream (the bridge feeds the monitors directly). */
+export async function setRobotCamera(
+  action: "start" | "stop",
+): Promise<RobotCameraStatus> {
+  const r = await fetch(`${BACKEND_URL}/api/robot-camera/${action}`, {
+    method: "POST",
+  });
+  return r.json();
+}
+
 /** List the robots the command interpreter can target (for the robot selector). */
 export async function fetchRobots(): Promise<RobotInfo[]> {
   const r = await fetch(`${BACKEND_URL}/api/skills`);

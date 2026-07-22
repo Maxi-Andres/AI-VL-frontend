@@ -6,6 +6,7 @@ import {
   fetchClasses,
   fetchRobots,
   interpretCommand,
+  setRobotCamera,
   transcribeAudio,
 } from "../api/backend";
 import { WS_VIEW_URL } from "../config";
@@ -44,6 +45,10 @@ export function MonitorPage() {
   const [activated, setActivated] = useState(false);
   const [waiting, setWaiting] = useState(false); // socket open, no frame yet
   const wsRef = useRef<WebSocket | null>(null);
+
+  // Robot camera as the Live source (fed straight to the monitors, no YOLO).
+  const [robotCam, setRobotCam] = useState(false);
+  const [robotCamStatus, setRobotCamStatus] = useState("");
 
   // --- YOLO controls (same as LivePage) ---
   const [yoloModel, setYoloModel] = useState("");
@@ -467,6 +472,29 @@ export function MonitorPage() {
   const handleExecuteOnRobot = useCallback(
     () => void executeResult(cmdResult), [executeResult, cmdResult]);
 
+  // Toggle the robot camera as the Live source (start/stop the camera bridge).
+  const toggleRobotCamera = useCallback(async () => {
+    const action = robotCam ? "stop" : "start";
+    setRobotCamStatus(action === "start" ? "Encendiendo cámara del robot…" : "Apagando…");
+    try {
+      const r = await setRobotCamera(action);
+      if (r.error) {
+        setRobotCamStatus(`✗ ${r.error}`);
+        return;
+      }
+      const on = action === "start";
+      setRobotCam(on);
+      setRobotCamStatus(
+        on
+          ? r.connected
+            ? "Cámara del robot: ON"
+            : "ON — esperando frames…"
+          : "Cámara del robot: OFF");
+    } catch (e) {
+      setRobotCamStatus(`Error: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }, [robotCam]);
+
   // Emergency stop: halt the robot NOW, regardless of the switches.
   const handleStopRobot = useCallback(async () => {
     setExecuting(true);
@@ -544,6 +572,16 @@ export function MonitorPage() {
           <Button variant="secondary" onClick={deactivate}>
             Deactivate
           </Button>
+          <Button
+            variant={robotCam ? "primary" : "secondary"}
+            onClick={toggleRobotCamera}
+            title="Use the robot's camera as the Live source (low-latency, no YOLO)"
+          >
+            {robotCam ? "Robot camera: ON" : "Use robot camera"}
+          </Button>
+          {robotCamStatus && (
+            <span className="text-xs text-muted">{robotCamStatus}</span>
+          )}
           <span className="text-muted tabular-nums">{fps}</span>
           <span className="text-muted tabular-nums">{count}</span>
         </div>
