@@ -1,4 +1,6 @@
+import { useRef } from "react";
 import { Button } from "../ui/Button";
+import { FullscreenButton } from "../ui/FullscreenButton";
 
 interface Props {
   /** Latest robot-camera JPEG as a data URL (empty until the first frame). */
@@ -14,9 +16,14 @@ interface Props {
  * the frame + a control to go back to the own camera.
  */
 export function RobotCameraStage({ frameUrl, connected, onExit }: Props) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+
   return (
     <section className="min-w-0">
-      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-line bg-black">
+      <div
+        ref={wrapRef}
+        className="relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-line bg-black"
+      >
         {frameUrl ? (
           // eslint-disable-next-line jsx-a11y/alt-text
           <img
@@ -29,6 +36,7 @@ export function RobotCameraStage({ frameUrl, connected, onExit }: Props) {
             {connected ? "Waiting for the robot camera…" : "Connecting…"}
           </div>
         )}
+        <FullscreenButton targetRef={wrapRef} />
       </div>
 
       <div className="mt-2.5 flex flex-wrap items-center gap-2.5">

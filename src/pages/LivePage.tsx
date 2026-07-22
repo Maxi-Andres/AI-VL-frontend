@@ -11,6 +11,7 @@ import {
 } from "../api/backend";
 import { VideoStage } from "../components/live/VideoStage";
 import { RobotCameraStage } from "../components/live/RobotCameraStage";
+import { ControlsStageLayout } from "../components/live/ControlsStageLayout";
 import { YoloPanel } from "../components/live/YoloPanel";
 import { VlmPanel } from "../components/live/VlmPanel";
 import { CommandPanel } from "../components/live/CommandPanel";
@@ -499,8 +500,111 @@ export function LivePage() {
   const variants = options.scopes[scope]?.variants ?? [];
 
   return (
-    <main className="grid grid-cols-1 items-start gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_640px]">
-      <div className="min-w-0">
+    <main className="p-4">
+      {cameraError && (
+        <p className="mt-0 mb-2.5 text-xs text-[#ff9aa6]">{cameraError}</p>
+      )}
+      <ControlsStageLayout
+        columns={[
+          {
+            key: "yolo",
+            title: "YOLO",
+            node: (
+              <YoloPanel
+                models={options.yolo_models}
+                classOptions={classOptions}
+                model={yoloModel}
+                conf={conf}
+                imgsz={imgsz}
+                classes={classes}
+                maxFps={maxFps}
+                onModelChange={handleModelChange}
+                onConfChange={setConf}
+                onImgszChange={setImgsz}
+                onClassesChange={setClasses}
+                onMaxFpsChange={setMaxFps}
+              />
+            ),
+          },
+          {
+            key: "command",
+            title: "Robot command",
+            node: (
+              <CommandPanel
+                robots={robots}
+                robot={cmdRobot}
+                onRobotChange={setCmdRobot}
+                models={options.vlm_models}
+                model={cmdModel}
+                onModelChange={setCmdModel}
+                text={cmdText}
+                onTextChange={setCmdText}
+                busy={cmdBusy}
+                status={cmdStatus}
+                result={cmdResult}
+                micSupported={cmdRecorder.supported}
+                recording={cmdRecorder.recording}
+                onInterpret={handleInterpret}
+                onRecord={handleRecordCommand}
+                onExecuteOnRobot={handleExecuteOnRobot}
+                onStop={handleStopRobot}
+                executing={executing}
+                executeStatus={executeStatus}
+                execEnabled={execEnabled}
+                onToggleExecEnabled={toggleExecEnabled}
+                autoRun={autoRun}
+                onToggleAutoRun={toggleAutoRun}
+                safeMode={safeMode}
+                onToggleSafeMode={toggleSafeMode}
+              />
+            ),
+          },
+          {
+            key: "vlm",
+            title: "VLM",
+            node: (
+              <VlmPanel
+                models={options.vlm_models}
+                scopes={Object.keys(options.scopes)}
+                variants={variants}
+                model={vlmModel}
+                scope={scope}
+                variant={variant}
+                canAsk={active}
+                busy={vlmBusy}
+                status={vlmStatus}
+                output={vlmOutput}
+                prompt={prompt}
+                imageMaxSize={vlmMaxSize}
+                onImageMaxSizeChange={setVlmMaxSize}
+                onPromptChange={setPrompt}
+                onModelChange={setVlmModel}
+                onScopeChange={handleScopeChange}
+                onVariantChange={setVariant}
+                onAsk={handleAsk}
+                onAskPrompt={handleAskPrompt}
+                voice={{
+                  micSupported: va.micSupported,
+                  voiceMode: va.voiceMode,
+                  onToggleVoiceMode: va.toggleVoiceMode,
+                  speechSupported: va.speechSupported,
+                  spokenMode: va.spokenMode,
+                  onToggleSpokenMode: va.toggleSpokenMode,
+                  fillerMode: va.fillerMode,
+                  onToggleFillerMode: va.toggleFillerMode,
+                  status: va.status,
+                  speaking: va.speaking,
+                  onSpeak: () => va.speak(vlmOutput),
+                  onStopSpeak: va.stopSpeak,
+                  voices: va.voices,
+                  voiceURI: va.voiceURI,
+                  onVoiceChange: va.onVoiceChange,
+                }}
+              />
+            ),
+          },
+        ]}
+      >
         {robotCamMode ? (
           <RobotCameraStage
             frameUrl={robotFrameUrl}
@@ -533,106 +637,7 @@ export function LivePage() {
             </div>
           </>
         )}
-      </div>
-
-      <aside className="rounded-lg border border-line bg-panel p-3.5">
-        {cameraError && (
-          <p className="mt-0 mb-2.5 text-xs text-[#ff9aa6]">{cameraError}</p>
-        )}
-
-        {/* Two columns so the controls fit without a long scroll (col 1: live
-            detection + robot command · col 2: on-demand VLM). Single column on
-            narrow screens. */}
-        <div className="grid grid-cols-1 items-start gap-x-5 gap-y-4 md:grid-cols-2">
-          <div className="min-w-0">
-            <YoloPanel
-              models={options.yolo_models}
-              classOptions={classOptions}
-              model={yoloModel}
-              conf={conf}
-              imgsz={imgsz}
-              classes={classes}
-              maxFps={maxFps}
-              onModelChange={handleModelChange}
-              onConfChange={setConf}
-              onImgszChange={setImgsz}
-              onClassesChange={setClasses}
-              onMaxFpsChange={setMaxFps}
-            />
-
-            <hr className="my-4 border-0 border-t border-line" />
-
-            <CommandPanel
-              robots={robots}
-              robot={cmdRobot}
-              onRobotChange={setCmdRobot}
-              models={options.vlm_models}
-              model={cmdModel}
-              onModelChange={setCmdModel}
-              text={cmdText}
-              onTextChange={setCmdText}
-              busy={cmdBusy}
-              status={cmdStatus}
-              result={cmdResult}
-              micSupported={cmdRecorder.supported}
-              recording={cmdRecorder.recording}
-              onInterpret={handleInterpret}
-              onRecord={handleRecordCommand}
-              onExecuteOnRobot={handleExecuteOnRobot}
-              onStop={handleStopRobot}
-              executing={executing}
-              executeStatus={executeStatus}
-              execEnabled={execEnabled}
-              onToggleExecEnabled={toggleExecEnabled}
-              autoRun={autoRun}
-              onToggleAutoRun={toggleAutoRun}
-              safeMode={safeMode}
-              onToggleSafeMode={toggleSafeMode}
-            />
-          </div>
-
-          <div className="min-w-0">
-            <VlmPanel
-              models={options.vlm_models}
-              scopes={Object.keys(options.scopes)}
-              variants={variants}
-              model={vlmModel}
-              scope={scope}
-              variant={variant}
-              canAsk={active}
-              busy={vlmBusy}
-              status={vlmStatus}
-              output={vlmOutput}
-              prompt={prompt}
-              imageMaxSize={vlmMaxSize}
-              onImageMaxSizeChange={setVlmMaxSize}
-              onPromptChange={setPrompt}
-              onModelChange={setVlmModel}
-              onScopeChange={handleScopeChange}
-              onVariantChange={setVariant}
-              onAsk={handleAsk}
-              onAskPrompt={handleAskPrompt}
-              voice={{
-                micSupported: va.micSupported,
-                voiceMode: va.voiceMode,
-                onToggleVoiceMode: va.toggleVoiceMode,
-                speechSupported: va.speechSupported,
-                spokenMode: va.spokenMode,
-                onToggleSpokenMode: va.toggleSpokenMode,
-                fillerMode: va.fillerMode,
-                onToggleFillerMode: va.toggleFillerMode,
-                status: va.status,
-                speaking: va.speaking,
-                onSpeak: () => va.speak(vlmOutput),
-                onStopSpeak: va.stopSpeak,
-                voices: va.voices,
-                voiceURI: va.voiceURI,
-                onVoiceChange: va.onVoiceChange,
-              }}
-            />
-          </div>
-        </div>
-      </aside>
+      </ControlsStageLayout>
     </main>
   );
 }

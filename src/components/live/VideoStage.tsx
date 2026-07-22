@@ -1,7 +1,7 @@
-import { IconMaximize } from "@tabler/icons-react";
 import { useRef } from "react";
 import { DetectionOverlay } from "./DetectionOverlay";
 import { ControlBar } from "./ControlBar";
+import { FullscreenButton } from "../ui/FullscreenButton";
 import type { DetectedObject } from "../../types";
 import type { Facing } from "../../hooks/useCamera";
 
@@ -34,16 +34,6 @@ export function VideoStage({
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
 
-  const toggleFullscreen = () => {
-    const el = wrapRef.current;
-    if (!el) return;
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
-    } else {
-      el.requestFullscreen?.();
-    }
-  };
-
   return (
     <section className="min-w-0">
       <div
@@ -62,15 +52,7 @@ export function VideoStage({
           overrideColor={overrideColor}
           videoRef={videoRef}
         />
-        <button
-          type="button"
-          onClick={toggleFullscreen}
-          title="Fullscreen"
-          aria-label="Toggle fullscreen"
-          className="absolute right-2 top-2 flex items-center justify-center rounded bg-black/50 p-1.5 text-white hover:bg-black/70"
-        >
-          <IconMaximize size={18} stroke={2} />
-        </button>
+        <FullscreenButton targetRef={wrapRef} />
       </div>
       <ControlBar
         active={active}
