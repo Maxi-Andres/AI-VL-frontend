@@ -149,6 +149,33 @@ export async function fetchRobots(): Promise<RobotInfo[]> {
   return data.robots ?? [];
 }
 
+/** One parameter spec in a skill's catalog entry (bool flags carry `type`/`default`;
+ * choice params carry `values`). */
+export interface SkillParamSpec {
+  type?: string;
+  desc?: string;
+  default?: unknown;
+  values?: string[];
+}
+export interface SkillInfo {
+  desc: string;
+  params: Record<string, SkillParamSpec>;
+}
+
+/** The skill catalog for one robot (single source of truth in iacore's
+ * command_common). Used to build the drive pad's preset-action buttons so they
+ * never drift from what the robot can actually do. */
+export async function fetchSkills(
+  robot: string,
+): Promise<Record<string, SkillInfo>> {
+  const r = await fetch(
+    `${BACKEND_URL}/api/skills?robot=${encodeURIComponent(robot)}`,
+  );
+  if (!r.ok) throw new Error(`GET /api/skills -> ${r.status}`);
+  const data = (await r.json()) as { skills?: Record<string, SkillInfo> };
+  return data.skills ?? {};
+}
+
 /** Speech-to-text: send a recorded audio clip and get back the transcript. The
  * raw blob is the request body (Content-Type = the recorder's mime); Whisper runs
  * server-side in iacore. `translate` asks Whisper to translate to English. */

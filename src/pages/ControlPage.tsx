@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { executeCommand, setRobotCamera } from "../api/backend";
+import { executeCommand, fetchSkills, setRobotCamera } from "../api/backend";
+import type { SkillInfo } from "../api/backend";
 import { useRobotCameraView } from "../hooks/useRobotCameraView";
 import { Joystick } from "../components/control/Joystick";
+import { ActionPad } from "../components/control/ActionPad";
 import { Button } from "../components/ui/Button";
 import { FullscreenButton } from "../components/ui/FullscreenButton";
 
@@ -42,10 +44,18 @@ export function ControlPage() {
   const [armed, setArmed] = useState(false);
   const [speed, setSpeed] = useState<Speed>("normal");
   const [status, setStatus] = useState("");
+  // SAFE mode gates the acrobatic tricks (flips, handstand, upright). Default ON.
+  const [safeMode, setSafeMode] = useState(true);
+  const [skills, setSkills] = useState<Record<string, SkillInfo>>({});
   const [isTouch] = useState(
     () => typeof window !== "undefined" &&
       window.matchMedia?.("(pointer: coarse)").matches,
   );
+
+  // Load the Go2 skill catalog once (single source of truth for the preset buttons).
+  useEffect(() => {
+    fetchSkills(ROBOT).then(setSkills).catch(console.error);
+  }, []);
 
   // The robot camera is the backdrop. Start the bridge on mount, stop on unmount.
   const { frameUrl, connected } = useRobotCameraView(true, false);
@@ -186,11 +196,23 @@ export function ControlPage() {
     setStatus("⏹ Stopped");
   }, [sendStop]);
 
+  // Fire one preset skill (sit, hello, dance, gait…) from the side pad.
+  const runAction = useCallback(
+    (skill: string, params?: Record<string, unknown>) => {
+      executeCommand(ROBOT, skill, params ?? {}, safeMode)
+        .then(setStatusFrom)
+        .catch((e) => setStatus(`✗ ${e instanceof Error ? e.message : String(e)}`));
+    },
+    [safeMode, setStatusFrom],
+  );
+
   return (
     <main className="p-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        <div className="min-w-0 flex-1">
       <div
         ref={stageRef}
-        className="relative mx-auto aspect-[4/3] w-full max-w-4xl overflow-hidden rounded-lg border border-line bg-black"
+        className="relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-line bg-black"
       >
         {frameUrl ? (
           // eslint-disable-next-line jsx-a11y/alt-text
@@ -268,6 +290,29 @@ export function ControlPage() {
             {!armed && " · press “Arm to drive” first"}
           </div>
         )}
+      </div>
+        </div>
+
+        <aside className="rounded-lg border border-line bg-panel p-3 lg:w-[300px]">
+          <div className="mb-2.5 flex items-center justify-between gap-2">
+            <h2 className="m-0 text-[13px] font-semibold uppercase tracking-[0.04em] text-muted">
+              Preset actions
+            </h2>
+            <Button
+              variant={safeMode ? "primary" : "secondary"}
+              className="px-2 py-1 text-[11px]"
+              aria-pressed={safeMode}
+              title="Safe mode blocks acrobatic tricks (flips, handstand, walk-upright). Turn off to allow them."
+              onClick={() => setSafeMode((s) => !s)}
+            >
+              {safeMode ? "Safe: on" : "Safe: off"}
+            </Button>
+          </div>
+          {!armed && (
+            <p className="m-0 mb-2 text-xs text-muted">Arm (top-left) to enable.</p>
+          )}
+          <ActionPad skills={skills} disabled={!armed} onAction={runAction} />
+        </aside>
       </div>
     </main>
   );
