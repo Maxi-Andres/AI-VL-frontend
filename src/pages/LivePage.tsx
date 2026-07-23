@@ -47,8 +47,14 @@ export function LivePage() {
   // (viewed via the shared /ws/view fan-out). Turning one on turns the other off.
   const [robotCamMode, setRobotCamMode] = useState(false);
   const [robotCamStatus, setRobotCamStatus] = useState("");
-  const { frameUrl: robotFrameUrl, connected: robotViewConnected } =
-    useRobotCameraView(robotCamMode);
+  // Master YOLO on/off (shared session flag). Default OFF so no GPU is used until
+  // it's turned on — it applies to whichever video is showing (own camera or robot).
+  const [yoloEnabled, setYoloEnabled] = useState(false);
+  const {
+    frameUrl: robotFrameUrl,
+    connected: robotViewConnected,
+    objects: robotObjects,
+  } = useRobotCameraView(robotCamMode, yoloEnabled);
 
   // --- YOLO controls ---
   const [yoloModel, setYoloModel] = useState("");
@@ -142,9 +148,18 @@ export function LivePage() {
   }, [options]);
 
   const config = useMemo<YoloConfig>(
-    () => ({ model: yoloModel, conf, imgsz, classes, max_fps: maxFps }),
-    [yoloModel, conf, imgsz, classes, maxFps],
+    () => ({ model: yoloModel, conf, imgsz, classes, max_fps: maxFps, enabled: yoloEnabled }),
+    [yoloModel, conf, imgsz, classes, maxFps, yoloEnabled],
   );
+
+  // Turning YOLO off clears any boxes still on screen (no new frames arrive to
+  // clear them, since the pump stops sending).
+  useEffect(() => {
+    if (!yoloEnabled) {
+      setObjects([]);
+      setOverrideColor(undefined);
+    }
+  }, [yoloEnabled]);
 
   const onResult = useCallback((msg: DetectionMessage) => {
     setObjects(msg.objects);
@@ -178,6 +193,7 @@ export function LivePage() {
       if (state.imgsz != null) setImgsz(state.imgsz);
       if (state.classes != null) setClasses(state.classes);
       if (state.max_fps != null) setMaxFps(state.max_fps);
+      if (state.enabled != null) setYoloEnabled(state.enabled);
     },
     [yoloModel],
   );
@@ -518,6 +534,8 @@ export function LivePage() {
                 imgsz={imgsz}
                 classes={classes}
                 maxFps={maxFps}
+                enabled={yoloEnabled}
+                onEnabledChange={setYoloEnabled}
                 onModelChange={handleModelChange}
                 onConfChange={setConf}
                 onImgszChange={setImgsz}
@@ -609,6 +627,7 @@ export function LivePage() {
           <RobotCameraStage
             frameUrl={robotFrameUrl}
             connected={robotViewConnected}
+            objects={robotObjects}
             onExit={exitRobotCam}
           />
         ) : (

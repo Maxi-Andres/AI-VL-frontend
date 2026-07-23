@@ -111,6 +111,7 @@ export function useDetectionSocket({
       const minInterval = maxFps > 0 ? 1000 / maxFps : 0;
       const now = performance.now();
       if (
+        configRef.current.enabled && // YOLO off => send nothing (no GPU use)
         gctx &&
         ws.readyState === WebSocket.OPEN &&
         !inFlightRef.current &&

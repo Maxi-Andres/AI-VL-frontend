@@ -50,6 +50,10 @@ export interface YoloConfig {
   /** Client-side capture cap: max frames/sec the phone sends. 0 = unlimited.
    * Relayed through the shared config so it can be set from the monitor too. */
   max_fps?: number;
+  /** Master YOLO on/off. When false, no detection runs anywhere (own camera:
+   * no frames are sent; robot camera: the backend skips iacore) — so the GPU
+   * isn't used until it's turned on. Shared so any client can flip it. */
+  enabled?: boolean;
 }
 
 // --- WebSocket server -> client messages ---------------------------------- //
@@ -71,6 +75,7 @@ export interface ConfigState {
   imgsz?: number | null;
   classes?: string[] | null;
   max_fps?: number | null;
+  enabled?: boolean | null;
 }
 export interface ConfigAckMessage {
   type: "config";

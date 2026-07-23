@@ -59,6 +59,9 @@ export function MonitorPage() {
   const [classes, setClasses] = useState<string[]>([]);
   const [classOptions, setClassOptions] = useState<string[]>([]);
   const [maxFps, setMaxFps] = useState(15); // default cap; 0 = unlimited (caps the phone)
+  // Master YOLO on/off (shared session flag). Default OFF so no GPU is used until
+  // it's turned on; toggling it here pushes to the whole session.
+  const [yoloEnabled, setYoloEnabled] = useState(false);
 
   // --- VLM controls ---
   const [vlmModel, setVlmModel] = useState("");
@@ -164,6 +167,7 @@ export function MonitorPage() {
       if (state.imgsz != null) setImgsz(state.imgsz);
       if (state.classes != null) setClasses(state.classes);
       if (state.max_fps != null) setMaxFps(state.max_fps);
+      if (state.enabled != null) setYoloEnabled(state.enabled);
     },
     [yoloModel],
   );
@@ -561,6 +565,12 @@ export function MonitorPage() {
                 imgsz={imgsz}
                 classes={classes}
                 maxFps={maxFps}
+                enabled={yoloEnabled}
+                onEnabledChange={(v) => {
+                  setYoloEnabled(v);
+                  pushConfig({ enabled: v });
+                  if (!v) setObjects([]); // clear boxes right away when turning off
+                }}
                 onModelChange={(m) => {
                   handleModelChange(m);
                   pushConfig({ model: m, classes: [] });
