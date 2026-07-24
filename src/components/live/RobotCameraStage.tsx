@@ -1,27 +1,33 @@
 import { useEffect, useRef } from "react";
-import { Button } from "../ui/Button";
 import { FullscreenButton } from "../ui/FullscreenButton";
 import { drawBoxes } from "../../lib/draw";
 import type { DetectedObject } from "../../types";
 
 interface Props {
-  /** Latest robot-camera JPEG as a data URL (empty until the first frame). */
+  /** Latest frame as an object-URL (empty until the first frame). */
   frameUrl: string;
   connected: boolean;
-  /** Detection boxes for the current frame (empty when YOLO is off). */
+  /** Boxes to draw (live detections, or a VLM overlay). */
   objects: DetectedObject[];
-  /** Switch back to this device's own camera. */
-  onExit: () => void;
+  /** Force one color for all boxes (VLM overlay); omit for per-class colors. */
+  overrideColor?: string;
+  /** Caption shown under the video (e.g. "Robot camera" / "Session mirror"). */
+  label?: string;
 }
 
 /**
- * Shows the robot camera feed on the Live page (when the device is acting as a
- * remote monitor instead of using its own webcam). Renders the frame, a YOLO
- * overlay (only populated when detection is on), and a control to go back to the
- * own camera. The canvas tracks the frame's native size and uses the same
- * object-contain CSS, so normalized bboxes stay aligned.
+ * Read-only video stage for a fanned-out source (robot camera or a session
+ * mirror). Renders the frame, a YOLO/VLM overlay, and a fullscreen button. The
+ * canvas tracks the frame's native size and uses the same object-contain CSS, so
+ * normalized bboxes stay aligned. The camera-source picker lives on the page.
  */
-export function RobotCameraStage({ frameUrl, connected, objects, onExit }: Props) {
+export function RobotCameraStage({
+  frameUrl,
+  connected,
+  objects,
+  overrideColor,
+  label = "Robot camera",
+}: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -34,9 +40,9 @@ export function RobotCameraStage({ frameUrl, connected, objects, onExit }: Props
     const h = img?.naturalHeight || 960;
     if (canvas.width !== w) canvas.width = w;
     if (canvas.height !== h) canvas.height = h;
-    drawBoxes(canvas, objects);
+    drawBoxes(canvas, objects, overrideColor);
   };
-  useEffect(redraw, [objects, frameUrl]);
+  useEffect(redraw, [objects, overrideColor, frameUrl]);
 
   return (
     <section className="min-w-0">
@@ -55,7 +61,7 @@ export function RobotCameraStage({ frameUrl, connected, objects, onExit }: Props
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-sm text-muted">
-            {connected ? "Waiting for the robot camera…" : "Connecting…"}
+            {connected ? "Waiting for frames…" : "Connecting…"}
           </div>
         )}
         <canvas
@@ -65,13 +71,8 @@ export function RobotCameraStage({ frameUrl, connected, objects, onExit }: Props
         <FullscreenButton targetRef={wrapRef} />
       </div>
 
-      <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
-        <Button variant="secondary" onClick={onExit}>
-          Use my camera
-        </Button>
-        <span className="text-xs text-muted">
-          Robot camera {connected ? "· live" : "· connecting"}
-        </span>
+      <div className="mt-2.5 text-xs text-muted">
+        {label} {connected ? "· live" : "· connecting"}
       </div>
     </section>
   );

@@ -128,6 +128,10 @@ export interface RobotCameraStatus {
   streaming?: boolean;
   connected?: boolean;
   frames_sent?: number;
+  /** Live source params (Go2): capture rate, resolution preset, JPEG quality. */
+  fps?: number;
+  resolution?: string;
+  quality?: number;
   error?: string;
 }
 
@@ -137,6 +141,31 @@ export async function setRobotCamera(
 ): Promise<RobotCameraStatus> {
   const r = await fetch(`${BACKEND_URL}/api/robot-camera/${action}`, {
     method: "POST",
+  });
+  return r.json();
+}
+
+/** Current robot-camera bridge status (streaming + live source params). */
+export async function getRobotCameraStatus(): Promise<RobotCameraStatus> {
+  const r = await fetch(`${BACKEND_URL}/api/robot-camera/status`);
+  return r.json();
+}
+
+export interface RobotCameraConfig {
+  robot?: string; // go2 | g1 | test — switches the camera source
+  fps?: number;
+  resolution?: string; // native | 720p | 480p | 360p
+  quality?: number; // 0 = keep the robot's native JPEG quality
+}
+
+/** Reconfigure the shared robot-camera source (affects every viewer + Drive). */
+export async function setRobotCameraConfig(
+  cfg: RobotCameraConfig,
+): Promise<RobotCameraStatus> {
+  const r = await fetch(`${BACKEND_URL}/api/robot-camera/config`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(cfg),
   });
   return r.json();
 }

@@ -6,9 +6,7 @@ import { Joystick } from "../components/control/Joystick";
 import { ActionPad } from "../components/control/ActionPad";
 import { Button } from "../components/ui/Button";
 import { FullscreenButton } from "../components/ui/FullscreenButton";
-
-// Only the Go2 is wired in the executor today, so the drive pad targets it.
-const ROBOT = "go2";
+import { useRobot } from "../components/layout/RobotContext";
 
 // Max velocities per speed preset (m/s, m/s, rad/s). The executor also clamps.
 const SPEEDS: Record<string, { vx: number; vy: number; vyaw: number }> = {
@@ -52,10 +50,17 @@ export function ControlPage() {
       window.matchMedia?.("(pointer: coarse)").matches,
   );
 
-  // Load the Go2 skill catalog once (single source of truth for the preset buttons).
+  // Robot comes from the global header selector. Only the Go2 is wired in the
+  // executor today, so driving/actions are disabled (with a notice) for anything else.
+  const { robot } = useRobot();
+  const supported = robot === "go2";
+  const supportedRef = useRef(supported);
+  supportedRef.current = supported;
+
+  // Load the selected robot's skill catalog (single source of truth for the buttons).
   useEffect(() => {
-    fetchSkills(ROBOT).then(setSkills).catch(console.error);
-  }, []);
+    fetchSkills(robot).then(setSkills).catch(console.error);
+  }, [robot]);
 
   // The robot camera is the backdrop. Start the bridge on mount, stop on unmount.
   const { frameUrl, connected } = useRobotCameraView(true, false);
@@ -91,16 +96,16 @@ export function ControlPage() {
   const sendMove = useCallback(
     (v: Vel) => {
       executeCommand(
-        ROBOT, "move", { ...v, continuous: false, duration_s: DURATION_S }, true)
+        robot, "move", { ...v, continuous: false, duration_s: DURATION_S }, true)
         .then(setStatusFrom)
         .catch((e) => setStatus(`✗ ${e instanceof Error ? e.message : String(e)}`));
     },
-    [setStatusFrom],
+    [robot, setStatusFrom],
   );
 
   const sendStop = useCallback(() => {
-    executeCommand(ROBOT, "stop", {}, false).catch(() => {});
-  }, []);
+    executeCommand(robot, "stop", {}, false).catch(() => {});
+  }, [robot]);
 
   // Compute the current velocity from sticks + keys, scaled by the speed preset.
   const computeVel = useCallback((): Vel => {
@@ -134,7 +139,7 @@ export function ControlPage() {
       const isZero =
         Math.abs(v.vx) < DEAD && Math.abs(v.vy) < DEAD && Math.abs(v.vyaw) < DEAD;
 
-      if (!armedRef.current || isZero) {
+      if (!armedRef.current || !supportedRef.current || isZero) {
         if (!stoppedRef.current) {
           sendStop();
           stoppedRef.current = true;
@@ -199,11 +204,11 @@ export function ControlPage() {
   // Fire one preset skill (sit, hello, dance, gait…) from the side pad.
   const runAction = useCallback(
     (skill: string, params?: Record<string, unknown>) => {
-      executeCommand(ROBOT, skill, params ?? {}, safeMode)
+      executeCommand(robot, skill, params ?? {}, safeMode)
         .then(setStatusFrom)
         .catch((e) => setStatus(`✗ ${e instanceof Error ? e.message : String(e)}`));
     },
-    [safeMode, setStatusFrom],
+    [robot, safeMode, setStatusFrom],
   );
 
   return (
@@ -308,10 +313,21 @@ export function ControlPage() {
               {safeMode ? "Safe: on" : "Safe: off"}
             </Button>
           </div>
-          {!armed && (
-            <p className="m-0 mb-2 text-xs text-muted">Arm (top-left) to enable.</p>
+          {!supported ? (
+            <p className="m-0 mb-2 text-xs text-[#ff9aa6]">
+              “{robot}” is not supported by the executor yet — only the Go2 can be
+              driven. Switch the robot to Go2 in the header.
+            </p>
+          ) : (
+            !armed && (
+              <p className="m-0 mb-2 text-xs text-muted">Arm (top-left) to enable.</p>
+            )
           )}
-          <ActionPad skills={skills} disabled={!armed} onAction={runAction} />
+          <ActionPad
+            skills={skills}
+            disabled={!armed || !supported}
+            onAction={runAction}
+          />
         </aside>
       </div>
     </main>

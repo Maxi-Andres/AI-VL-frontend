@@ -4,7 +4,6 @@ import {
   askVlmStream,
   executeCommand,
   fetchClasses,
-  fetchRobots,
   interpretCommand,
   setRobotCamera,
   transcribeAudio,
@@ -17,6 +16,7 @@ import { VlmPanel } from "../components/live/VlmPanel";
 import { CommandPanel } from "../components/live/CommandPanel";
 import { Button } from "../components/ui/Button";
 import { useStatus } from "../components/layout/StatusContext";
+import { useRobot } from "../components/layout/RobotContext";
 import { fmtMs } from "../lib/format";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { useCamera } from "../hooks/useCamera";
@@ -29,7 +29,6 @@ import type {
   ConfigState,
   DetectedObject,
   DetectionMessage,
-  RobotInfo,
   YoloConfig,
 } from "../types";
 
@@ -43,18 +42,18 @@ export function LivePage() {
   const { videoRef, active, facing, error: cameraError, start, stop, flip } =
     useCamera();
 
-  // Camera source is EXCLUSIVE: this device's own webcam, or the robot's camera
-  // (viewed via the shared /ws/view fan-out). Turning one on turns the other off.
-  const [robotCamMode, setRobotCamMode] = useState(false);
+  // The camera source is EXCLUSIVE and one of three modes (this single page
+  // replaces the old Live + Monitor pages):
+  //   "own"   -> this device's webcam; we PRODUCE frames to /ws/detect.
+  //   "robot" -> the robot camera; we start the bridge and VIEW /ws/view.
+  //   "view"  -> a read-only MIRROR of whatever the session is showing (/ws/view),
+  //              without producing or starting the robot camera.
+  const [source, setSource] = useState<"own" | "robot" | "view">("own");
   const [robotCamStatus, setRobotCamStatus] = useState("");
+  const viewing = source !== "own"; // true when we're a /ws/view consumer
   // Master YOLO on/off (shared session flag). Default OFF so no GPU is used until
-  // it's turned on — it applies to whichever video is showing (own camera or robot).
+  // it's turned on — it applies to whichever video is showing.
   const [yoloEnabled, setYoloEnabled] = useState(false);
-  const {
-    frameUrl: robotFrameUrl,
-    connected: robotViewConnected,
-    objects: robotObjects,
-  } = useRobotCameraView(robotCamMode, yoloEnabled);
 
   // --- YOLO controls ---
   const [yoloModel, setYoloModel] = useState("");
@@ -89,8 +88,8 @@ export function LivePage() {
 
   // --- Robot command interpreter state (verification view) ---
   const cmdRecorder = useAudioRecorder();
-  const [robots, setRobots] = useState<RobotInfo[]>([]);
-  const [cmdRobot, setCmdRobot] = useState("g1");
+  // Robot is chosen globally in the header now (shared context).
+  const { robot: cmdRobot } = useRobot();
   const [cmdModel, setCmdModel] = useState("");
   const [cmdText, setCmdText] = useState("");
   const [cmdBusy, setCmdBusy] = useState(false);
@@ -115,10 +114,6 @@ export function LivePage() {
   safeModeRef.current = safeMode;
   const cmdAbortRef = useRef<AbortController | null>(null);
   useEffect(() => () => cmdAbortRef.current?.abort(), []);
-  // Load the robot list (G1, Go2) once for the command interpreter's selector.
-  useEffect(() => {
-    fetchRobots().then(setRobots).catch(console.error);
-  }, []);
 
   const initialized = useRef(false);
   const lastFrameTsRef = useRef(0); // for measuring the actual processed FPS
@@ -198,6 +193,33 @@ export function LivePage() {
     [yoloModel],
   );
 
+  // Viewer/mirror source (robot camera or plain mirror of the session). Adopts the
+  // server's shared config so the panels stay in sync, and exposes `sendViewConfig`
+  // so panel changes here propagate to the producer + robot-cam detection.
+  const {
+    frameUrl: robotFrameUrl,
+    connected: robotViewConnected,
+    objects: robotObjects,
+    getLastFrameBlob,
+    sendConfig: sendViewConfig,
+  } = useRobotCameraView(viewing, yoloEnabled, applyServerConfig);
+
+  // While viewing, push config changes over the view socket (no-op when producing;
+  // the detect socket below handles that case). The hub only rebroadcasts real
+  // changes, so this won't loop with the adopt above.
+  useEffect(() => {
+    if (viewing) sendViewConfig(config);
+  }, [config, viewing, sendViewConfig]);
+
+  // While viewing, the live boxes come from the fan-out (`robotObjects`); mirror
+  // them into the shared overlay state (a VLM ask can still override with blue).
+  useEffect(() => {
+    if (viewing) {
+      setObjects(robotObjects);
+      setOverrideColor(undefined);
+    }
+  }, [viewing, robotObjects]);
+
   const { connected } = useDetectionSocket({
     active,
     videoRef,
@@ -207,7 +229,10 @@ export function LivePage() {
     onConfig: applyServerConfig,
   });
 
-  useEffect(() => setConnected(connected), [connected, setConnected]);
+  useEffect(
+    () => setConnected(viewing ? robotViewConnected : connected),
+    [viewing, connected, robotViewConnected, setConnected],
+  );
 
   // --- Handlers ---
   const handleStart = useCallback(() => {
@@ -225,11 +250,19 @@ export function LivePage() {
     lastFrameTsRef.current = 0;
   }, [stop]);
 
-  // Switch to the robot camera (exclusive): stop our own webcam, then start the
-  // robot camera stream and view it via /ws/view (see the render + hook).
-  const enterRobotCam = useCallback(async () => {
+  // Use this device's own webcam (producer). Stops the robot camera if we started it.
+  const useOwnCamera = useCallback(async () => {
+    if (source === "robot") {
+      try { await setRobotCamera("stop"); } catch { /* ignore */ }
+    }
+    setRobotCamStatus("");
+    setSource("own");
+  }, [source]);
+
+  // Use the robot camera: stop our webcam, start the bridge, view via /ws/view.
+  const useRobotCam = useCallback(async () => {
     handleStop();
-    setRobotCamMode(true);
+    setSource("robot");
     setRobotCamStatus("Starting robot camera…");
     try {
       const r = await setRobotCamera("start");
@@ -239,16 +272,35 @@ export function LivePage() {
     }
   }, [handleStop]);
 
-  // Back to our own camera (exclusive): stop the robot camera stream.
-  const exitRobotCam = useCallback(async () => {
-    setRobotCamMode(false);
-    setRobotCamStatus("");
-    try {
-      await setRobotCamera("stop");
-    } catch {
-      /* ignore */
+  // Mirror the session read-only (what the old Monitor did): view /ws/view without
+  // producing or starting the robot camera.
+  const useMirror = useCallback(async () => {
+    handleStop();
+    if (source === "robot") {
+      try { await setRobotCamera("stop"); } catch { /* ignore */ }
     }
-  }, []);
+    setRobotCamStatus("");
+    setSource("view");
+  }, [handleStop, source]);
+
+  // The current JPEG frame for a VLM ask, from whichever source is active: capture
+  // from our webcam, or convert the latest fanned-out frame Blob to a data URL.
+  const getCurrentFrame = useCallback(async (): Promise<string | null> => {
+    if (source === "own") {
+      const video = videoRef.current;
+      if (!video?.videoWidth) return null;
+      const { captureFrame } = await import("../lib/capture");
+      return captureFrame(video, 0.85, vlmMaxSize);
+    }
+    const blob = getLastFrameBlob();
+    if (!blob) return null;
+    return await new Promise((resolve) => {
+      const r = new FileReader();
+      r.onload = () => resolve(typeof r.result === "string" ? r.result : null);
+      r.onerror = () => resolve(null);
+      r.readAsDataURL(blob);
+    });
+  }, [source, videoRef, vlmMaxSize, getLastFrameBlob]);
 
   const handleModelChange = useCallback((model: string) => {
     setYoloModel(model);
@@ -266,10 +318,7 @@ export function LivePage() {
   );
 
   const handleAsk = useCallback(async () => {
-    const video = videoRef.current;
-    if (!video?.videoWidth) return;
-    const { captureFrame } = await import("../lib/capture");
-    const image = captureFrame(video, 0.85, vlmMaxSize);
+    const image = await getCurrentFrame();
     if (!image) return;
 
     vlmAbortRef.current?.abort();
@@ -301,7 +350,7 @@ export function LivePage() {
     } finally {
       setVlmBusy(false);
     }
-  }, [videoRef, vlmModel, scope, variant, vlmMaxSize]);
+  }, [getCurrentFrame, vlmModel, scope, variant]);
 
   // Free-form question about the current frame, STREAMED. `onDelta` receives each
   // text chunk as the model generates it (shown live + spoken sentence by
@@ -313,10 +362,7 @@ export function LivePage() {
     ): Promise<string | null> => {
       // Reflect what we're about to send in the prompt box (esp. voice dictation).
       setPrompt(prompt);
-      const video = videoRef.current;
-      if (!video?.videoWidth) return null;
-      const { captureFrame } = await import("../lib/capture");
-      const image = captureFrame(video, 0.85, vlmMaxSize);
+      const image = await getCurrentFrame();
       if (!image) return null;
 
       vlmAbortRef.current?.abort();
@@ -353,7 +399,7 @@ export function LivePage() {
         setVlmBusy(false);
       }
     },
-    [videoRef, vlmModel, vlmMaxSize],
+    [getCurrentFrame, vlmModel],
   );
 
   // Hands-free voice: say "robot", speak the question, it auto-submits and (in
@@ -549,9 +595,6 @@ export function LivePage() {
             title: "Robot command",
             node: (
               <CommandPanel
-                robots={robots}
-                robot={cmdRobot}
-                onRobotChange={setCmdRobot}
                 models={options.vlm_models}
                 model={cmdModel}
                 onModelChange={setCmdModel}
@@ -588,7 +631,7 @@ export function LivePage() {
                 model={vlmModel}
                 scope={scope}
                 variant={variant}
-                canAsk={active}
+                canAsk={source === "own" ? active : !!robotFrameUrl}
                 busy={vlmBusy}
                 status={vlmStatus}
                 output={vlmOutput}
@@ -623,39 +666,48 @@ export function LivePage() {
           },
         ]}
       >
-        {robotCamMode ? (
+        {source === "own" ? (
+          <VideoStage
+            videoRef={videoRef}
+            objects={objects}
+            overrideColor={overrideColor}
+            active={active}
+            facing={facing}
+            fps={fps}
+            count={count}
+            onStart={handleStart}
+            onStop={handleStop}
+            onFlip={flip}
+          />
+        ) : (
           <RobotCameraStage
             frameUrl={robotFrameUrl}
             connected={robotViewConnected}
-            objects={robotObjects}
-            onExit={exitRobotCam}
+            objects={objects}
+            overrideColor={overrideColor}
+            label={source === "robot" ? "Robot camera" : "Session mirror"}
           />
-        ) : (
-          <>
-            <VideoStage
-              videoRef={videoRef}
-              objects={objects}
-              overrideColor={overrideColor}
-              active={active}
-              facing={facing}
-              fps={fps}
-              count={count}
-              onStart={handleStart}
-              onStop={handleStop}
-              onFlip={flip}
-            />
-            {/* Turn this device into a remote monitor of the robot camera
-                (exclusive with the own webcam above). */}
-            <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
-              <Button variant="secondary" onClick={enterRobotCam}>
-                Use robot camera
-              </Button>
-              {robotCamStatus && (
-                <span className="text-xs text-muted">{robotCamStatus}</span>
-              )}
-            </div>
-          </>
         )}
+        {/* Camera source picker (this one page replaces Live + Monitor). */}
+        <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
+          <Button variant={source === "own" ? "primary" : "secondary"} onClick={useOwnCamera}>
+            My camera
+          </Button>
+          <Button variant={source === "robot" ? "primary" : "secondary"} onClick={useRobotCam}>
+            Robot camera
+          </Button>
+          <Button variant={source === "view" ? "primary" : "secondary"} onClick={useMirror}>
+            View only
+          </Button>
+          {robotCamStatus && (
+            <span className="text-xs text-muted">{robotCamStatus}</span>
+          )}
+          {viewing && (
+            <span className="text-xs text-muted tabular-nums">
+              {objects.length} objects
+            </span>
+          )}
+        </div>
       </ControlsStageLayout>
     </main>
   );

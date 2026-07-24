@@ -1,14 +1,11 @@
 import { IconMicrophone, IconMicrophoneOff } from "@tabler/icons-react";
-import type { CommandResponse, RobotInfo } from "../../types";
+import type { CommandResponse } from "../../types";
 import { Button } from "../ui/Button";
 import { Field } from "../ui/Field";
 import { Select } from "../ui/Select";
 
 interface Props {
-  /** Robots the interpreter can target (e.g. G1, Go2). */
-  robots: RobotInfo[];
-  robot: string;
-  onRobotChange: (v: string) => void;
+  // Robot is selected globally in the header (see RobotContext); not a prop here.
   models: string[];
   model: string;
   onModelChange: (v: string) => void;
@@ -51,9 +48,6 @@ interface Props {
  * not drive the robot; it only shows the decision.
  */
 export function CommandPanel({
-  robots,
-  robot,
-  onRobotChange,
   models,
   model,
   onModelChange,
@@ -88,22 +82,6 @@ export function CommandPanel({
       <h2 className="m-0 mb-2.5 text-[13px] font-semibold uppercase tracking-[0.04em] text-muted">
         Robot command (interpreter)
       </h2>
-
-      {robots.length > 1 && (
-        <Field label="Robot" inline>
-          <select
-            value={robot}
-            onChange={(e) => onRobotChange(e.target.value)}
-            className="w-full rounded-md border border-line bg-bg p-1.5 text-fg focus:border-accent focus:outline-none"
-          >
-            {robots.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-      )}
 
       <Field
         label="Model"
