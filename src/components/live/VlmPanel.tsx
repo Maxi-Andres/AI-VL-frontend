@@ -1,4 +1,6 @@
 import {
+  IconMessage,
+  IconMessageOff,
   IconMicrophone,
   IconMicrophoneOff,
   IconPlayerStopFilled,
@@ -8,6 +10,9 @@ import {
 import { Button } from "../ui/Button";
 import { Field } from "../ui/Field";
 import { Select } from "../ui/Select";
+
+// Longer-side sizes (px) offered for the frame sent to the VLM; "Full" = native.
+const VLM_IMG_SIZES = ["512", "768", "1024", "Full"];
 
 /** Hands-free voice controls, produced by useVoiceAssistant. */
 export interface VoiceControls {
@@ -19,6 +24,9 @@ export interface VoiceControls {
   speechSupported: boolean;
   spokenMode: boolean;
   onToggleSpokenMode: () => void;
+  /** Speak a short "thinking" filler when the answer is slow to start. */
+  fillerMode: boolean;
+  onToggleFillerMode: () => void;
   /** Status of the voice loop (e.g. "Listening for the wake word…"). */
   status: string;
   /** A TTS utterance is currently playing. */
@@ -45,6 +53,11 @@ interface Props {
   output: string;
   /** Free-prompt text (controlled here so dictation can populate it). */
   prompt: string;
+  /** Optional: longer-side px of the frame sent to the VLM (0 = native). Rendered
+   * only when provided — the live camera page owns capture; the monitor mirrors
+   * the phone's frames and has no say here. */
+  imageMaxSize?: number;
+  onImageMaxSizeChange?: (v: number) => void;
   onPromptChange: (v: string) => void;
   onModelChange: (v: string) => void;
   onScopeChange: (v: string) => void;
@@ -68,6 +81,8 @@ export function VlmPanel({
   status,
   output,
   prompt,
+  imageMaxSize,
+  onImageMaxSizeChange,
   onPromptChange,
   onModelChange,
   onScopeChange,
@@ -90,7 +105,7 @@ export function VlmPanel({
         />
       </Field>
 
-      <Field label="Scope">
+      <Field label="Scope" inline>
         <Select
           options={scopes}
           value={scope}
@@ -98,13 +113,31 @@ export function VlmPanel({
         />
       </Field>
 
-      <Field label="Prompt variant">
+      <Field label="Prompt variant" inline>
         <Select
           options={variants}
           value={variant}
           onChange={(e) => onVariantChange(e.target.value)}
         />
       </Field>
+
+      {imageMaxSize !== undefined && onImageMaxSizeChange && (
+        <Field
+          label="Image quality (VLM)"
+          hint="Bigger = more detail but slower; smaller = faster answers."
+          inline
+        >
+          <Select
+            options={VLM_IMG_SIZES}
+            value={imageMaxSize > 0 ? String(imageMaxSize) : "Full"}
+            onChange={(e) =>
+              onImageMaxSizeChange(
+                e.target.value === "Full" ? 0 : parseInt(e.target.value, 10),
+              )
+            }
+          />
+        </Field>
+      )}
 
       <Button
         variant="accent"
@@ -128,41 +161,63 @@ export function VlmPanel({
         />
       </Field>
 
-      {/* Hands-free voice toggles: mic (wake word) + spoken answers. */}
+      {/* Hands-free voice toggles: mic (wake word) + spoken answers. Compact so
+          all three fit on one row; on/off is shown by the icon + color. The
+          status sits on its own line below so it never pushes a button down. */}
       {(voice.micSupported || voice.speechSupported) && (
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          {voice.micSupported && (
-            <Button
-              variant={voice.voiceMode ? "primary" : "secondary"}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs"
-              aria-pressed={voice.voiceMode}
-              onClick={voice.onToggleVoiceMode}
-            >
-              {voice.voiceMode ? (
-                <IconMicrophone size={16} stroke={2} />
-              ) : (
-                <IconMicrophoneOff size={16} stroke={2} />
-              )}
-              Voice {voice.voiceMode ? "on" : "off"}
-            </Button>
-          )}
-          {voice.speechSupported && (
-            <Button
-              variant={voice.spokenMode ? "primary" : "secondary"}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs"
-              aria-pressed={voice.spokenMode}
-              onClick={voice.onToggleSpokenMode}
-            >
-              {voice.spokenMode ? (
-                <IconVolume size={16} stroke={2} />
-              ) : (
-                <IconVolumeOff size={16} stroke={2} />
-              )}
-              Speak {voice.spokenMode ? "on" : "off"}
-            </Button>
-          )}
+        <div className="mb-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {voice.micSupported && (
+              <Button
+                variant={voice.voiceMode ? "primary" : "secondary"}
+                className="inline-flex items-center gap-1 px-2 py-1 text-[11px]"
+                aria-pressed={voice.voiceMode}
+                title={`Voice ${voice.voiceMode ? "on" : "off"}`}
+                onClick={voice.onToggleVoiceMode}
+              >
+                {voice.voiceMode ? (
+                  <IconMicrophone size={14} stroke={2} />
+                ) : (
+                  <IconMicrophoneOff size={14} stroke={2} />
+                )}
+                Voice
+              </Button>
+            )}
+            {voice.speechSupported && (
+              <Button
+                variant={voice.spokenMode ? "primary" : "secondary"}
+                className="inline-flex items-center gap-1 px-2 py-1 text-[11px]"
+                aria-pressed={voice.spokenMode}
+                title={`Speak ${voice.spokenMode ? "on" : "off"}`}
+                onClick={voice.onToggleSpokenMode}
+              >
+                {voice.spokenMode ? (
+                  <IconVolume size={14} stroke={2} />
+                ) : (
+                  <IconVolumeOff size={14} stroke={2} />
+                )}
+                Speak
+              </Button>
+            )}
+            {voice.speechSupported && (
+              <Button
+                variant={voice.fillerMode ? "primary" : "secondary"}
+                className="inline-flex items-center gap-1 px-2 py-1 text-[11px]"
+                aria-pressed={voice.fillerMode}
+                onClick={voice.onToggleFillerMode}
+                title="Speak a short filler if the answer is slow to start (needs Speak on)"
+              >
+                {voice.fillerMode ? (
+                  <IconMessage size={14} stroke={2} />
+                ) : (
+                  <IconMessageOff size={14} stroke={2} />
+                )}
+                Filler
+              </Button>
+            )}
+          </div>
           {voice.status && (
-            <span className="text-xs text-muted">{voice.status}</span>
+            <span className="mt-1 block text-xs text-muted">{voice.status}</span>
           )}
         </div>
       )}

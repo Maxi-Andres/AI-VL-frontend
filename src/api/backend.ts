@@ -1,7 +1,14 @@
 // REST helpers for the backend gateway. All network knowledge of the backend
 // lives here (plus the WebSocket in useDetectionSocket).
 import { BACKEND_URL } from "../config";
-import type { Options, TranscribeResponse, VlmResponse } from "../types";
+import type {
+  CommandResponse,
+  ExecuteResponse,
+  Options,
+  RobotInfo,
+  TranscribeResponse,
+  VlmResponse,
+} from "../types";
 
 export async function fetchOptions(): Promise<Options> {
   const r = await fetch(`${BACKEND_URL}/api/options`);
@@ -28,12 +35,17 @@ export interface VlmRequest {
   prompt?: string;
 }
 
-export async function askVlm(req: VlmRequest): Promise<VlmResponse> {
+export async function askVlm(
+  req: VlmRequest,
+  signal?: AbortSignal,
+): Promise<VlmResponse> {
   const r = await fetch(`${BACKEND_URL}/api/vlm`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
+    signal,
   });
+  if (!r.ok) throw new Error(`POST /api/vlm -> ${r.status}`);
   return r.json();
 }
 
@@ -45,11 +57,13 @@ export async function askVlm(req: VlmRequest): Promise<VlmResponse> {
 export async function askVlmStream(
   req: { image: string; model: string; prompt: string },
   onDelta: (piece: string) => void,
+  signal?: AbortSignal,
 ): Promise<string> {
   const r = await fetch(`${BACKEND_URL}/api/vlm/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
+    signal,
   });
   if (!r.ok || !r.body) throw new Error(`POST /api/vlm/stream -> ${r.status}`);
   const reader = r.body.getReader();
@@ -65,6 +79,130 @@ export async function askVlmStream(
     }
   }
   return full;
+}
+
+/**
+ * Interpret a spoken/typed command into a Unitree G1 skill JSON. Returns the
+ * chosen skill + params (the interpreter's decision only — nothing moves yet), so
+ * the UI can show whether the command was understood correctly.
+ */
+export async function interpretCommand(
+  text: string,
+  model?: string,
+  robot?: string,
+  signal?: AbortSignal,
+): Promise<CommandResponse> {
+  const r = await fetch(`${BACKEND_URL}/api/command`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, model, robot }),
+    signal,
+  });
+  if (!r.ok) throw new Error(`POST /api/command -> ${r.status}`);
+  return r.json();
+}
+
+/**
+ * Send a chosen skill to the robot executor so the robot acts on it. Does NOT throw
+ * on a 4xx/5xx — the executor returns a JSON body (e.g. SAFE_MODE block, unreachable)
+ * that the UI shows as-is.
+ */
+export async function executeCommand(
+  robot: string,
+  skill: string,
+  params: Record<string, unknown>,
+  safeMode: boolean,
+): Promise<ExecuteResponse> {
+  const r = await fetch(`${BACKEND_URL}/api/execute`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ robot, skill, params, safe_mode: safeMode }),
+  });
+  return r.json();
+}
+
+/** Status of the robot camera bridge (from /api/robot-camera/*). */
+export interface RobotCameraStatus {
+  ok?: boolean;
+  robot?: string;
+  streaming?: boolean;
+  connected?: boolean;
+  frames_sent?: number;
+  /** Live source params (Go2): capture rate, resolution preset, JPEG quality. */
+  fps?: number;
+  resolution?: string;
+  quality?: number;
+  error?: string;
+}
+
+/** Start/stop the robot camera stream (the bridge feeds the monitors directly). */
+export async function setRobotCamera(
+  action: "start" | "stop",
+): Promise<RobotCameraStatus> {
+  const r = await fetch(`${BACKEND_URL}/api/robot-camera/${action}`, {
+    method: "POST",
+  });
+  return r.json();
+}
+
+/** Current robot-camera bridge status (streaming + live source params). */
+export async function getRobotCameraStatus(): Promise<RobotCameraStatus> {
+  const r = await fetch(`${BACKEND_URL}/api/robot-camera/status`);
+  return r.json();
+}
+
+export interface RobotCameraConfig {
+  robot?: string; // go2 | g1 | test — switches the camera source
+  fps?: number;
+  resolution?: string; // native | 720p | 480p | 360p
+  quality?: number; // 0 = keep the robot's native JPEG quality
+}
+
+/** Reconfigure the shared robot-camera source (affects every viewer + Drive). */
+export async function setRobotCameraConfig(
+  cfg: RobotCameraConfig,
+): Promise<RobotCameraStatus> {
+  const r = await fetch(`${BACKEND_URL}/api/robot-camera/config`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(cfg),
+  });
+  return r.json();
+}
+
+/** List the robots the command interpreter can target (for the robot selector). */
+export async function fetchRobots(): Promise<RobotInfo[]> {
+  const r = await fetch(`${BACKEND_URL}/api/skills`);
+  if (!r.ok) throw new Error(`GET /api/skills -> ${r.status}`);
+  const data = (await r.json()) as { robots?: RobotInfo[] };
+  return data.robots ?? [];
+}
+
+/** One parameter spec in a skill's catalog entry (bool flags carry `type`/`default`;
+ * choice params carry `values`). */
+export interface SkillParamSpec {
+  type?: string;
+  desc?: string;
+  default?: unknown;
+  values?: string[];
+}
+export interface SkillInfo {
+  desc: string;
+  params: Record<string, SkillParamSpec>;
+}
+
+/** The skill catalog for one robot (single source of truth in iacore's
+ * command_common). Used to build the drive pad's preset-action buttons so they
+ * never drift from what the robot can actually do. */
+export async function fetchSkills(
+  robot: string,
+): Promise<Record<string, SkillInfo>> {
+  const r = await fetch(
+    `${BACKEND_URL}/api/skills?robot=${encodeURIComponent(robot)}`,
+  );
+  if (!r.ok) throw new Error(`GET /api/skills -> ${r.status}`);
+  const data = (await r.json()) as { skills?: Record<string, SkillInfo> };
+  return data.skills ?? {};
 }
 
 /** Speech-to-text: send a recorded audio clip and get back the transcript. The

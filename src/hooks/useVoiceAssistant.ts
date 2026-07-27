@@ -18,6 +18,23 @@ import { useWakeWord } from "./useWakeWord";
  */
 const LS_VOICE = "aivl.voiceMode";
 const LS_SPOKEN = "aivl.spokenMode";
+const LS_FILLER = "aivl.fillerMode";
+
+// Short "thinking" fillers spoken while the VLM works, so a slow answer isn't
+// preceded by dead air. These are SPOKEN CONTENT (audio for the end user), not UI
+// text: they must be real pronounceable words in the TTS voice's language, since a
+// neural voice spells non-words out ("Hmm" -> "h-m-m"). The default voice is
+// Spanish (es_AR-daniela-high) and the whole voice loop is Spanish (Whisper input,
+// VLM answer), so the fillers are Spanish to match. Each ends in a period so the
+// SpeechQueue flushes it immediately instead of buffering.
+const FILLERS = ["Eh, a ver.", "Dejame ver.", "Un momento.", "A ver."];
+// Only speak a filler if the answer hasn't started within this window, so a fast
+// reply is never preceded by (or talked over with) a filler.
+const FILLER_DELAY_MS = 2000;
+
+function pickFiller(): string {
+  return FILLERS[Math.floor(Math.random() * FILLERS.length)];
+}
 
 function readFlag(key: string): boolean {
   if (typeof localStorage === "undefined") return false;
@@ -44,6 +61,8 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
 
   const [voiceMode, setVoiceMode] = useState(() => readFlag(LS_VOICE));
   const [spokenMode, setSpokenMode] = useState(() => readFlag(LS_SPOKEN));
+  // Filler word (spoken "thinking" cue on a slow answer) — off by default.
+  const [fillerMode, setFillerMode] = useState(() => readFlag(LS_FILLER));
   const [status, setStatus] = useState("");
   const [phase, setPhase] = useState<VoicePhase>("off");
 
@@ -52,6 +71,8 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
   voiceModeRef.current = voiceMode;
   const spokenModeRef = useRef(spokenMode);
   spokenModeRef.current = spokenMode;
+  const fillerModeRef = useRef(fillerMode);
+  fillerModeRef.current = fillerMode;
   const askPromptStreamRef = useRef(askPromptStream);
   askPromptStreamRef.current = askPromptStream;
   const busyRef = useRef(false); // one command at a time
@@ -76,6 +97,7 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
     wake.stop(); // free the mic to record the command cleanly
 
     let spoke = false;
+    let fillerTimer: ReturnType<typeof setTimeout> | null = null;
     try {
       setPhase("recording");
       setStatus("Listening… speak your question");
@@ -97,10 +119,27 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
       // Stream the answer: speak each sentence as soon as it lands, so the reply
       // starts playing while the model is still generating the rest.
       const stream = spokenModeRef.current ? speech.createStream() : null;
-      let first = true;
+      let answerStarted = false;
+      if (stream && fillerModeRef.current) {
+        // Speak a filler only if the answer is slow to start (see FILLER_DELAY_MS):
+        // covers a slow VLM without preceding a fast reply. The real answer
+        // sentences are spoken after the filler, in order.
+        fillerTimer = setTimeout(() => {
+          fillerTimer = null;
+          if (!answerStarted) {
+            stream.push(pickFiller());
+            spoke = true;
+            setPhase("speaking");
+          }
+        }, FILLER_DELAY_MS);
+      }
       await askPromptStreamRef.current(text, (piece) => {
-        if (first) {
-          first = false;
+        if (!answerStarted) {
+          answerStarted = true;
+          if (fillerTimer) {
+            clearTimeout(fillerTimer); // answer beat the filler -> skip it
+            fillerTimer = null;
+          }
           if (stream) {
             spoke = true;
             setPhase("speaking");
@@ -112,6 +151,7 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
     } catch (e) {
       setStatus(`Voice error: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
+      if (fillerTimer) clearTimeout(fillerTimer);
       // ALWAYS return to listening so the wake word keeps working every time.
       // (We resume even while the answer is still being spoken, so "robot"
       // interrupts it — the barge-in in speech.cancel() above.)
@@ -169,13 +209,24 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
     });
   }, []);
 
+  const toggleFillerMode = useCallback(() => {
+    setFillerMode((v) => {
+      const next = !v;
+      if (typeof localStorage !== "undefined")
+        localStorage.setItem(LS_FILLER, next ? "1" : "0");
+      return next;
+    });
+  }, []);
+
   return {
     micSupported,
     speechSupported: speech.supported,
     voiceMode,
     spokenMode,
+    fillerMode,
     toggleVoiceMode,
     toggleSpokenMode,
+    toggleFillerMode,
     status: status || wake.error || "",
     phase,
     speaking: speech.speaking,

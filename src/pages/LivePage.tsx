@@ -1,15 +1,31 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { askVlm, askVlmStream, fetchClasses } from "../api/backend";
+import {
+  askVlm,
+  askVlmStream,
+  executeCommand,
+  fetchClasses,
+  interpretCommand,
+  setRobotCamera,
+  transcribeAudio,
+} from "../api/backend";
 import { VideoStage } from "../components/live/VideoStage";
+import { RobotCameraStage } from "../components/live/RobotCameraStage";
+import { ControlsStageLayout } from "../components/live/ControlsStageLayout";
 import { YoloPanel } from "../components/live/YoloPanel";
 import { VlmPanel } from "../components/live/VlmPanel";
+import { CommandPanel } from "../components/live/CommandPanel";
+import { Button } from "../components/ui/Button";
 import { useStatus } from "../components/layout/StatusContext";
+import { useRobot } from "../components/layout/RobotContext";
 import { fmtMs } from "../lib/format";
+import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { useCamera } from "../hooks/useCamera";
 import { useDetectionSocket } from "../hooks/useDetectionSocket";
 import { useOptions } from "../hooks/useOptions";
+import { useRobotCameraView } from "../hooks/useRobotCameraView";
 import { useVoiceAssistant } from "../hooks/useVoiceAssistant";
 import type {
+  CommandResponse,
   ConfigState,
   DetectedObject,
   DetectionMessage,
@@ -26,6 +42,19 @@ export function LivePage() {
   const { videoRef, active, facing, error: cameraError, start, stop, flip } =
     useCamera();
 
+  // The camera source is EXCLUSIVE and one of three modes (this single page
+  // replaces the old Live + Monitor pages):
+  //   "own"   -> this device's webcam; we PRODUCE frames to /ws/detect.
+  //   "robot" -> the robot camera; we start the bridge and VIEW /ws/view.
+  //   "view"  -> a read-only MIRROR of whatever the session is showing (/ws/view),
+  //              without producing or starting the robot camera.
+  const [source, setSource] = useState<"own" | "robot" | "view">("own");
+  const [robotCamStatus, setRobotCamStatus] = useState("");
+  const viewing = source !== "own"; // true when we're a /ws/view consumer
+  // Master YOLO on/off (shared session flag). Default OFF so no GPU is used until
+  // it's turned on — it applies to whichever video is showing.
+  const [yoloEnabled, setYoloEnabled] = useState(false);
+
   // --- YOLO controls ---
   const [yoloModel, setYoloModel] = useState("");
   const [conf, setConf] = useState(0.25);
@@ -38,6 +67,8 @@ export function LivePage() {
   const [vlmModel, setVlmModel] = useState("");
   const [scope, setScope] = useState("");
   const [variant, setVariant] = useState("");
+  // Longer-side px of the frame sent to the VLM (0 = native). Smaller = faster.
+  const [vlmMaxSize, setVlmMaxSize] = useState(768);
 
   // --- Overlay + metrics ---
   const [objects, setObjects] = useState<DetectedObject[]>([]);
@@ -55,9 +86,42 @@ export function LivePage() {
   // Free-prompt text lives here (not in VlmPanel) so dictation can populate it.
   const [prompt, setPrompt] = useState("");
 
+  // --- Robot command interpreter state (verification view) ---
+  const cmdRecorder = useAudioRecorder();
+  // Robot is chosen globally in the header now (shared context).
+  const { robot: cmdRobot } = useRobot();
+  const [cmdModel, setCmdModel] = useState("");
+  const [cmdText, setCmdText] = useState("");
+  const [cmdBusy, setCmdBusy] = useState(false);
+  const [cmdStatus, setCmdStatus] = useState("");
+  const [cmdResult, setCmdResult] = useState<CommandResponse | null>(null);
+  const [executing, setExecuting] = useState(false);
+  const [executeStatus, setExecuteStatus] = useState("");
+  // Execution switches (persisted): master arm + auto-run. Default OFF (safe).
+  const [execEnabled, setExecEnabled] = useState(
+    () => typeof localStorage !== "undefined" &&
+      localStorage.getItem("aivl.execEnabled") === "1");
+  // Always start each session SAFE ON / AUTO OFF (not persisted on purpose): never
+  // dangerous and never automatic until you explicitly enable it.
+  const [autoRun, setAutoRun] = useState(false);
+  const [safeMode, setSafeMode] = useState(true);
+  // Refs so runInterpret (auto-run) / executeResult always see the latest toggles.
+  const execEnabledRef = useRef(execEnabled);
+  execEnabledRef.current = execEnabled;
+  const autoRunRef = useRef(autoRun);
+  autoRunRef.current = autoRun;
+  const safeModeRef = useRef(safeMode);
+  safeModeRef.current = safeMode;
+  const cmdAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => cmdAbortRef.current?.abort(), []);
+
   const initialized = useRef(false);
   const lastFrameTsRef = useRef(0); // for measuring the actual processed FPS
   const fpsEmaRef = useRef(0);
+  // Aborts the in-flight VLM request/stream on a new ask or on unmount, so a slow
+  // answer never resolves into an unmounted page.
+  const vlmAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => vlmAbortRef.current?.abort(), []);
 
   // Seed all controls from the server defaults once options arrive.
   useEffect(() => {
@@ -71,13 +135,26 @@ export function LivePage() {
     setVlmModel(d.vlm_model);
     setScope(d.scope);
     setVariant(d.variant);
+    // Command parsing needs no reasoning: prefer an *-instruct model (much faster
+    // time-to-answer) when one is installed, else fall back to the VLM default.
+    const instruct = options.vlm_models.find((m) => m.includes("instruct"));
+    setCmdModel(instruct ?? d.vlm_model);
     fetchClasses(d.yolo_model).then(setClassOptions).catch(console.error);
   }, [options]);
 
   const config = useMemo<YoloConfig>(
-    () => ({ model: yoloModel, conf, imgsz, classes, max_fps: maxFps }),
-    [yoloModel, conf, imgsz, classes, maxFps],
+    () => ({ model: yoloModel, conf, imgsz, classes, max_fps: maxFps, enabled: yoloEnabled }),
+    [yoloModel, conf, imgsz, classes, maxFps, yoloEnabled],
   );
+
+  // Turning YOLO off clears any boxes still on screen (no new frames arrive to
+  // clear them, since the pump stops sending).
+  useEffect(() => {
+    if (!yoloEnabled) {
+      setObjects([]);
+      setOverrideColor(undefined);
+    }
+  }, [yoloEnabled]);
 
   const onResult = useCallback((msg: DetectionMessage) => {
     setObjects(msg.objects);
@@ -111,9 +188,37 @@ export function LivePage() {
       if (state.imgsz != null) setImgsz(state.imgsz);
       if (state.classes != null) setClasses(state.classes);
       if (state.max_fps != null) setMaxFps(state.max_fps);
+      if (state.enabled != null) setYoloEnabled(state.enabled);
     },
     [yoloModel],
   );
+
+  // Viewer/mirror source (robot camera or plain mirror of the session). Adopts the
+  // server's shared config so the panels stay in sync, and exposes `sendViewConfig`
+  // so panel changes here propagate to the producer + robot-cam detection.
+  const {
+    frameUrl: robotFrameUrl,
+    connected: robotViewConnected,
+    objects: robotObjects,
+    getLastFrameBlob,
+    sendConfig: sendViewConfig,
+  } = useRobotCameraView(viewing, yoloEnabled, applyServerConfig);
+
+  // While viewing, push config changes over the view socket (no-op when producing;
+  // the detect socket below handles that case). The hub only rebroadcasts real
+  // changes, so this won't loop with the adopt above.
+  useEffect(() => {
+    if (viewing) sendViewConfig(config);
+  }, [config, viewing, sendViewConfig]);
+
+  // While viewing, the live boxes come from the fan-out (`robotObjects`); mirror
+  // them into the shared overlay state (a VLM ask can still override with blue).
+  useEffect(() => {
+    if (viewing) {
+      setObjects(robotObjects);
+      setOverrideColor(undefined);
+    }
+  }, [viewing, robotObjects]);
 
   const { connected } = useDetectionSocket({
     active,
@@ -124,7 +229,10 @@ export function LivePage() {
     onConfig: applyServerConfig,
   });
 
-  useEffect(() => setConnected(connected), [connected, setConnected]);
+  useEffect(
+    () => setConnected(viewing ? robotViewConnected : connected),
+    [viewing, connected, robotViewConnected, setConnected],
+  );
 
   // --- Handlers ---
   const handleStart = useCallback(() => {
@@ -142,6 +250,58 @@ export function LivePage() {
     lastFrameTsRef.current = 0;
   }, [stop]);
 
+  // Use this device's own webcam (producer). Stops the robot camera if we started it.
+  const useOwnCamera = useCallback(async () => {
+    if (source === "robot") {
+      try { await setRobotCamera("stop"); } catch { /* ignore */ }
+    }
+    setRobotCamStatus("");
+    setSource("own");
+  }, [source]);
+
+  // Use the robot camera: stop our webcam, start the bridge, view via /ws/view.
+  const useRobotCam = useCallback(async () => {
+    handleStop();
+    setSource("robot");
+    setRobotCamStatus("Starting robot camera…");
+    try {
+      const r = await setRobotCamera("start");
+      setRobotCamStatus(r.error ? `✗ ${r.error}` : "");
+    } catch (e) {
+      setRobotCamStatus(`Error: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }, [handleStop]);
+
+  // Mirror the session read-only (what the old Monitor did): view /ws/view without
+  // producing or starting the robot camera.
+  const useMirror = useCallback(async () => {
+    handleStop();
+    if (source === "robot") {
+      try { await setRobotCamera("stop"); } catch { /* ignore */ }
+    }
+    setRobotCamStatus("");
+    setSource("view");
+  }, [handleStop, source]);
+
+  // The current JPEG frame for a VLM ask, from whichever source is active: capture
+  // from our webcam, or convert the latest fanned-out frame Blob to a data URL.
+  const getCurrentFrame = useCallback(async (): Promise<string | null> => {
+    if (source === "own") {
+      const video = videoRef.current;
+      if (!video?.videoWidth) return null;
+      const { captureFrame } = await import("../lib/capture");
+      return captureFrame(video, 0.85, vlmMaxSize);
+    }
+    const blob = getLastFrameBlob();
+    if (!blob) return null;
+    return await new Promise((resolve) => {
+      const r = new FileReader();
+      r.onload = () => resolve(typeof r.result === "string" ? r.result : null);
+      r.onerror = () => resolve(null);
+      r.readAsDataURL(blob);
+    });
+  }, [source, videoRef, vlmMaxSize, getLastFrameBlob]);
+
   const handleModelChange = useCallback((model: string) => {
     setYoloModel(model);
     setClasses([]);
@@ -158,17 +318,17 @@ export function LivePage() {
   );
 
   const handleAsk = useCallback(async () => {
-    const video = videoRef.current;
-    if (!video?.videoWidth) return;
-    const { captureFrame } = await import("../lib/capture");
-    const image = captureFrame(video);
+    const image = await getCurrentFrame();
     if (!image) return;
 
+    vlmAbortRef.current?.abort();
+    const ac = new AbortController();
+    vlmAbortRef.current = ac;
     setVlmBusy(true);
     setVlmStatus("Asking the VLM… (this can take several seconds)");
     setVlmOutput("");
     try {
-      const res = await askVlm({ image, model: vlmModel, scope, variant });
+      const res = await askVlm({ image, model: vlmModel, scope, variant }, ac.signal);
       if (res.error) {
         setVlmStatus(`Error: ${res.error}`);
         return;
@@ -185,11 +345,12 @@ export function LivePage() {
         setOverrideColor(BLUE);
       }
     } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
       setVlmStatus(`Request failed: ${e instanceof Error ? e.message : e}`);
     } finally {
       setVlmBusy(false);
     }
-  }, [videoRef, vlmModel, scope, variant]);
+  }, [getCurrentFrame, vlmModel, scope, variant]);
 
   // Free-form question about the current frame, STREAMED. `onDelta` receives each
   // text chunk as the model generates it (shown live + spoken sentence by
@@ -201,12 +362,12 @@ export function LivePage() {
     ): Promise<string | null> => {
       // Reflect what we're about to send in the prompt box (esp. voice dictation).
       setPrompt(prompt);
-      const video = videoRef.current;
-      if (!video?.videoWidth) return null;
-      const { captureFrame } = await import("../lib/capture");
-      const image = captureFrame(video);
+      const image = await getCurrentFrame();
       if (!image) return null;
 
+      vlmAbortRef.current?.abort();
+      const ac = new AbortController();
+      vlmAbortRef.current = ac;
       setVlmBusy(true);
       setVlmStatus("Asking the VLM…");
       setVlmOutput("");
@@ -222,6 +383,7 @@ export function LivePage() {
             setVlmOutput(acc); // live, token by token
             onDelta(piece);
           },
+          ac.signal,
         );
         const total = performance.now() - t0;
         const firstMs = tFirst !== null ? tFirst - t0 : total;
@@ -230,13 +392,14 @@ export function LivePage() {
         setVlmOutput(text);
         return text;
       } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return null;
         setVlmStatus(`Request failed: ${e instanceof Error ? e.message : e}`);
         return null;
       } finally {
         setVlmBusy(false);
       }
     },
-    [videoRef, vlmModel],
+    [getCurrentFrame, vlmModel],
   );
 
   // Hands-free voice: say "robot", speak the question, it auto-submits and (in
@@ -259,6 +422,129 @@ export function LivePage() {
     [askPromptStream, va],
   );
 
+  const toggleExecEnabled = useCallback(() => {
+    setExecEnabled((v) => {
+      const next = !v;
+      if (typeof localStorage !== "undefined")
+        localStorage.setItem("aivl.execEnabled", next ? "1" : "0");
+      return next;
+    });
+  }, []);
+  const toggleAutoRun = useCallback(() => setAutoRun((v) => !v), []);
+  const toggleSafeMode = useCallback(() => setSafeMode((v) => !v), []);
+
+  // Send ONE interpreted result to the robot executor. Shared by the manual button
+  // and auto-run. No-op unless execution is armed (checked by callers).
+  const executeResult = useCallback(async (res: CommandResponse | null) => {
+    if (!res || res.skill === "unknown") return;
+    setExecuting(true);
+    setExecuteStatus("Sending to the robot…");
+    try {
+      const r = await executeCommand(
+        res.robot, res.skill, res.params, safeModeRef.current);
+      if (r.ok) {
+        setExecuteStatus(
+          `✓ ${r.detail ?? "sent"}${r.dry_run ? " (dry-run, not moved)" : ""}`);
+      } else if (r.blocked) {
+        setExecuteStatus(`⛔ ${r.error ?? "blocked by SAFE_MODE"}`);
+      } else {
+        setExecuteStatus(`✗ ${r.error ?? r.detail ?? "failed"}`);
+      }
+    } catch (e) {
+      setExecuteStatus(`Request failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setExecuting(false);
+    }
+  }, []);
+
+  // --- Robot command interpreter (verification) ---
+  // Send a command text to the interpreter and show the chosen skill + JSON.
+  const runInterpret = useCallback(
+    async (text: string) => {
+      const t = text.trim();
+      if (!t) return;
+      cmdAbortRef.current?.abort();
+      const ac = new AbortController();
+      cmdAbortRef.current = ac;
+      setCmdBusy(true);
+      setCmdStatus("Interpreting…");
+      try {
+        const res = await interpretCommand(t, cmdModel, cmdRobot, ac.signal);
+        if (res.error) {
+          setCmdStatus(`Error: ${res.error}`);
+          return;
+        }
+        setCmdResult(res);
+        setCmdStatus(
+          `${res.model} · ${fmtMs(res.elapsed_ms)}${
+            res.ok ? "" : " · (invalid JSON — fell back to unknown)"
+          }`,
+        );
+        // Auto-run: fire immediately when armed + auto (no button needed).
+        if (execEnabledRef.current && autoRunRef.current) void executeResult(res);
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        setCmdStatus(`Request failed: ${e instanceof Error ? e.message : e}`);
+      } finally {
+        setCmdBusy(false);
+      }
+    },
+    [cmdModel, cmdRobot, executeResult],
+  );
+
+  const handleInterpret = useCallback(
+    () => void runInterpret(cmdText),
+    [runInterpret, cmdText],
+  );
+
+  // Speak one command: record → transcribe → interpret. Reuses the same STT path
+  // as the voice assistant; here the transcript feeds the interpreter, not the VLM.
+  const handleRecordCommand = useCallback(async () => {
+    if (cmdBusy || cmdRecorder.recording) return;
+    setCmdBusy(true);
+    setCmdStatus("Listening… speak a command");
+    try {
+      const blob = await cmdRecorder.recordUtterance();
+      if (!blob) {
+        setCmdStatus("Didn't catch that — try again");
+        return;
+      }
+      setCmdStatus("Transcribing…");
+      const res = await transcribeAudio(blob);
+      const text = res.text?.trim();
+      if (res.error || !text) {
+        setCmdStatus(res.error ? `Error: ${res.error}` : "Nothing recognized");
+        return;
+      }
+      setCmdText(text);
+      await runInterpret(text); // manages its own busy/status from here
+    } catch (e) {
+      setCmdStatus(`Voice error: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setCmdBusy(false);
+    }
+  }, [cmdBusy, cmdRecorder, runInterpret]);
+
+  // Manual trigger: send the current interpreted skill to the robot.
+  const handleExecuteOnRobot = useCallback(
+    () => void executeResult(cmdResult), [executeResult, cmdResult]);
+
+  // Emergency stop: halt the robot NOW, regardless of the switches. Sends the
+  // `stop` skill (StopMove + cancels the executor's move loop) with safe_mode off
+  // (stop is never blocked). Named *Robot to avoid the camera's handleStop.
+  const handleStopRobot = useCallback(async () => {
+    setExecuting(true);
+    setExecuteStatus("⏹ Stopping the robot…");
+    try {
+      const r = await executeCommand(cmdRobot, "stop", {}, false);
+      setExecuteStatus(r.ok ? "⏹ Stopped" : `✗ ${r.error ?? "stop failed"}`);
+    } catch (e) {
+      setExecuteStatus(`Stop failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setExecuting(false);
+    }
+  }, [cmdRobot]);
+
   if (optionsError) {
     return (
       <main className="p-4 text-[#ff9aa6]">
@@ -276,77 +562,153 @@ export function LivePage() {
   const variants = options.scopes[scope]?.variants ?? [];
 
   return (
-    <main className="grid grid-cols-1 items-start gap-4 p-4 lg:grid-cols-[1fr_320px]">
-      <VideoStage
-        videoRef={videoRef}
-        objects={objects}
-        overrideColor={overrideColor}
-        active={active}
-        facing={facing}
-        fps={fps}
-        count={count}
-        onStart={handleStart}
-        onStop={handleStop}
-        onFlip={flip}
-      />
-
-      <aside className="rounded-lg border border-line bg-panel p-3.5">
-        {cameraError && (
-          <p className="mt-0 mb-2.5 text-xs text-[#ff9aa6]">{cameraError}</p>
+    <main className="p-4">
+      {cameraError && (
+        <p className="mt-0 mb-2.5 text-xs text-[#ff9aa6]">{cameraError}</p>
+      )}
+      <ControlsStageLayout
+        columns={[
+          {
+            key: "yolo",
+            title: "YOLO",
+            node: (
+              <YoloPanel
+                models={options.yolo_models}
+                classOptions={classOptions}
+                model={yoloModel}
+                conf={conf}
+                imgsz={imgsz}
+                classes={classes}
+                maxFps={maxFps}
+                enabled={yoloEnabled}
+                onEnabledChange={setYoloEnabled}
+                onModelChange={handleModelChange}
+                onConfChange={setConf}
+                onImgszChange={setImgsz}
+                onClassesChange={setClasses}
+                onMaxFpsChange={setMaxFps}
+              />
+            ),
+          },
+          {
+            key: "command",
+            title: "Robot command",
+            node: (
+              <CommandPanel
+                models={options.vlm_models}
+                model={cmdModel}
+                onModelChange={setCmdModel}
+                text={cmdText}
+                onTextChange={setCmdText}
+                busy={cmdBusy}
+                status={cmdStatus}
+                result={cmdResult}
+                micSupported={cmdRecorder.supported}
+                recording={cmdRecorder.recording}
+                onInterpret={handleInterpret}
+                onRecord={handleRecordCommand}
+                onExecuteOnRobot={handleExecuteOnRobot}
+                onStop={handleStopRobot}
+                executing={executing}
+                executeStatus={executeStatus}
+                execEnabled={execEnabled}
+                onToggleExecEnabled={toggleExecEnabled}
+                autoRun={autoRun}
+                onToggleAutoRun={toggleAutoRun}
+                safeMode={safeMode}
+                onToggleSafeMode={toggleSafeMode}
+              />
+            ),
+          },
+          {
+            key: "vlm",
+            title: "VLM",
+            node: (
+              <VlmPanel
+                models={options.vlm_models}
+                scopes={Object.keys(options.scopes)}
+                variants={variants}
+                model={vlmModel}
+                scope={scope}
+                variant={variant}
+                canAsk={source === "own" ? active : !!robotFrameUrl}
+                busy={vlmBusy}
+                status={vlmStatus}
+                output={vlmOutput}
+                prompt={prompt}
+                imageMaxSize={vlmMaxSize}
+                onImageMaxSizeChange={setVlmMaxSize}
+                onPromptChange={setPrompt}
+                onModelChange={setVlmModel}
+                onScopeChange={handleScopeChange}
+                onVariantChange={setVariant}
+                onAsk={handleAsk}
+                onAskPrompt={handleAskPrompt}
+                voice={{
+                  micSupported: va.micSupported,
+                  voiceMode: va.voiceMode,
+                  onToggleVoiceMode: va.toggleVoiceMode,
+                  speechSupported: va.speechSupported,
+                  spokenMode: va.spokenMode,
+                  onToggleSpokenMode: va.toggleSpokenMode,
+                  fillerMode: va.fillerMode,
+                  onToggleFillerMode: va.toggleFillerMode,
+                  status: va.status,
+                  speaking: va.speaking,
+                  onSpeak: () => va.speak(vlmOutput),
+                  onStopSpeak: va.stopSpeak,
+                  voices: va.voices,
+                  voiceURI: va.voiceURI,
+                  onVoiceChange: va.onVoiceChange,
+                }}
+              />
+            ),
+          },
+        ]}
+      >
+        {source === "own" ? (
+          <VideoStage
+            videoRef={videoRef}
+            objects={objects}
+            overrideColor={overrideColor}
+            active={active}
+            facing={facing}
+            fps={fps}
+            count={count}
+            onStart={handleStart}
+            onStop={handleStop}
+            onFlip={flip}
+          />
+        ) : (
+          <RobotCameraStage
+            frameUrl={robotFrameUrl}
+            connected={robotViewConnected}
+            objects={objects}
+            overrideColor={overrideColor}
+            label={source === "robot" ? "Robot camera" : "Session mirror"}
+          />
         )}
-
-        <YoloPanel
-          models={options.yolo_models}
-          classOptions={classOptions}
-          model={yoloModel}
-          conf={conf}
-          imgsz={imgsz}
-          classes={classes}
-          maxFps={maxFps}
-          onModelChange={handleModelChange}
-          onConfChange={setConf}
-          onImgszChange={setImgsz}
-          onClassesChange={setClasses}
-          onMaxFpsChange={setMaxFps}
-        />
-
-        <hr className="my-4 border-0 border-t border-line" />
-
-        <VlmPanel
-          models={options.vlm_models}
-          scopes={Object.keys(options.scopes)}
-          variants={variants}
-          model={vlmModel}
-          scope={scope}
-          variant={variant}
-          canAsk={active}
-          busy={vlmBusy}
-          status={vlmStatus}
-          output={vlmOutput}
-          prompt={prompt}
-          onPromptChange={setPrompt}
-          onModelChange={setVlmModel}
-          onScopeChange={handleScopeChange}
-          onVariantChange={setVariant}
-          onAsk={handleAsk}
-          onAskPrompt={handleAskPrompt}
-          voice={{
-            micSupported: va.micSupported,
-            voiceMode: va.voiceMode,
-            onToggleVoiceMode: va.toggleVoiceMode,
-            speechSupported: va.speechSupported,
-            spokenMode: va.spokenMode,
-            onToggleSpokenMode: va.toggleSpokenMode,
-            status: va.status,
-            speaking: va.speaking,
-            onSpeak: () => va.speak(vlmOutput),
-            onStopSpeak: va.stopSpeak,
-            voices: va.voices,
-            voiceURI: va.voiceURI,
-            onVoiceChange: va.onVoiceChange,
-          }}
-        />
-      </aside>
+        {/* Camera source picker (this one page replaces Live + Monitor). */}
+        <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
+          <Button variant={source === "own" ? "primary" : "secondary"} onClick={useOwnCamera}>
+            My camera
+          </Button>
+          <Button variant={source === "robot" ? "primary" : "secondary"} onClick={useRobotCam}>
+            Robot camera
+          </Button>
+          <Button variant={source === "view" ? "primary" : "secondary"} onClick={useMirror}>
+            View only
+          </Button>
+          {robotCamStatus && (
+            <span className="text-xs text-muted">{robotCamStatus}</span>
+          )}
+          {viewing && (
+            <span className="text-xs text-muted tabular-nums">
+              {objects.length} objects
+            </span>
+          )}
+        </div>
+      </ControlsStageLayout>
     </main>
   );
 }

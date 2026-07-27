@@ -50,6 +50,10 @@ export interface YoloConfig {
   /** Client-side capture cap: max frames/sec the phone sends. 0 = unlimited.
    * Relayed through the shared config so it can be set from the monitor too. */
   max_fps?: number;
+  /** Master YOLO on/off. When false, no detection runs anywhere (own camera:
+   * no frames are sent; robot camera: the backend skips iacore) — so the GPU
+   * isn't used until it's turned on. Shared so any client can flip it. */
+  enabled?: boolean;
 }
 
 // --- WebSocket server -> client messages ---------------------------------- //
@@ -71,12 +75,25 @@ export interface ConfigState {
   imgsz?: number | null;
   classes?: string[] | null;
   max_fps?: number | null;
+  enabled?: boolean | null;
 }
 export interface ConfigAckMessage {
   type: "config";
   state: ConfigState;
 }
 export type ServerMessage = DetectionMessage | ErrorMessage | ConfigAckMessage;
+
+/** Detection payload over /ws/view. The JPEG itself now arrives as a separate
+ * BINARY WebSocket frame (not base64-in-JSON); this small JSON message carries the
+ * boxes for the frame that follows it. */
+export interface DetMessage {
+  type: "det";
+  objects: DetectedObject[];
+  elapsed_ms: number;
+  n: number;
+}
+/** Text (JSON) messages a /ws/view viewer receives. Frames arrive as binary. */
+export type ViewMessage = DetMessage | ConfigAckMessage | ErrorMessage;
 
 /** Payload of POST /api/transcribe (speech-to-text of a dictated clip). */
 export interface TranscribeResponse {
@@ -86,6 +103,51 @@ export interface TranscribeResponse {
   /** Detected (or forced) language code, e.g. "es"/"en". */
   language: string | null;
   elapsed_ms: number;
+}
+
+/** A robot the command interpreter can target (from GET /api/skills). */
+export interface RobotInfo {
+  id: string;
+  label: string;
+}
+
+/** Payload of POST /api/command — the Unitree command interpreter.
+ * Maps a spoken/typed command to ONE skill + params (what the robot should do).
+ * This is the interpreter's decision only; no motion happens yet. */
+export interface CommandResponse {
+  error?: string;
+  /** False only when the model returned no parseable JSON (skill falls back to
+   * "unknown"). */
+  ok: boolean;
+  model: string;
+  /** Which robot's catalog was used ("g1" | "go2"). */
+  robot: string;
+  /** Chosen skill name (e.g. "walk", "stop", "arm_action", "unknown"). */
+  skill: string;
+  /** Skill-specific parameters (e.g. {direction, speed} for "walk"). */
+  params: Record<string, unknown>;
+  /** Short spoken confirmation, in the command's language (for TTS). */
+  say: string;
+  /** The command text the interpreter received (the transcript). */
+  understood: string;
+  /** Raw model output (for debugging when ok is false). */
+  content: string;
+  elapsed_ms: number;
+}
+
+/** Payload of POST /api/execute — the robot executor's result for one skill. */
+export interface ExecuteResponse {
+  ok: boolean;
+  robot?: string;
+  skill?: string;
+  /** Human-readable description of what was sent (e.g. "sport api_id=1009"). */
+  detail?: string;
+  error?: string;
+  /** True when SAFE_MODE blocked an acrobatic skill. */
+  blocked?: boolean;
+  /** True when the executor only logged the command (did not move the robot). */
+  dry_run?: boolean;
+  api_id?: number;
 }
 
 /** Payload of POST /api/vlm. */
