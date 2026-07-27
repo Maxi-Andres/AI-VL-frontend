@@ -45,15 +45,16 @@ export function ControlPage() {
   // SAFE mode gates the acrobatic tricks (flips, handstand, upright). Default ON.
   const [safeMode, setSafeMode] = useState(true);
   const [skills, setSkills] = useState<Record<string, SkillInfo>>({});
+  const [sayText, setSayText] = useState(""); // G1 TTS text
   const [isTouch] = useState(
     () => typeof window !== "undefined" &&
       window.matchMedia?.("(pointer: coarse)").matches,
   );
 
-  // Robot comes from the global header selector. Only the Go2 is wired in the
-  // executor today, so driving/actions are disabled (with a notice) for anything else.
+  // Robot comes from the global header selector. Go2 and G1 both have executors;
+  // anything else disables driving/actions (with a notice).
   const { robot } = useRobot();
-  const supported = robot === "go2";
+  const supported = robot === "go2" || robot === "g1";
   const supportedRef = useRef(supported);
   supportedRef.current = supported;
 
@@ -315,14 +316,42 @@ export function ControlPage() {
           </div>
           {!supported ? (
             <p className="m-0 mb-2 text-xs text-[#ff9aa6]">
-              “{robot}” is not supported by the executor yet — only the Go2 can be
-              driven. Switch the robot to Go2 in the header.
+              “{robot}” is not supported by the executor yet. Switch to Go2 or G1
+              in the header.
             </p>
           ) : (
             !armed && (
               <p className="m-0 mb-2 text-xs text-muted">Arm (top-left) to enable.</p>
             )
           )}
+
+          {/* G1 speaks through its onboard speaker (TTS). Go2 has no TTS. */}
+          {robot === "g1" && (
+            <form
+              className="mb-3 flex gap-1.5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const t = sayText.trim();
+                if (t) runAction("say", { text: t });
+              }}
+            >
+              <input
+                value={sayText}
+                onChange={(e) => setSayText(e.target.value)}
+                placeholder="Type something to say…"
+                className="min-w-0 flex-1 rounded-md border border-line bg-bg px-2 py-1 text-xs text-fg focus:border-accent focus:outline-none"
+              />
+              <Button
+                type="submit"
+                variant="secondary"
+                className="px-2 py-1 text-[11px]"
+                disabled={!armed || !sayText.trim()}
+              >
+                Say
+              </Button>
+            </form>
+          )}
+
           <ActionPad
             skills={skills}
             disabled={!armed || !supported}
