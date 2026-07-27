@@ -306,12 +306,14 @@ export function ControlPage() {
             </h2>
             <Button
               variant={safeMode ? "primary" : "secondary"}
-              className="px-2 py-1 text-[11px]"
+              className={`px-2 py-1 text-[11px] ${
+                safeMode ? "" : "!bg-[#c0392b] !text-white hover:!brightness-110"
+              }`}
               aria-pressed={safeMode}
-              title="Safe mode blocks acrobatic tricks (flips, handstand, walk-upright). Turn off to allow them."
+              title="Safe mode blocks acrobatic/dangerous skills (flips, handstand, walk-upright, zero-torque). Turn off to allow them."
               onClick={() => setSafeMode((s) => !s)}
             >
-              {safeMode ? "Safe: on" : "Safe: off"}
+              {safeMode ? "Safe: on" : "Safe: OFF"}
             </Button>
           </div>
           {!supported ? (
@@ -355,6 +357,7 @@ export function ControlPage() {
           <ActionPad
             skills={skills}
             disabled={!armed || !supported}
+            safeMode={safeMode}
             onAction={runAction}
           />
         </aside>
