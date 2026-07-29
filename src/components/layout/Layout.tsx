@@ -4,6 +4,7 @@ import { StatusBadge } from "./StatusBadge";
 import { StatusProvider, useStatus } from "./StatusContext";
 import { RobotProvider, useRobot } from "./RobotContext";
 import { CameraControls } from "./CameraControls";
+import { NetworkControls } from "./NetworkControls";
 import { PresencePills } from "./PresencePills";
 import { VoiceStatusBadge } from "./VoiceStatusBadge";
 
@@ -28,6 +29,7 @@ function HeaderWithStatus() {
           </select>
         )}
         <CameraControls />
+        <NetworkControls />
         <VoiceStatusBadge phase={voicePhase} />
         <PresencePills />
         <StatusBadge connected={connected} />

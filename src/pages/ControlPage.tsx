@@ -42,9 +42,11 @@ export function ControlPage() {
   const [armed, setArmed] = useState(false);
   const [speed, setSpeed] = useState<Speed>("normal");
   const [status, setStatus] = useState("");
-  // SAFE mode gates the acrobatic tricks (flips, handstand, upright). Default ON.
+  // SAFE mode gates every skill the executor marks dangerous — anything that can make
+  // the robot lose its support or swap its control mode. Default ON.
   const [safeMode, setSafeMode] = useState(true);
   const [skills, setSkills] = useState<Record<string, SkillInfo>>({});
+  const [dangerous, setDangerous] = useState<string[]>([]);
   const [sayText, setSayText] = useState(""); // G1 TTS text
   const [isTouch] = useState(
     () => typeof window !== "undefined" &&
@@ -60,7 +62,12 @@ export function ControlPage() {
 
   // Load the selected robot's skill catalog (single source of truth for the buttons).
   useEffect(() => {
-    fetchSkills(robot).then(setSkills).catch(console.error);
+    fetchSkills(robot)
+      .then((c) => {
+        setSkills(c.skills);
+        setDangerous(c.dangerous);
+      })
+      .catch(console.error);
   }, [robot]);
 
   // The robot camera is the backdrop. Start the bridge on mount, stop on unmount.
@@ -310,7 +317,11 @@ export function ControlPage() {
                 safeMode ? "" : "!bg-[#c0392b] !text-white hover:!brightness-110"
               }`}
               aria-pressed={safeMode}
-              title="Safe mode blocks acrobatic/dangerous skills (flips, handstand, walk-upright, zero-torque). Turn off to allow them."
+              title={
+                dangerous.length
+                  ? `Safe mode blocks anything that can make the robot lose its support or change control mode. Blocked for this robot: ${dangerous.join(", ")}. Turn off to allow them.`
+                  : "Safe mode blocks skills that can make the robot lose its support or change control mode."
+              }
               onClick={() => setSafeMode((s) => !s)}
             >
               {safeMode ? "Safe: on" : "Safe: OFF"}
@@ -356,6 +367,7 @@ export function ControlPage() {
 
           <ActionPad
             skills={skills}
+            dangerous={dangerous}
             disabled={!armed || !supported}
             safeMode={safeMode}
             onAction={runAction}

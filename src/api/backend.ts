@@ -171,6 +171,38 @@ export async function setRobotCameraConfig(
   return r.json();
 }
 
+/** The robot executor's DDS transport: which host interface it binds to, and the robot
+ * IPs it discovers by unicast. */
+export interface RobotNet {
+  ok?: boolean;
+  iface?: string;
+  peers?: string[];
+  /** "unicast" when peers are set (crosses subnets), else "multicast" (same subnet). */
+  discovery?: "unicast" | "multicast";
+  error?: string;
+  detail?: string;
+  restarting?: boolean;
+}
+
+export async function getRobotNet(): Promise<RobotNet> {
+  const r = await fetch(`${BACKEND_URL}/api/robot-net`);
+  return r.json();
+}
+
+/** Point the stack at the robot's IP(s). The executor restarts to apply it, so it is
+ * unreachable for a few seconds afterwards. `peers: []` goes back to multicast. */
+export async function setRobotNet(
+  peers: string[],
+  iface?: string,
+): Promise<RobotNet> {
+  const r = await fetch(`${BACKEND_URL}/api/robot-net`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ peers, iface }),
+  });
+  return r.json();
+}
+
 /**
  * Who is connected to the gateway right now (robot camera, browsers, services).
  * Polled by usePresence for the header pills.
@@ -202,24 +234,38 @@ export interface SkillParamSpec {
   desc?: string;
   default?: unknown;
   values?: string[];
+  /** Display name per value, matched to the Unitree app's wording (arm actions). */
+  labels?: Record<string, string>;
 }
 export interface SkillInfo {
   desc: string;
+  /** Display name from the catalog — matched to the Unitree phone app's wording. */
+  label?: string;
+  /** Raw mode controls: operator-only, kept out of the interpreter's prompt. */
+  hidden?: boolean;
   params: Record<string, SkillParamSpec>;
+}
+
+/** One robot's catalog: the skills plus the names of the ones the executor refuses
+ * while safe mode is on. */
+export interface SkillCatalog {
+  skills: Record<string, SkillInfo>;
+  /** Skills blocked by safe mode — the single source of truth is iacore's
+   * command_common (mirrored by each executor command module), so the UI must never
+   * keep its own copy. */
+  dangerous: string[];
 }
 
 /** The skill catalog for one robot (single source of truth in iacore's
  * command_common). Used to build the drive pad's preset-action buttons so they
  * never drift from what the robot can actually do. */
-export async function fetchSkills(
-  robot: string,
-): Promise<Record<string, SkillInfo>> {
+export async function fetchSkills(robot: string): Promise<SkillCatalog> {
   const r = await fetch(
     `${BACKEND_URL}/api/skills?robot=${encodeURIComponent(robot)}`,
   );
   if (!r.ok) throw new Error(`GET /api/skills -> ${r.status}`);
-  const data = (await r.json()) as { skills?: Record<string, SkillInfo> };
-  return data.skills ?? {};
+  const data = (await r.json()) as Partial<SkillCatalog>;
+  return { skills: data.skills ?? {}, dangerous: data.dangerous ?? [] };
 }
 
 /** Speech-to-text: send a recorded audio clip and get back the transcript. The
