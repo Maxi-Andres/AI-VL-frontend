@@ -1,0 +1,28 @@
+<!--
+  Favicon: the Tabler Icons "robot" glyph (MIT), drawn in the app's accent green so
+  it reads on both a light and a dark browser tab bar. Kept as a static asset (not
+  the @tabler/icons-react component) because a favicon must be a real file the
+  browser can fetch; vite copies public/ to dist/, so it also works in phone mode
+  where the backend serves the SPA.
+-->
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="#4ade80"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M6 6a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2l0 -4" />
+  <path d="M12 2v2" />
+  <path d="M9 12v9" />
+  <path d="M15 12v9" />
+  <path d="M5 16l4 -2" />
+  <path d="M15 14l4 2" />
+  <path d="M9 18h6" />
+  <path d="M10 8v.01" />
+  <path d="M14 8v.01" />
+</svg>

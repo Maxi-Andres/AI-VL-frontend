@@ -5,6 +5,7 @@ import type {
   CommandResponse,
   ExecuteResponse,
   Options,
+  Presence,
   RobotInfo,
   TranscribeResponse,
   VlmResponse,
@@ -167,6 +168,22 @@ export async function setRobotCameraConfig(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(cfg),
   });
+  return r.json();
+}
+
+/**
+ * Who is connected to the gateway right now (robot camera, browsers, services).
+ * Polled by usePresence for the header pills.
+ *
+ * Throws when the gateway is unreachable (the caller shows that as its own pill),
+ * but returns null on a 404 — a gateway too old to know the route, which happens
+ * while a freshly built SPA is served by a backend that hasn't restarted yet. The
+ * UI then just hides the pills instead of crying "offline".
+ */
+export async function fetchPresence(): Promise<Presence | null> {
+  const r = await fetch(`${BACKEND_URL}/api/presence`);
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`GET /api/presence -> ${r.status}`);
   return r.json();
 }
 

@@ -1,18 +1,28 @@
+import { IconVideo } from "@tabler/icons-react";
+import { Pill } from "../ui/Pill";
+
 interface Props {
   connected: boolean;
 }
 
-/** Pill showing the live WebSocket connection state. */
+/**
+ * Pill for THIS browser's own live-stream socket (/ws/detect when we produce,
+ * /ws/view when we watch). It says nothing about the robots or the services — those
+ * are the presence pills next to it. "off" is grey, not red: not streaming is the
+ * normal resting state, not a failure.
+ */
 export function StatusBadge({ connected }: Props) {
   return (
-    <span
-      className={`rounded-full px-2 py-0.5 text-xs ${
+    <Pill
+      tone={connected ? "good" : "idle"}
+      icon={<IconVideo size={13} stroke={2} />}
+      title={
         connected
-          ? "bg-[#173a26] text-accent"
-          : "bg-[#3a2330] text-[#ff9aa6]"
-      }`}
+          ? "This browser's live-stream socket to the gateway is open"
+          : "This browser is not streaming or watching (start the camera)"
+      }
     >
-      {connected ? "connected" : "disconnected"}
-    </span>
+      {connected ? "stream live" : "stream off"}
+    </Pill>
   );
 }

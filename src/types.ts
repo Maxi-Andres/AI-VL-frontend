@@ -109,6 +109,40 @@ export interface TranscribeResponse {
 export interface RobotInfo {
   id: string;
   label: string;
+  /** Compact name for status pills ("G1", "Go2"); `label` is the long selector text. */
+  short?: string;
+}
+
+/** Payload of GET /api/presence — who is attached to the gateway right now, so the
+ * header can show a pill per participant instead of one anonymous "connected". */
+export interface Presence {
+  /** Browsers on the live session: producers stream their own camera, viewers watch. */
+  web: { producers: number; viewers: number; total: number };
+  robot_cam: {
+    /** A robot-camera bridge socket is attached to the gateway. */
+    attached: boolean;
+    /** Frames really arrived in the last seconds — the gateway's own evidence,
+     * not the bridge's self-report. This is what makes a robot "connected". */
+    live: boolean;
+    frames: number;
+    /** The bridge's control port answers (it is running at all). */
+    bridge: boolean;
+    /** Robot the bridge has selected as its camera source ("go2" | "g1" | "test"). */
+    robot?: string | null;
+    /** The bridge thinks it is streaming (may be true while `live` is false). */
+    streaming: boolean;
+    fps?: number | null;
+    resolution?: string | null;
+  };
+  /** The ROS2 skill executor — the service that actually moves a robot. */
+  executor: {
+    online: boolean;
+    default_robot?: string | null;
+    safe_mode?: boolean | null;
+    dry_run?: boolean | null;
+  };
+  /** The inference service (YOLO / VLM / speech). */
+  iacore: { online: boolean };
 }
 
 /** Payload of POST /api/command — the Unitree command interpreter.

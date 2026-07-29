@@ -229,10 +229,13 @@ export function LivePage() {
     onConfig: applyServerConfig,
   });
 
-  useEffect(
-    () => setConnected(viewing ? robotViewConnected : connected),
-    [viewing, connected, robotViewConnected, setConnected],
-  );
+  // Mirror this page's live socket into the header. The cleanup matters: the shared
+  // state outlives this page (it sits above <Outlet/>), so without it the pill would
+  // still claim "stream live" on Drive/About after the socket closed with the page.
+  useEffect(() => {
+    setConnected(viewing ? robotViewConnected : connected);
+    return () => setConnected(false);
+  }, [viewing, connected, robotViewConnected, setConnected]);
 
   // --- Handlers ---
   const handleStart = useCallback(() => {

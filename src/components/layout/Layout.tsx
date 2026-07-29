@@ -4,6 +4,7 @@ import { StatusBadge } from "./StatusBadge";
 import { StatusProvider, useStatus } from "./StatusContext";
 import { RobotProvider, useRobot } from "./RobotContext";
 import { CameraControls } from "./CameraControls";
+import { PresencePills } from "./PresencePills";
 import { VoiceStatusBadge } from "./VoiceStatusBadge";
 
 function HeaderWithStatus() {
@@ -11,7 +12,7 @@ function HeaderWithStatus() {
   const { robot, setRobot, robots } = useRobot();
   return (
     <Header>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-1.5">
         {robots.length > 1 && (
           <select
             value={robot}
@@ -28,13 +29,15 @@ function HeaderWithStatus() {
         )}
         <CameraControls />
         <VoiceStatusBadge phase={voicePhase} />
+        <PresencePills />
         <StatusBadge connected={connected} />
       </div>
     </Header>
   );
 }
 
-/** App shell: header (nav + robot selector + live/voice status) over the page. */
+/** App shell: header (nav + robot selector + who-is-connected pills + live/voice
+ * status) over the page. */
 export function Layout() {
   return (
     <StatusProvider>
