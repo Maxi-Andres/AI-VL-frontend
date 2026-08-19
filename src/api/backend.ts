@@ -153,7 +153,7 @@ export async function getRobotCameraStatus(): Promise<RobotCameraStatus> {
 }
 
 export interface RobotCameraConfig {
-  robot?: string; // go2 | g1 | test — switches the camera source
+  robot?: string; // go2 | g1 (DDS) | stream (HTTP, any network) | test
   fps?: number;
   resolution?: string; // native | 720p | 480p | 360p
   quality?: number; // 0 = keep the robot's native JPEG quality
@@ -199,6 +199,34 @@ export async function setRobotNet(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ peers, iface }),
+  });
+  return r.json();
+}
+
+/** How commands reach a robot: DDS from this machine, or a relay running ON the robot. */
+export interface RobotTransports {
+  ok: boolean;
+  transports?: Record<string, { mode: string; url: string }>;
+  error?: string;
+}
+
+export async function getRobotTransport(): Promise<RobotTransports> {
+  const r = await fetch(`${BACKEND_URL}/api/robot-transport`);
+  return r.json();
+}
+
+/** Switch a robot between "dds" (only works on the robot's own subnet) and "relay" (works
+ * from any network, via the agent on the robot). The executor restarts to apply it, so it
+ * is unreachable for a few seconds afterwards. */
+export async function setRobotTransport(cfg: {
+  robot: string;
+  mode: string;
+  url?: string;
+}): Promise<{ ok: boolean; mode?: string; url?: string; error?: string }> {
+  const r = await fetch(`${BACKEND_URL}/api/robot-transport`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(cfg),
   });
   return r.json();
 }

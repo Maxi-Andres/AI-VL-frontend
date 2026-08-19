@@ -127,7 +127,7 @@ export interface Presence {
     frames: number;
     /** The bridge's control port answers (it is running at all). */
     bridge: boolean;
-    /** Robot the bridge has selected as its camera source ("go2" | "g1" | "test"). */
+    /** The bridge's camera source: "go2" | "g1" (DDS) | "stream" (HTTP) | "test". */
     robot?: string | null;
     /** The bridge thinks it is streaming (may be true while `live` is false). */
     streaming: boolean;

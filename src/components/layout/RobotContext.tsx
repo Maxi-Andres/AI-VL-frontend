@@ -6,7 +6,11 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { fetchRobots, setRobotCameraConfig } from "../../api/backend";
+import {
+  fetchRobots,
+  getRobotCameraStatus,
+  setRobotCameraConfig,
+} from "../../api/backend";
 import type { RobotInfo } from "../../types";
 
 interface RobotContextValue {
@@ -30,9 +34,20 @@ export function RobotProvider({ children }: { children: ReactNode }) {
   }, []);
   // Switching the robot also switches the camera source in the bridge, so the
   // robot camera shows the right robot (Go2 video API vs the G1 image topic).
+  // BUT only when the camera is on a per-robot DDS source. The "stream" source reads the
+  // video over HTTP and is what works with the robot on another network; "test" is
+  // synthetic. Overwriting either of those on a robot change would silently drop the user
+  // back to DDS — and DDS is exactly what does not work off-subnet.
   const setRobot = useCallback((v: string) => {
     setRobotState(v);
-    setRobotCameraConfig({ robot: v }).catch(() => {});
+    getRobotCameraStatus()
+      .then((s) => {
+        const current = s.robot;
+        if (!current || current === "go2" || current === "g1") {
+          return setRobotCameraConfig({ robot: v });
+        }
+      })
+      .catch(() => {});
   }, []);
   return (
     <RobotContext value={{ robot, setRobot, robots }}>{children}</RobotContext>

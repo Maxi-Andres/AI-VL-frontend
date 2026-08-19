@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { getRobotNet, setRobotNet, type RobotNet } from "../../api/backend";
+import {
+  getRobotNet,
+  getRobotTransport,
+  setRobotNet,
+  setRobotTransport,
+  type RobotNet,
+} from "../../api/backend";
+import { useRobot } from "./RobotContext";
 
 /**
  * Header control for WHERE THE ROBOT IS ON THE NETWORK.
@@ -21,6 +28,36 @@ export function NetworkControls() {
   const [ip, setIp] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const { robot } = useRobot();
+  const [mode, setMode] = useState("dds");
+  const [relayUrl, setRelayUrl] = useState("");
+
+  // The transport is per robot, so re-read it whenever the selected robot changes.
+  useEffect(() => {
+    getRobotTransport()
+      .then((t) => {
+        const cur = t.transports?.[robot];
+        if (cur) {
+          setMode(cur.mode || "dds");
+          setRelayUrl(cur.url || "");
+        }
+      })
+      .catch(() => {});
+  }, [robot]);
+
+  const applyTransport = (nextMode: string, url: string) => {
+    setBusy(true);
+    setMsg("");
+    setRobotTransport({ robot, mode: nextMode, url: url || undefined })
+      .then((r) => {
+        setMsg(r.ok
+          ? `${robot}: ${nextMode} — executor restarting…`
+          : r.error || "could not switch transport");
+        if (r.ok) setMode(nextMode);
+      })
+      .catch((e) => setMsg(String(e)))
+      .finally(() => setBusy(false));
+  };
 
   const load = () =>
     getRobotNet()
@@ -64,6 +101,38 @@ export function NetworkControls() {
         Net
       </summary>
       <div className="absolute right-0 z-30 mt-1 w-60 space-y-2 rounded-md border border-line bg-panel p-2.5 shadow-lg">
+        <label className="block text-[11px] text-muted">
+          Command transport ({robot})
+          <select
+            value={mode}
+            disabled={busy}
+            onChange={(e) => applyTransport(e.target.value, relayUrl)}
+            className="w-full rounded-md border border-line bg-bg px-1.5 py-1 text-xs text-fg focus:border-accent focus:outline-none"
+          >
+            <option value="dds">DDS — same subnet only</option>
+            <option value="relay">Relay on the robot — any network</option>
+          </select>
+          <span className="mt-0.5 block text-[10px] leading-tight text-muted/70">
+            {mode === "relay"
+              ? "Commands go over HTTP to an agent on the robot, which publishes DDS there."
+              : "Commands are published as DDS from this machine — only works while the robot shares this subnet."}
+          </span>
+        </label>
+
+        {mode === "relay" && (
+          <label className="block text-[11px] text-muted">
+            Relay URL
+            <input
+              value={relayUrl}
+              onChange={(e) => setRelayUrl(e.target.value)}
+              onBlur={() => relayUrl && applyTransport("relay", relayUrl)}
+              placeholder="http://10.1.254.18:8092"
+              spellCheck={false}
+              className="w-full rounded-md border border-line bg-bg px-1.5 py-1 text-xs text-fg focus:border-accent focus:outline-none"
+            />
+          </label>
+        )}
+
         <label className="block text-[11px] text-muted">
           Robot IP (empty = same subnet)
           <input
