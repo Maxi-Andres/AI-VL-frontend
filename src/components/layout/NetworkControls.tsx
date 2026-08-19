@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   getRobotNet,
   getRobotTransport,
   setRobotNet,
   setRobotTransport,
   type RobotNet,
+  type RobotVideoTarget,
 } from "../../api/backend";
 import { useRobot } from "./RobotContext";
 
@@ -31,19 +32,31 @@ export function NetworkControls() {
   const { robot } = useRobot();
   const [mode, setMode] = useState("dds");
   const [relayUrl, setRelayUrl] = useState("");
+  const [robotInfo, setRobotInfo] = useState<{
+    senderAlive?: boolean;
+    video?: RobotVideoTarget;
+  } | null>(null);
 
   // The transport is per robot, so re-read it whenever the selected robot changes.
-  useEffect(() => {
+  const loadTransport = useCallback(() => {
     getRobotTransport()
       .then((t) => {
         const cur = t.transports?.[robot];
         if (cur) {
           setMode(cur.mode || "dds");
           setRelayUrl(cur.url || "");
+          setRobotInfo({
+            senderAlive: cur.relay?.sender_alive,
+            video: cur.relay?.video,
+          });
         }
       })
       .catch(() => {});
   }, [robot]);
+
+  useEffect(() => {
+    loadTransport();
+  }, [loadTransport]);
 
   const applyTransport = (nextMode: string, url: string) => {
     setBusy(true);
@@ -53,7 +66,14 @@ export function NetworkControls() {
         setMsg(r.ok
           ? `${robot}: ${nextMode} — executor restarting…`
           : r.error || "could not switch transport");
-        if (r.ok) setMode(nextMode);
+        if (r.ok) {
+          setMode(nextMode);
+          // The executor re-execs to apply this, so it is unreachable for a few seconds.
+          // Re-read afterwards: without this the panel keeps showing the pre-change values
+          // and looks like the switch was ignored.
+          setTimeout(loadTransport, 6000);
+          setTimeout(loadTransport, 14000);
+        }
       })
       .catch((e) => setMsg(String(e)))
       .finally(() => setBusy(false));
@@ -126,11 +146,33 @@ export function NetworkControls() {
               value={relayUrl}
               onChange={(e) => setRelayUrl(e.target.value)}
               onBlur={() => relayUrl && applyTransport("relay", relayUrl)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && relayUrl) applyTransport("relay", relayUrl);
+              }}
               placeholder="http://10.1.254.18:8092"
               spellCheck={false}
               className="w-full rounded-md border border-line bg-bg px-1.5 py-1 text-xs text-fg focus:border-accent focus:outline-none"
             />
           </label>
+        )}
+
+        {mode === "relay" && robotInfo?.video && (
+          <p className="m-0 rounded-md border border-line/60 bg-bg/40 px-1.5 py-1 text-[10px] leading-tight text-muted">
+            {robotInfo.video.running
+              ? <>Robot publishes video to{" "}
+                  <span className="text-fg">
+                    {robotInfo.video.proto}://{robotInfo.video.publish_host}
+                    {robotInfo.video.port ? `:${robotInfo.video.port}` : ""}/
+                    {robotInfo.video.stream}
+                  </span>{" "}
+                  · {robotInfo.video.maxfps} fps
+                </>
+              : "Robot is not publishing video"}
+            <br />
+            <span className="opacity-70">
+              Reported by the robot — change it in robot/video.env there.
+            </span>
+          </p>
         )}
 
         <label className="block text-[11px] text-muted">

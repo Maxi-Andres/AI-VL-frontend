@@ -204,9 +204,28 @@ export async function setRobotNet(
 }
 
 /** How commands reach a robot: DDS from this machine, or a relay running ON the robot. */
+export interface RobotVideoTarget {
+  running?: boolean;
+  publish_host?: string;
+  proto?: string;
+  stream?: string;
+  port?: string;
+  bitrate?: string;
+  maxfps?: string;
+  error?: string;
+}
+
 export interface RobotTransports {
   ok: boolean;
-  transports?: Record<string, { mode: string; url: string }>;
+  transports?: Record<
+    string,
+    {
+      mode: string;
+      url: string;
+      /** What the ROBOT reports about itself, read from its running processes. */
+      relay?: { ok?: boolean; sender_alive?: boolean; video?: RobotVideoTarget };
+    }
+  >;
   error?: string;
 }
 
