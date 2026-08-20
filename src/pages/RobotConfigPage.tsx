@@ -186,18 +186,22 @@ export function RobotConfigPage() {
           lines={[
             "ssh unitree@<robot>",
             "",
-            "# telemetry + command relay (has two C++ binaries)",
+            "# telemetry + command relay  ->  telemetry_reader, command_sender",
             `cd ${REPO_RELAY} && git pull && ./build.sh`,
             "sudo systemctl restart robot-splunk-bridge robot-command-relay",
             "",
-            "# video (shell + GStreamer, no build step)",
-            `cd ${REPO_VIDEO} && git pull`,
+            "# video  ->  go2_jpeg_stream (this is what reads the camera off DDS)",
+            `cd ${REPO_VIDEO} && git pull && ./build.sh`,
             "sudo systemctl restart robot-video",
           ]}
         />
         <p className="mb-1 text-sm text-muted">
-          <code>./build.sh</code> is not optional after a pull: the binaries are gitignored,
-          so a pull brings new source without rebuilding it.
+          <strong>Both</strong> repos compile C++ and <strong>both</strong> need
+          <code> ./build.sh</code>: the binaries are gitignored, so a pull brings new source
+          without rebuilding it. In the video repo the GStreamer pipeline is only the encode
+          half — <code>go2_jpeg_stream</code> is the C++ that reads the camera over DDS.
+          Running <code>build.sh</code> when nothing changed is harmless, so just always run
+          it.
         </p>
         <p className="mb-1 text-sm text-muted">
           Pull the SDK only to take an upstream update — and then rebuild <em>both</em> repos,
