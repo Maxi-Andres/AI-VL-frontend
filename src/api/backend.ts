@@ -215,6 +215,15 @@ export interface RobotVideoTarget {
   error?: string;
 }
 
+export interface RobotTelemetryTarget {
+  running?: boolean;
+  hec_url?: string;
+  index?: string;
+  robot_name?: string;
+  period_s?: string;
+  daily_byte_cap?: string;
+}
+
 export interface RobotTransports {
   ok: boolean;
   transports?: Record<
@@ -222,8 +231,18 @@ export interface RobotTransports {
     {
       mode: string;
       url: string;
+      /** Address probed for the online dot (persisted server-side, so all viewers agree). */
+      ping_ip?: string;
+      /** Result of that probe, measured by the backend (the container cannot ping). */
+      online?: boolean;
       /** What the ROBOT reports about itself, read from its running processes. */
-      relay?: { ok?: boolean; sender_alive?: boolean; video?: RobotVideoTarget };
+      relay?: {
+        ok?: boolean;
+        sender_alive?: boolean;
+        video?: RobotVideoTarget;
+        telemetry?: RobotTelemetryTarget;
+        limits?: Record<string, string>;
+      };
     }
   >;
   error?: string;
@@ -239,8 +258,9 @@ export async function getRobotTransport(): Promise<RobotTransports> {
  * is unreachable for a few seconds afterwards. */
 export async function setRobotTransport(cfg: {
   robot: string;
-  mode: string;
+  mode?: string;
   url?: string;
+  ping_ip?: string;
 }): Promise<{ ok: boolean; mode?: string; url?: string; error?: string }> {
   const r = await fetch(`${BACKEND_URL}/api/robot-transport`, {
     method: "POST",

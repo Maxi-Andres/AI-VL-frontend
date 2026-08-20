@@ -5,7 +5,6 @@ import {
   setRobotNet,
   setRobotTransport,
   type RobotNet,
-  type RobotVideoTarget,
 } from "../../api/backend";
 import { useRobot } from "./RobotContext";
 
@@ -34,29 +33,58 @@ export function NetworkControls() {
   const [relayUrl, setRelayUrl] = useState("");
   const [robotInfo, setRobotInfo] = useState<{
     senderAlive?: boolean;
-    video?: RobotVideoTarget;
+    online?: boolean;
   } | null>(null);
+  const [pingIp, setPingIp] = useState("");
 
   // The transport is per robot, so re-read it whenever the selected robot changes.
-  const loadTransport = useCallback(() => {
+  /** Status only — safe to call on a timer: it never touches the editable fields. */
+  const loadStatus = useCallback(() => {
     getRobotTransport()
       .then((t) => {
         const cur = t.transports?.[robot];
         if (cur) {
-          setMode(cur.mode || "dds");
-          setRelayUrl(cur.url || "");
           setRobotInfo({
             senderAlive: cur.relay?.sender_alive,
-            video: cur.relay?.video,
+            online: cur.online,
           });
         }
       })
       .catch(() => {});
   }, [robot]);
 
+  /** Also fills the editable fields. Only on mount / robot change / after applying —
+   * NEVER on the poll, or it overwrites what the user is typing mid-word. */
+  const loadConfig = useCallback(() => {
+    getRobotTransport()
+      .then((t) => {
+        const cur = t.transports?.[robot];
+        if (cur) {
+          setMode(cur.mode || "dds");
+          setRelayUrl(cur.url || "");
+          setPingIp(cur.ping_ip || "");
+        }
+      })
+      .catch(() => {});
+  }, [robot]);
+
   useEffect(() => {
-    loadTransport();
-  }, [loadTransport]);
+    loadConfig();
+    loadStatus();
+    const t = setInterval(loadStatus, 6000);
+    return () => clearInterval(t);
+  }, [loadConfig, loadStatus]);
+
+  // Saving the probe address does NOT restart the executor (nothing about the transport
+  // changes), so no reload delay is needed here — unlike a mode or URL change.
+  const savePingIp = () => {
+    setRobotTransport({ robot, ping_ip: pingIp })
+      .then((r) => {
+        setMsg(r.ok ? `${robot}: address saved` : r.error || "invalid address");
+        setTimeout(loadStatus, 1500);
+      })
+      .catch((e) => setMsg(String(e)));
+  };
 
   const applyTransport = (nextMode: string, url: string) => {
     setBusy(true);
@@ -71,8 +99,10 @@ export function NetworkControls() {
           // The executor re-execs to apply this, so it is unreachable for a few seconds.
           // Re-read afterwards: without this the panel keeps showing the pre-change values
           // and looks like the switch was ignored.
-          setTimeout(loadTransport, 6000);
-          setTimeout(loadTransport, 14000);
+          setTimeout(loadConfig, 6000);
+          setTimeout(loadStatus, 6000);
+          setTimeout(loadConfig, 14000);
+          setTimeout(loadStatus, 14000);
         }
       })
       .catch((e) => setMsg(String(e)))
@@ -121,6 +151,43 @@ export function NetworkControls() {
         Net
       </summary>
       <div className="absolute right-0 z-30 mt-1 w-60 space-y-2 rounded-md border border-line bg-panel p-2.5 shadow-lg">
+        <div className="flex items-center justify-between text-[11px]">
+          <span className="text-muted">{robot}</span>
+          <span className="flex items-center gap-1">
+            <span
+              className={`inline-block h-1.5 w-1.5 rounded-full ${
+                robotInfo?.online ? "bg-emerald-500" : "bg-zinc-600"
+              }`}
+            />
+            <span className={robotInfo?.online ? "text-emerald-500" : "text-muted"}>
+              {pingIp
+                ? robotInfo?.online
+                  ? "online"
+                  : "offline"
+                : "no address set"}
+            </span>
+          </span>
+        </div>
+
+        <label className="block text-[11px] text-muted">
+          Online check address
+          <input
+            value={pingIp}
+            onChange={(e) => setPingIp(e.target.value)}
+            onBlur={savePingIp}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") savePingIp();
+            }}
+            placeholder="192.168.123.18"
+            spellCheck={false}
+            className="w-full rounded-md border border-line bg-bg px-1.5 py-1 text-xs text-fg focus:border-accent focus:outline-none"
+          />
+          <span className="mt-0.5 block text-[10px] leading-tight text-muted/70">
+            Pinged from the server ONLY to light the online dot — it does not affect
+            commands or video. Empty = no check.
+          </span>
+        </label>
+
         <label className="block text-[11px] text-muted">
           Command transport ({robot})
           <select
@@ -150,29 +217,11 @@ export function NetworkControls() {
                 if (e.key === "Enter" && relayUrl) applyTransport("relay", relayUrl);
               }}
               placeholder="http://10.1.254.18:8092"
+              title="Applies on Enter or when the field loses focus"
               spellCheck={false}
               className="w-full rounded-md border border-line bg-bg px-1.5 py-1 text-xs text-fg focus:border-accent focus:outline-none"
             />
           </label>
-        )}
-
-        {mode === "relay" && robotInfo?.video && (
-          <p className="m-0 rounded-md border border-line/60 bg-bg/40 px-1.5 py-1 text-[10px] leading-tight text-muted">
-            {robotInfo.video.running
-              ? <>Robot publishes video to{" "}
-                  <span className="text-fg">
-                    {robotInfo.video.proto}://{robotInfo.video.publish_host}
-                    {robotInfo.video.port ? `:${robotInfo.video.port}` : ""}/
-                    {robotInfo.video.stream}
-                  </span>{" "}
-                  · {robotInfo.video.maxfps} fps
-                </>
-              : "Robot is not publishing video"}
-            <br />
-            <span className="opacity-70">
-              Reported by the robot — change it in robot/video.env there.
-            </span>
-          </p>
         )}
 
         <label className="block text-[11px] text-muted">
