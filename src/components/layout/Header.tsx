@@ -20,6 +20,9 @@ export function Header({ children }: Props) {
         <NavLink to="/drive" className={linkClass}>
           Drive
         </NavLink>
+        <NavLink to="/robot" className={linkClass}>
+          Robot
+        </NavLink>
         <NavLink to="/about" className={linkClass}>
           About
         </NavLink>

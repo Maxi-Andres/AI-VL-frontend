@@ -5,7 +5,6 @@ import { StatusProvider, useStatus } from "./StatusContext";
 import { RobotProvider, useRobot } from "./RobotContext";
 import { CameraControls } from "./CameraControls";
 import { NetworkControls } from "./NetworkControls";
-import { RobotFacts } from "./RobotFacts";
 import { PresencePills } from "./PresencePills";
 import { VoiceStatusBadge } from "./VoiceStatusBadge";
 
@@ -31,7 +30,6 @@ function HeaderWithStatus() {
         )}
         <CameraControls />
         <NetworkControls />
-        <RobotFacts />
         <VoiceStatusBadge phase={voicePhase} />
         <PresencePills />
         <StatusBadge connected={connected} />
