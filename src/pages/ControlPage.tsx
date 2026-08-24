@@ -4,6 +4,8 @@ import type { SkillInfo } from "../api/backend";
 import { useRobotCameraView } from "../hooks/useRobotCameraView";
 import { Joystick } from "../components/control/Joystick";
 import { useGamepad, PAD } from "../hooks/useGamepad";
+import { StatusText, type Status } from "../components/ui/StatusText";
+import { IconDeviceGamepad2, IconPlayerStopFilled } from "@tabler/icons-react";
 import { ActionPad } from "../components/control/ActionPad";
 import { Button } from "../components/ui/Button";
 import { FullscreenButton } from "../components/ui/FullscreenButton";
@@ -64,7 +66,7 @@ interface Vel {
 export function ControlPage() {
   const [armed, setArmed] = useState(false);
   const [speed, setSpeed] = useState<Speed>("normal");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState<Status | null>(null);
   // SAFE mode gates every skill the executor marks dangerous — anything that can make
   // the robot lose its support or swap its control mode. Default ON.
   const [safeMode, setSafeMode] = useState(true);
@@ -130,9 +132,9 @@ export function ControlPage() {
 
   const setStatusFrom = useCallback(
     (r: { ok?: boolean; blocked?: boolean; detail?: string; error?: string }) => {
-      if (r.blocked) setStatus(`⛔ ${r.error ?? "blocked"}`);
-      else if (r.ok) setStatus(r.detail ?? "moving");
-      else if (r.error) setStatus(`✗ ${r.error}`);
+      if (r.blocked) setStatus({ tone: "blocked", text: r.error ?? "blocked" });
+      else if (r.ok) setStatus({ tone: "ok", text: r.detail ?? "moving" });
+      else if (r.error) setStatus({ tone: "error", text: r.error });
     },
     [],
   );
@@ -142,7 +144,11 @@ export function ControlPage() {
       executeCommand(
         robot, "move", { ...v, continuous: false, duration_s: DURATION_S }, true)
         .then(setStatusFrom)
-        .catch((e) => setStatus(`✗ ${e instanceof Error ? e.message : String(e)}`));
+        .catch((e) =>
+          setStatus({
+            tone: "error",
+            text: e instanceof Error ? e.message : String(e),
+          }));
     },
     [robot, setStatusFrom],
   );
@@ -248,7 +254,7 @@ export function ControlPage() {
     leftRef.current = { x: 0, y: 0 };
     rightRef.current = { x: 0 };
     sendStop();
-    setStatus("⏹ Stopped");
+    setStatus({ tone: "stopped", text: "Stopped" });
   }, [sendStop]);
 
   // Fire one preset skill (sit, hello, dance, gait…) from the side pad.
@@ -256,7 +262,11 @@ export function ControlPage() {
     (skill: string, params?: Record<string, unknown>) => {
       executeCommand(robot, skill, params ?? {}, safeMode)
         .then(setStatusFrom)
-        .catch((e) => setStatus(`✗ ${e instanceof Error ? e.message : String(e)}`));
+        .catch((e) =>
+          setStatus({
+            tone: "error",
+            text: e instanceof Error ? e.message : String(e),
+          }));
     },
     [robot, safeMode, setStatusFrom],
   );
@@ -300,7 +310,7 @@ export function ControlPage() {
       }
       if (!armedRef.current || !supportedRef.current) {
         trace(`skill "${skill}" ignorado: falta armar`);
-        setStatus("Arm to drive first");
+        setStatus({ tone: "warn", text: "Arm to drive first" });
         return;
       }
       trace(`skill "${skill}"`);
@@ -342,7 +352,10 @@ export function ControlPage() {
             {armed ? "Armed" : "Arm to drive"}
           </Button>
           <Button variant="secondary" onClick={estop} title="Emergency stop">
-            ⏹ Stop
+            <span className="inline-flex items-center gap-1">
+              <IconPlayerStopFilled size={14} stroke={2} />
+              Stop
+            </span>
           </Button>
           <div className="flex overflow-hidden rounded-md border border-white/25">
             {SPEED_NAMES.map((s) => (
@@ -360,17 +373,17 @@ export function ControlPage() {
           </div>
           {pad && (
             <span
-              className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] text-white/80"
+              className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[11px] text-white/80"
               title={`Gamepad: ${pad.id}`}
             >
-              🎮 Pad
+              <IconDeviceGamepad2 size={13} stroke={2} />
+              Pad
             </span>
           )}
-          {status && (
-            <span className="ml-auto max-w-[45%] truncate text-xs text-white/80">
-              {status}
-            </span>
-          )}
+          <StatusText
+            status={status}
+            className="ml-auto max-w-[45%] text-xs text-white/80"
+          />
           <FullscreenButton targetRef={stageRef} />
         </div>
 

@@ -1,4 +1,10 @@
-import { IconMicrophone, IconMicrophoneOff } from "@tabler/icons-react";
+import {
+  IconAlertTriangle,
+  IconMicrophone,
+  IconMicrophoneOff,
+  IconPlayerStopFilled,
+} from "@tabler/icons-react";
+import { StatusText, type Status } from "../ui/StatusText";
 import type { CommandResponse } from "../../types";
 import { Button } from "../ui/Button";
 import { Field } from "../ui/Field";
@@ -29,7 +35,7 @@ interface Props {
   onStop: () => void;
   executing: boolean;
   /** One-line result of the last execute (sent / blocked / error). */
-  executeStatus: string;
+  executeStatus: Status | null;
   /** Master arm switch: while off, nothing is ever sent to the robot. */
   execEnabled: boolean;
   onToggleExecEnabled: () => void;
@@ -180,7 +186,10 @@ export function CommandPanel({
         onClick={onStop}
         title="Halt the robot NOW — stop sending any movement"
       >
-        ■ STOP — quedate quieto
+        <span className="inline-flex items-center gap-1.5">
+          <IconPlayerStopFilled size={15} stroke={2} />
+          STOP — quedate quieto
+        </span>
       </Button>
 
       {/* Execution switches, color-coded: green = safe, red = dangerous/acting,
@@ -219,13 +228,15 @@ export function CommandPanel({
       </div>
       {/* Loud warnings when a dangerous mode is on. */}
       {!safeMode && (
-        <p className="m-0 mt-1 text-[11px] font-semibold text-[#ff5a5f]">
-          ⚠ Safe OFF — acrobacias (flips/handstand) habilitadas
+        <p className="m-0 mt-1 flex items-center gap-1 text-[11px] font-semibold text-[#ff5a5f]">
+          <IconAlertTriangle size={13} stroke={2} className="shrink-0" />
+          Safe OFF — acrobacias (flips/handstand) habilitadas
         </p>
       )}
       {execEnabled && autoRun && (
-        <p className="m-0 mt-1 text-[11px] font-semibold text-[#ff5a5f]">
-          ⚠ Auto ON — se ejecuta solo al interpretar (sin botón)
+        <p className="m-0 mt-1 flex items-center gap-1 text-[11px] font-semibold text-[#ff5a5f]">
+          <IconAlertTriangle size={13} stroke={2} className="shrink-0" />
+          Auto ON — se ejecuta solo al interpretar (sin botón)
         </p>
       )}
 
@@ -241,9 +252,7 @@ export function CommandPanel({
       >
         {executing ? "Sending to robot…" : "Execute on robot"}
       </Button>
-      {executeStatus && (
-        <p className="m-0 mt-1 text-xs text-muted">{executeStatus}</p>
-      )}
+      <StatusText status={executeStatus} className="mt-1 text-xs text-muted" />
     </div>
   );
 }

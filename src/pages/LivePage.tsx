@@ -24,6 +24,7 @@ import { useDetectionSocket } from "../hooks/useDetectionSocket";
 import { useOptions } from "../hooks/useOptions";
 import { useRobotCameraView } from "../hooks/useRobotCameraView";
 import { useVoiceAssistant } from "../hooks/useVoiceAssistant";
+import { StatusText, type Status } from "../components/ui/StatusText";
 import type {
   CommandResponse,
   ConfigState,
@@ -49,7 +50,7 @@ export function LivePage() {
   //   "view"  -> a read-only MIRROR of whatever the session is showing (/ws/view),
   //              without producing or starting the robot camera.
   const [source, setSource] = useState<"own" | "robot" | "view">("own");
-  const [robotCamStatus, setRobotCamStatus] = useState("");
+  const [robotCamStatus, setRobotCamStatus] = useState<Status | null>(null);
   const viewing = source !== "own"; // true when we're a /ws/view consumer
   // Master YOLO on/off (shared session flag). Default OFF so no GPU is used until
   // it's turned on — it applies to whichever video is showing.
@@ -96,7 +97,7 @@ export function LivePage() {
   const [cmdStatus, setCmdStatus] = useState("");
   const [cmdResult, setCmdResult] = useState<CommandResponse | null>(null);
   const [executing, setExecuting] = useState(false);
-  const [executeStatus, setExecuteStatus] = useState("");
+  const [executeStatus, setExecuteStatus] = useState<Status | null>(null);
   // Execution switches (persisted): master arm + auto-run. Default OFF (safe).
   const [execEnabled, setExecEnabled] = useState(
     () => typeof localStorage !== "undefined" &&
@@ -258,7 +259,7 @@ export function LivePage() {
     if (source === "robot") {
       try { await setRobotCamera("stop"); } catch { /* ignore */ }
     }
-    setRobotCamStatus("");
+    setRobotCamStatus(null);
     setSource("own");
   }, [source]);
 
@@ -266,12 +267,15 @@ export function LivePage() {
   const useRobotCam = useCallback(async () => {
     handleStop();
     setSource("robot");
-    setRobotCamStatus("Starting robot camera…");
+    setRobotCamStatus({ tone: "busy", text: "Starting robot camera…" });
     try {
       const r = await setRobotCamera("start");
-      setRobotCamStatus(r.error ? `✗ ${r.error}` : "");
+      setRobotCamStatus(r.error ? { tone: "error", text: r.error } : null);
     } catch (e) {
-      setRobotCamStatus(`Error: ${e instanceof Error ? e.message : String(e)}`);
+      setRobotCamStatus({
+        tone: "error",
+        text: e instanceof Error ? e.message : String(e),
+      });
     }
   }, [handleStop]);
 
@@ -282,7 +286,7 @@ export function LivePage() {
     if (source === "robot") {
       try { await setRobotCamera("stop"); } catch { /* ignore */ }
     }
-    setRobotCamStatus("");
+    setRobotCamStatus(null);
     setSource("view");
   }, [handleStop, source]);
 
@@ -441,20 +445,25 @@ export function LivePage() {
   const executeResult = useCallback(async (res: CommandResponse | null) => {
     if (!res || res.skill === "unknown") return;
     setExecuting(true);
-    setExecuteStatus("Sending to the robot…");
+    setExecuteStatus({ tone: "busy", text: "Sending to the robot…" });
     try {
       const r = await executeCommand(
         res.robot, res.skill, res.params, safeModeRef.current);
       if (r.ok) {
-        setExecuteStatus(
-          `✓ ${r.detail ?? "sent"}${r.dry_run ? " (dry-run, not moved)" : ""}`);
+        setExecuteStatus({
+          tone: "ok",
+          text: `${r.detail ?? "sent"}${r.dry_run ? " (dry-run, not moved)" : ""}`,
+        });
       } else if (r.blocked) {
-        setExecuteStatus(`⛔ ${r.error ?? "blocked by SAFE_MODE"}`);
+        setExecuteStatus({ tone: "blocked", text: r.error ?? "blocked by SAFE_MODE" });
       } else {
-        setExecuteStatus(`✗ ${r.error ?? r.detail ?? "failed"}`);
+        setExecuteStatus({ tone: "error", text: r.error ?? r.detail ?? "failed" });
       }
     } catch (e) {
-      setExecuteStatus(`Request failed: ${e instanceof Error ? e.message : String(e)}`);
+      setExecuteStatus({
+        tone: "error",
+        text: `Request failed: ${e instanceof Error ? e.message : String(e)}`,
+      });
     } finally {
       setExecuting(false);
     }
@@ -537,12 +546,17 @@ export function LivePage() {
   // (stop is never blocked). Named *Robot to avoid the camera's handleStop.
   const handleStopRobot = useCallback(async () => {
     setExecuting(true);
-    setExecuteStatus("⏹ Stopping the robot…");
+    setExecuteStatus({ tone: "busy", text: "Stopping the robot…" });
     try {
       const r = await executeCommand(cmdRobot, "stop", {}, false);
-      setExecuteStatus(r.ok ? "⏹ Stopped" : `✗ ${r.error ?? "stop failed"}`);
+      setExecuteStatus(r.ok
+        ? { tone: "stopped", text: "Stopped" }
+        : { tone: "error", text: r.error ?? "stop failed" });
     } catch (e) {
-      setExecuteStatus(`Stop failed: ${e instanceof Error ? e.message : String(e)}`);
+      setExecuteStatus({
+        tone: "error",
+        text: `Stop failed: ${e instanceof Error ? e.message : String(e)}`,
+      });
     } finally {
       setExecuting(false);
     }
@@ -702,9 +716,7 @@ export function LivePage() {
           <Button variant={source === "view" ? "primary" : "secondary"} onClick={useMirror}>
             View only
           </Button>
-          {robotCamStatus && (
-            <span className="text-xs text-muted">{robotCamStatus}</span>
-          )}
+          <StatusText status={robotCamStatus} className="text-xs text-muted" />
           {viewing && (
             <span className="text-xs text-muted tabular-nums">
               {objects.length} objects

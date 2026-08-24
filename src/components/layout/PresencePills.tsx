@@ -1,4 +1,5 @@
 import {
+  IconBone,
   IconCpu,
   IconDeviceGamepad2,
   IconPlugConnected,
@@ -9,6 +10,13 @@ import { usePresence } from "../../hooks/usePresence";
 import { Pill, type PillTone } from "../ui/Pill";
 import type { Presence, RobotInfo } from "../../types";
 import { useRobot } from "./RobotContext";
+
+/** Per-robot glyph. The Go2 is a quadruped, so it gets the bone; anything else
+ * falls back to the generic robot icon (the registry can grow without touching
+ * this — a missing entry is not a bug, just the default). */
+const ROBOT_ICONS: Record<string, typeof IconRobot> = {
+  go2: IconBone,
+};
 
 /** State of one robot, derived from what the gateway can actually observe. */
 function robotState(
@@ -55,11 +63,12 @@ function robotState(
 function RobotPill({ p, robot, selected }: { p: Presence; robot: RobotInfo; selected: boolean }) {
   const { tone, text, title } = robotState(p, robot.id);
   const name = robot.short ?? robot.id.toUpperCase();
+  const Icon = ROBOT_ICONS[robot.id] ?? IconRobot;
   return (
     <Pill
       tone={tone}
       dot
-      icon={<IconRobot size={13} stroke={2} />}
+      icon={<Icon size={13} stroke={2} />}
       title={`${robot.label} — ${title}${selected ? " · selected for commands" : ""}`}
       className={selected ? "ring-1 ring-line" : ""}
     >
