@@ -3,6 +3,7 @@ import { executeCommand, fetchSkills, setRobotCamera } from "../api/backend";
 import type { SkillInfo } from "../api/backend";
 import { useRobotCameraView } from "../hooks/useRobotCameraView";
 import { Joystick } from "../components/control/Joystick";
+import { useGamepad, PAD } from "../hooks/useGamepad";
 import { ActionPad } from "../components/control/ActionPad";
 import { Button } from "../components/ui/Button";
 import { FullscreenButton } from "../components/ui/FullscreenButton";
@@ -25,6 +26,26 @@ const SEND_MS = 150; // dispatch cadence
 const DURATION_S = 0.4;
 const clamp1 = (v: number) => Math.max(-1, Math.min(1, v));
 
+// Console trace of every stick move and button edge, plus what each button resolved
+// to on this robot. On in dev so you can tell "the pad is not reaching the browser"
+// apart from "the button is mapped to a skill this robot does not have".
+const PAD_DEBUG = import.meta.env.DEV;
+
+// Gamepad buttons that fire a preset skill. The catalog differs per robot (Go2 and
+// G1 name things differently), so each entry lists candidates and the first one the
+// selected robot actually has wins — a button with no match on this robot does
+// nothing. Sticks, arm, stop and speed are handled separately in the press handler.
+const PAD_SKILLS: Record<number, string[]> = {
+  [PAD.A]: ["stand_up", "start"],
+  [PAD.B]: ["stand_down", "damp"],
+  [PAD.X]: ["hello", "wave_hand"],
+  [PAD.Y]: ["recovery_stand", "balance_stand"],
+  [PAD.UP]: ["high_stand", "stretch"],
+  [PAD.DOWN]: ["sit", "squat"],
+  [PAD.LEFT]: ["scrape", "shake_hand"],
+  [PAD.RIGHT]: ["dance1", "pose"],
+};
+
 interface Vel {
   vx: number;
   vy: number;
@@ -34,7 +55,9 @@ interface Vel {
 /**
  * Drive pad: shows the robot camera and steers the robot. On touch devices two
  * joysticks (left = translate fwd/back + strafe, right = rotate); on desktop
- * WASD to translate and ← → to rotate. Nothing moves until you ARM it, and it
+ * WASD to translate and ← → to rotate. A connected gamepad works everywhere and
+ * drives the same loop: sticks steer, Start arms, Back stops, LB/RB change speed
+ * and the face/d-pad buttons fire preset skills. Nothing moves until you ARM it, and it
  * always sends a stop when you release, disarm, hide the tab, or leave the page —
  * so the robot never runs away.
  */
@@ -85,6 +108,19 @@ export function ControlPage() {
   const leftRef = useRef({ x: 0, y: 0 }); // translate stick
   const rightRef = useRef({ x: 0 }); // rotate stick
   const keysRef = useRef<Set<string>>(new Set());
+
+  // Gamepad. Its press handler needs actions declared further down, so it goes
+  // through a ref — the pad loop only ever calls it after mount, so the
+  // indirection costs nothing and keeps the hook above `computeVel`, which reads
+  // the sticks it exposes.
+  const padPressRef = useRef<(index: number) => void>(() => {});
+  const { sticks: padRef, pad } = useGamepad({
+    debug: PAD_DEBUG,
+    onPress: (i) => padPressRef.current(i),
+    // Losing the pad mid-drive must not leave the robot rolling.
+    onDisconnect: () => setArmed(false),
+  });
+
   const armedRef = useRef(armed);
   armedRef.current = armed;
   const speedRef = useRef<Speed>(speed);
@@ -120,6 +156,12 @@ export function ControlPage() {
     let lx = leftRef.current.x;
     let ly = leftRef.current.y;
     let rx = rightRef.current.x;
+    // Gamepad: left stick translates, right stick X rotates — same axes as the
+    // touch joysticks, so the three input sources simply add up.
+    const p = padRef.current;
+    lx += p.lx;
+    ly += p.ly;
+    rx += p.rx;
     const k = keysRef.current;
     if (k.has("w")) ly += 1;
     if (k.has("s")) ly -= 1;
@@ -137,7 +179,7 @@ export function ControlPage() {
       vy: +(-lx * s.vy).toFixed(3),
       vyaw: +(-rx * s.vyaw).toFixed(3),
     };
-  }, []);
+  }, [padRef]);
 
   // Dispatch loop: send a fresh `move` when the vector meaningfully changes, and a
   // single `stop` when it returns to zero (or whenever disarmed).
@@ -219,6 +261,55 @@ export function ControlPage() {
     [robot, safeMode, setStatusFrom],
   );
 
+  // Gamepad buttons, mirroring what the on-screen controls do. Arm and stop are
+  // always live (you must be able to stop with the pad); everything else obeys the
+  // same arm + supported-robot gate as the buttons in the side pad.
+  const handlePadPress = useCallback(
+    (index: number) => {
+      const trace = (what: string) =>
+        PAD_DEBUG && console.log(`%c[pad] boton ${index} -> ${what}`, "color:#fbbf24");
+
+      if (index === PAD.START) {
+        trace("ARM / DISARM");
+        setArmed((a) => !a);
+        return;
+      }
+      if (index === PAD.BACK) {
+        trace("E-STOP");
+        estop();
+        return;
+      }
+      if (index === PAD.LB || index === PAD.RB) {
+        const step = index === PAD.RB ? 1 : -1;
+        setSpeed((cur) => {
+          const i = SPEED_NAMES.indexOf(cur) + step;
+          const next = SPEED_NAMES[Math.max(0, Math.min(SPEED_NAMES.length - 1, i))];
+          trace(`velocidad ${next}`);
+          return next;
+        });
+        return;
+      }
+      const skill = PAD_SKILLS[index]?.find((n) => n in skills);
+      if (!skill) {
+        trace(
+          PAD_SKILLS[index]
+            ? `sin skill: ${robot} no tiene ninguno de [${PAD_SKILLS[index].join(", ")}]`
+            : "sin asignar",
+        );
+        return;
+      }
+      if (!armedRef.current || !supportedRef.current) {
+        trace(`skill "${skill}" ignorado: falta armar`);
+        setStatus("Arm to drive first");
+        return;
+      }
+      trace(`skill "${skill}"`);
+      runAction(skill);
+    },
+    [estop, robot, runAction, skills],
+  );
+  padPressRef.current = handlePadPress;
+
   return (
     <main className="p-4">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
@@ -267,6 +358,14 @@ export function ControlPage() {
               </button>
             ))}
           </div>
+          {pad && (
+            <span
+              className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] text-white/80"
+              title={`Gamepad: ${pad.id}`}
+            >
+              🎮 Pad
+            </span>
+          )}
           {status && (
             <span className="ml-auto max-w-[45%] truncate text-xs text-white/80">
               {status}
@@ -298,8 +397,20 @@ export function ControlPage() {
           </>
         ) : (
           <div className="absolute inset-x-0 bottom-3 text-center text-xs text-white/70">
-            <kbd className="font-semibold">W A S D</kbd> move ·{" "}
-            <kbd className="font-semibold">← →</kbd> rotate
+            {pad ? (
+              <>
+                <span className="font-semibold">Left stick</span> move ·{" "}
+                <span className="font-semibold">Right stick</span> rotate ·{" "}
+                <span className="font-semibold">Start</span> arm ·{" "}
+                <span className="font-semibold">Back</span> stop ·{" "}
+                <span className="font-semibold">LB/RB</span> speed
+              </>
+            ) : (
+              <>
+                <kbd className="font-semibold">W A S D</kbd> move ·{" "}
+                <kbd className="font-semibold">← →</kbd> rotate
+              </>
+            )}
             {!armed && " · press “Arm to drive” first"}
           </div>
         )}
