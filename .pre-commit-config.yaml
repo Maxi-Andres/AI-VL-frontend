@@ -1,0 +1,32 @@
+# Commit gate for the SPA. bun only — never npm.
+# The full suite runs in CI (.github/workflows/ci.yml).
+fail_fast: false
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: check-added-large-files
+        args: ["--maxkb=512"]
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint
+        entry: bunx eslint
+        language: system
+        types_or: [ts, tsx]
+      - id: tsc
+        name: tsc (typecheck)
+        entry: bun run typecheck
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: vitest
+        name: vitest
+        entry: bunx vitest run --passWithNoTests
+        language: system
+        pass_filenames: false
+        always_run: true

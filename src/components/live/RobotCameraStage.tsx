@@ -51,7 +51,6 @@ export function RobotCameraStage({
         className="relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-line bg-black"
       >
         {frameUrl ? (
-          // eslint-disable-next-line jsx-a11y/alt-text
           <img
             ref={imgRef}
             src={frameUrl}

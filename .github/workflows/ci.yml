@@ -1,0 +1,18 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2      # bun only — never npm (standard §6)
+      - run: bun install --frozen-lockfile
+      - name: Lint
+        run: bunx eslint src
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Test
+        run: bunx vitest run --passWithNoTests
+      - name: Build
+        run: bun run build
