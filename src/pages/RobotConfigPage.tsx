@@ -17,8 +17,9 @@ import { useRobot } from "../components/layout/RobotContext";
  * file edited without a restart shows the OLD value, which is the truth about what is running.
  */
 
-const REPO_RELAY = "~/robot-splunk-bridge";
-const REPO_VIDEO = "~/robot-nvr-bridge";
+const REPO_TELEMETRY = "~/robot-telemetry-agent";
+const REPO_RELAY = "~/robot-command-relay";
+const REPO_VIDEO = "~/robot-video-pipeline";
 
 function Steps({ lines }: { lines: string[] }) {
   return (
@@ -140,9 +141,9 @@ export function RobotConfigPage() {
         </p>
         <Steps
           lines={[
-            "sudo nano /etc/systemd/system/robot-splunk-bridge.service",
+            "sudo nano /etc/systemd/system/robot-telemetry-agent.service",
             "sudo systemctl daemon-reload",
-            "sudo systemctl restart robot-splunk-bridge",
+            "sudo systemctl restart robot-telemetry-agent",
           ]}
         />
       </section>
@@ -170,7 +171,7 @@ export function RobotConfigPage() {
         </p>
         <Steps
           lines={[
-            `nano ${REPO_RELAY}/relay/relay.env`,
+            `nano ${REPO_RELAY}/relay.env`,
             "sudo systemctl restart robot-command-relay",
           ]}
         />
@@ -179,16 +180,22 @@ export function RobotConfigPage() {
       <section>
         <h3 className="mb-1 text-base font-semibold">Updating the robot’s code</h3>
         <p className="mb-1 text-sm text-muted">
-          Three git repos live on the robot. Two are ours; <code>~/unitree_sdk2</code> is
-          Unitree’s, needed only to compile against.
+          Four git repos live on the robot. Three are ours — one per service, since the
+          telemetry agent and the command relay are separate repos: the relay is the only
+          thing that can move the robot, so it is named and audited on its own.
+          <code> ~/unitree_sdk2</code> is Unitree’s, needed only to compile against.
         </p>
         <Steps
           lines={[
             "ssh unitree@<robot>",
             "",
-            "# telemetry + command relay  ->  telemetry_reader, command_sender",
+            "# telemetry  ->  telemetry_reader (read-only; cannot move the robot)",
+            `cd ${REPO_TELEMETRY} && git pull && ./build.sh`,
+            "sudo systemctl restart robot-telemetry-agent",
+            "",
+            "# command relay  ->  command_sender (the only path that can move it)",
             `cd ${REPO_RELAY} && git pull && ./build.sh`,
-            "sudo systemctl restart robot-splunk-bridge robot-command-relay",
+            "sudo systemctl restart robot-command-relay",
             "",
             "# video  ->  go2_jpeg_stream (this is what reads the camera off DDS)",
             `cd ${REPO_VIDEO} && git pull && ./build.sh`,
@@ -196,20 +203,20 @@ export function RobotConfigPage() {
           ]}
         />
         <p className="mb-1 text-sm text-muted">
-          <strong>Both</strong> repos compile C++ and <strong>both</strong> need
-          <code> ./build.sh</code>: the binaries are gitignored, so a pull brings new source
-          without rebuilding it. In the video repo the GStreamer pipeline is only the encode
-          half — <code>go2_jpeg_stream</code> is the C++ that reads the camera over DDS.
-          Running <code>build.sh</code> when nothing changed is harmless, so just always run
-          it.
+          All three of ours compile C++ and all three need <code>./build.sh</code>: the
+          binaries are gitignored, so a pull brings new source without rebuilding it. In the
+          video repo the GStreamer pipeline is only the encode half —
+          <code> go2_jpeg_stream</code> is the C++ that reads the camera over DDS. Running
+          <code> build.sh</code> when nothing changed is harmless, so just always run it.
         </p>
         <p className="mb-1 text-sm text-muted">
-          Pull the SDK only to take an upstream update — and then rebuild <em>both</em> repos,
+          Pull the SDK only to take an upstream update — and then rebuild <em>all three</em>,
           since their binaries are statically linked against it:
         </p>
         <Steps
           lines={[
             "cd ~/unitree_sdk2 && git pull",
+            `cd ${REPO_TELEMETRY} && ./build.sh`,
             `cd ${REPO_RELAY} && ./build.sh`,
             `cd ${REPO_VIDEO} && ./build.sh`,
           ]}
@@ -224,7 +231,7 @@ export function RobotConfigPage() {
         </p>
         <Steps
           lines={[
-            "systemctl status robot-splunk-bridge robot-video robot-command-relay",
+            "systemctl status robot-telemetry-agent robot-video robot-command-relay",
             "journalctl -u robot-command-relay -f    # Ctrl-C closes the view, not the service",
           ]}
         />
