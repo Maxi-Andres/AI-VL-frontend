@@ -15,9 +15,12 @@ THIS (frontend, browser)  ──HTTP/WS──▶  backend (gateway)  ──HTTP�
 It captures the webcam, streams JPEG frames over a WebSocket to the **backend**,
 draws the returned boxes on a `<canvas>` over the video, and can ask the VLM about
 the current frame. It also has a **voice-assistant** flow (record → transcribe →
-speak, with wake-word) and a read-only **`/monitor`** page that mirrors the phone's
-stream. Routes: `/` (live), `/monitor`, `/about`. It talks **only** to the
-backend — it never knows the iacore service exists.
+speak, with wake-word). The Live page picks its own video source — "My camera",
+"Robot camera", or "View only", the last being a read-only mirror of whatever the
+session is streaming (this replaced the old separate `/monitor` page).
+Routes: `/` (live), `/drive` (robot drive pad), `/robot` (on-robot config),
+`/about`. It talks **only** to the backend — it never knows the iacore service
+exists.
 
 ## Toolchain
 

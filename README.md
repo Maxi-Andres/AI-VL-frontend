@@ -10,14 +10,17 @@ frontend (this repo)  ──HTTP/WS──▶  backend (gateway)  ──HTTP─�
 
 Captures the webcam, streams frames over a WebSocket to the **backend**, draws the
 returned boxes over the video, can ask the VLM about the current frame, and has a
-**voice-assistant** flow (record → transcribe → speak, with wake-word). A read-only
-**`/monitor`** page mirrors the phone's stream. It talks **only** to the backend.
+**voice-assistant** flow (record → transcribe → speak, with wake-word). The Live page
+picks its source: your own camera, the robot's camera, or "View only" — a read-only
+mirror of what the session is streaming, which replaced the old `/monitor` page. It
+also drives the robot (`/drive`) and shows what is configured on it (`/robot`). It
+talks **only** to the backend.
 
 ## Stack
 
 - **React 19** + **TypeScript** (strict)
 - **Tailwind CSS v4** (via the official Vite plugin — theme lives in `src/index.css`)
-- **React Router v7** (`/` live page, `/monitor`, `/about`)
+- **React Router v7** (`/` live, `/drive` drive pad, `/robot` config, `/about`)
 - **Vite** dev server / bundler
 - **bun** as the package manager and runtime
 
