@@ -23,6 +23,10 @@ export function usePresence() {
   useEffect(() => {
     let stopped = false;
     let timer: number | undefined;
+    // One controller for the whole effect: this polls forever, so teardown has to cancel
+    // whichever round happens to be in flight. Without it, unmounting during a slow poll
+    // left the request running and `setReachable(false)` firing into a dead tree on timeout.
+    const ac = new AbortController();
 
     const schedule = () => {
       if (!stopped) timer = window.setTimeout(run, POLL_MS);
@@ -31,12 +35,14 @@ export function usePresence() {
     const run = async () => {
       if (document.hidden) return schedule(); // idle tab: skip this round
       try {
-        const p = await fetchPresence();
+        const p = await fetchPresence(ac.signal);
         if (stopped) return;
         setPresence(p);
         setReachable(true);
       } catch {
-        if (stopped) return;
+        // An abort is our own teardown: do not report it as the robot being unreachable,
+        // and do not reschedule.
+        if (stopped || ac.signal.aborted) return;
         setReachable(false);
       }
       schedule();
@@ -52,6 +58,7 @@ export function usePresence() {
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
       stopped = true;
+      ac.abort();
       window.clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisibility);
     };

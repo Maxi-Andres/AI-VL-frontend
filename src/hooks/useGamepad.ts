@@ -105,8 +105,8 @@ export function useGamepad({
           setPad({ index: gp.index, id: gp.id });
           if (debug)
             console.log(
-              `%c[gamepad] conectado #${gp.index}: ${gp.id} — ${gp.axes.length} ejes, ` +
-                `${gp.buttons.length} botones, mapping="${gp.mapping || "(no estandar)"}"`,
+              `%c[gamepad] connected #${gp.index}: ${gp.id} — ${gp.axes.length} axes, ` +
+                `${gp.buttons.length} buttons, mapping="${gp.mapping || "(non-standard)"}"`,
               "color:#4ade80;font-weight:bold",
             );
         }
@@ -118,7 +118,7 @@ export function useGamepad({
           reset();
           setPad(null);
           if (debug)
-            console.log("%c[gamepad] desconectado", "color:#f87171;font-weight:bold");
+            console.log("%c[gamepad] disconnected", "color:#f87171;font-weight:bold");
           cbs.current.onDisconnect?.();
         }
         return;
@@ -141,7 +141,7 @@ export function useGamepad({
           lastLog = { ...sticks.current };
           const f = (v: number) => v.toFixed(2).padStart(5);
           console.log(
-            `[gamepad] stick izq x=${f(lx)} y=${f(-ly)} | der x=${f(rx)} y=${f(-ry)}`,
+            `[gamepad] left stick x=${f(lx)} y=${f(-ly)} | right x=${f(rx)} y=${f(-ry)}`,
           );
         }
       }
@@ -157,9 +157,9 @@ export function useGamepad({
         if (was === undefined) continue;
         if (debug)
           console.log(
-            `%c[gamepad] boton ${i} (${PAD_NAMES[i] ?? "?"}) ${down ? "PRESS" : "release"}` +
+            `%c[gamepad] button ${i} (${PAD_NAMES[i] ?? "?"}) ${down ? "PRESS" : "release"}` +
               (gp.buttons[i].value > 0 && gp.buttons[i].value < 1
-                ? ` valor=${gp.buttons[i].value.toFixed(2)}`
+                ? ` value=${gp.buttons[i].value.toFixed(2)}`
                 : ""),
             `color:${down ? "#60a5fa" : "#94a3b8"}`,
           );
@@ -170,8 +170,8 @@ export function useGamepad({
 
     if (debug)
       console.log(
-        "%c[gamepad] escuchando. Si no aparece nada, hace un click en la pagina y " +
-          "despues tocá un boton del joystick (el browser lo oculta hasta el primer gesto).",
+        "%c[gamepad] listening. If nothing shows up, click the page and then press a " +
+          "pad button — the browser hides gamepads until the first user gesture.",
         "color:#a78bfa",
       );
 

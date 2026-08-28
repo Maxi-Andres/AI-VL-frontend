@@ -39,9 +39,10 @@ export function NetworkControls() {
 
   // The transport is per robot, so re-read it whenever the selected robot changes.
   /** Status only — safe to call on a timer: it never touches the editable fields. */
-  const loadStatus = useCallback(() => {
-    getRobotTransport()
+  const loadStatus = useCallback((signal?: AbortSignal) => {
+    getRobotTransport(signal)
       .then((t) => {
+        if (signal?.aborted) return;
         const cur = t.transports?.[robot];
         if (cur) {
           setRobotInfo({
@@ -55,9 +56,10 @@ export function NetworkControls() {
 
   /** Also fills the editable fields. Only on mount / robot change / after applying —
    * NEVER on the poll, or it overwrites what the user is typing mid-word. */
-  const loadConfig = useCallback(() => {
-    getRobotTransport()
+  const loadConfig = useCallback((signal?: AbortSignal) => {
+    getRobotTransport(signal)
       .then((t) => {
+        if (signal?.aborted) return;
         const cur = t.transports?.[robot];
         if (cur) {
           setMode(cur.mode || "dds");
@@ -69,10 +71,17 @@ export function NetworkControls() {
   }, [robot]);
 
   useEffect(() => {
-    loadConfig();
-    loadStatus();
-    const t = setInterval(loadStatus, 6000);
-    return () => clearInterval(t);
+    // One controller for the effect's lifetime, so a robot switch cancels the previous
+    // robot's in-flight reads. Without it a slow answer for the OLD robot could land after
+    // the switch and repaint the fields with the wrong robot's transport.
+    const ac = new AbortController();
+    loadConfig(ac.signal);
+    loadStatus(ac.signal);
+    const t = setInterval(() => loadStatus(ac.signal), 6000);
+    return () => {
+      ac.abort();
+      clearInterval(t);
+    };
   }, [loadConfig, loadStatus]);
 
   // Saving the probe address does NOT restart the executor (nothing about the transport

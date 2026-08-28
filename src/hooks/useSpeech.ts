@@ -53,9 +53,17 @@ export function useSpeech() {
 
   // Load the server's neural (Piper) voices, if any.
   useEffect(() => {
-    fetchTtsVoices()
-      .then((r) => setPiperVoices(r.voices ?? []))
-      .catch(() => setPiperVoices([]));
+    const ac = new AbortController();
+    fetchTtsVoices(ac.signal)
+      .then((r) => {
+        if (!ac.signal.aborted) setPiperVoices(r.voices ?? []);
+      })
+      // An abort must NOT fall into the empty-list branch: that would look like "the server
+      // has no neural voices" and silently drop the user back to browser TTS.
+      .catch(() => {
+        if (!ac.signal.aborted) setPiperVoices([]);
+      });
+    return () => ac.abort();
   }, []);
 
   const voices = useMemo<VoiceOption[]>(

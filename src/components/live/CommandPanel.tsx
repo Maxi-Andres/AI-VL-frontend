@@ -230,13 +230,13 @@ export function CommandPanel({
       {!safeMode && (
         <p className="m-0 mt-1 flex items-center gap-1 text-[11px] font-semibold text-[#ff5a5f]">
           <IconAlertTriangle size={13} stroke={2} className="shrink-0" />
-          Safe OFF — acrobacias (flips/handstand) habilitadas
+          Safe OFF — acrobatics (flips/handstand) enabled
         </p>
       )}
       {execEnabled && autoRun && (
         <p className="m-0 mt-1 flex items-center gap-1 text-[11px] font-semibold text-[#ff5a5f]">
           <IconAlertTriangle size={13} stroke={2} className="shrink-0" />
-          Auto ON — se ejecuta solo al interpretar (sin botón)
+          Auto ON — runs on interpret, no button press needed
         </p>
       )}
 

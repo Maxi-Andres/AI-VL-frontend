@@ -39,14 +39,20 @@ export function CameraControls() {
   const [source, setSource] = useState("go2");
 
   useEffect(() => {
-    getRobotCameraStatus()
+    // This panel lives in a <details>, so it mounts and unmounts as the user opens and
+    // closes it — a late answer landing after a close would overwrite the controls with
+    // stale values from a previous round.
+    const ac = new AbortController();
+    getRobotCameraStatus(ac.signal)
       .then((s) => {
+        if (ac.signal.aborted) return;
         if (typeof s.fps === "number") setFps(Math.round(s.fps));
         if (s.resolution) setResolution(s.resolution);
         if (typeof s.quality === "number") setQuality(s.quality);
         if (s.robot) setSource(s.robot);
       })
       .catch(() => {});
+    return () => ac.abort();
   }, []);
 
   const push = (patch: RobotCameraConfig) => {

@@ -11,8 +11,11 @@ import type {
   VlmResponse,
 } from "../types";
 
-export async function fetchOptions(): Promise<Options> {
-  const r = await fetch(`${BACKEND_URL}/api/options`);
+// The GETs below take an optional `signal` for the same reason the POSTs do: a fetch fired
+// on mount outlives a component that unmounts before it answers, and its `.then` then writes
+// state into a dead tree. Optional, so every existing call site keeps working untouched.
+export async function fetchOptions(signal?: AbortSignal): Promise<Options> {
+  const r = await fetch(`${BACKEND_URL}/api/options`, { signal });
   if (!r.ok) throw new Error(`GET /api/options -> ${r.status}`);
   return r.json();
 }
@@ -147,8 +150,10 @@ export async function setRobotCamera(
 }
 
 /** Current robot-camera bridge status (streaming + live source params). */
-export async function getRobotCameraStatus(): Promise<RobotCameraStatus> {
-  const r = await fetch(`${BACKEND_URL}/api/robot-camera/status`);
+export async function getRobotCameraStatus(
+  signal?: AbortSignal,
+): Promise<RobotCameraStatus> {
+  const r = await fetch(`${BACKEND_URL}/api/robot-camera/status`, { signal });
   return r.json();
 }
 
@@ -184,8 +189,8 @@ export interface RobotNet {
   restarting?: boolean;
 }
 
-export async function getRobotNet(): Promise<RobotNet> {
-  const r = await fetch(`${BACKEND_URL}/api/robot-net`);
+export async function getRobotNet(signal?: AbortSignal): Promise<RobotNet> {
+  const r = await fetch(`${BACKEND_URL}/api/robot-net`, { signal });
   return r.json();
 }
 
@@ -248,8 +253,10 @@ export interface RobotTransports {
   error?: string;
 }
 
-export async function getRobotTransport(): Promise<RobotTransports> {
-  const r = await fetch(`${BACKEND_URL}/api/robot-transport`);
+export async function getRobotTransport(
+  signal?: AbortSignal,
+): Promise<RobotTransports> {
+  const r = await fetch(`${BACKEND_URL}/api/robot-transport`, { signal });
   return r.json();
 }
 
@@ -279,8 +286,10 @@ export async function setRobotTransport(cfg: {
  * while a freshly built SPA is served by a backend that hasn't restarted yet. The
  * UI then just hides the pills instead of crying "offline".
  */
-export async function fetchPresence(): Promise<Presence | null> {
-  const r = await fetch(`${BACKEND_URL}/api/presence`);
+export async function fetchPresence(
+  signal?: AbortSignal,
+): Promise<Presence | null> {
+  const r = await fetch(`${BACKEND_URL}/api/presence`, { signal });
   if (r.status === 404) return null;
   if (!r.ok) throw new Error(`GET /api/presence -> ${r.status}`);
   return r.json();
@@ -356,11 +365,11 @@ export async function transcribeAudio(
 }
 
 /** List the local neural (Piper) TTS voices the server has installed. */
-export async function fetchTtsVoices(): Promise<{
+export async function fetchTtsVoices(signal?: AbortSignal): Promise<{
   voices: string[];
   default: string;
 }> {
-  const r = await fetch(`${BACKEND_URL}/api/tts/voices`);
+  const r = await fetch(`${BACKEND_URL}/api/tts/voices`, { signal });
   if (!r.ok) throw new Error(`GET /api/tts/voices -> ${r.status}`);
   return r.json();
 }

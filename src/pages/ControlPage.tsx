@@ -277,7 +277,7 @@ export function ControlPage() {
   const handlePadPress = useCallback(
     (index: number) => {
       const trace = (what: string) =>
-        PAD_DEBUG && console.log(`%c[pad] boton ${index} -> ${what}`, "color:#fbbf24");
+        PAD_DEBUG && console.log(`%c[pad] button ${index} -> ${what}`, "color:#fbbf24");
 
       if (index === PAD.START) {
         trace("ARM / DISARM");
@@ -294,7 +294,7 @@ export function ControlPage() {
         setSpeed((cur) => {
           const i = SPEED_NAMES.indexOf(cur) + step;
           const next = SPEED_NAMES[Math.max(0, Math.min(SPEED_NAMES.length - 1, i))];
-          trace(`velocidad ${next}`);
+          trace(`speed ${next}`);
           return next;
         });
         return;
@@ -303,13 +303,13 @@ export function ControlPage() {
       if (!skill) {
         trace(
           PAD_SKILLS[index]
-            ? `sin skill: ${robot} no tiene ninguno de [${PAD_SKILLS[index].join(", ")}]`
-            : "sin asignar",
+            ? `no skill: ${robot} has none of [${PAD_SKILLS[index].join(", ")}]`
+            : "unassigned",
         );
         return;
       }
       if (!armedRef.current || !supportedRef.current) {
-        trace(`skill "${skill}" ignorado: falta armar`);
+        trace(`skill "${skill}" ignored: not armed`);
         setStatus({ tone: "warn", text: "Arm to drive first" });
         return;
       }

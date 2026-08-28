@@ -8,19 +8,20 @@ export function useOptions() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
-    fetchOptions()
+    // The `cancelled` flag alone only silenced the setState; the request still ran to
+    // completion in the background. Aborting frees the connection too, which matters on
+    // mobile and under StrictMode's double-mount.
+    const ac = new AbortController();
+    fetchOptions(ac.signal)
       .then((o) => {
-        if (!cancelled) setOptions(o);
+        if (!ac.signal.aborted) setOptions(o);
       })
       .catch((e: unknown) => {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : String(e));
-        }
+        // An abort is our own teardown, not a failure to report.
+        if (ac.signal.aborted) return;
+        setError(e instanceof Error ? e.message : String(e));
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => ac.abort();
   }, []);
 
   return { options, error, loading: !options && !error };
