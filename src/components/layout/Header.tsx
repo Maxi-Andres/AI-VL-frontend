@@ -23,6 +23,9 @@ export function Header({ children }: Props) {
         <NavLink to="/robot" className={linkClass}>
           Robot
         </NavLink>
+        <NavLink to="/video" className={linkClass}>
+          Video
+        </NavLink>
         <NavLink to="/about" className={linkClass}>
           About
         </NavLink>

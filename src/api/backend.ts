@@ -387,3 +387,55 @@ export async function synthesizeSpeech(
   if (!r.ok) throw new Error(`POST /api/speak -> ${r.status}`);
   return r.blob();
 }
+
+/** The robot's LIVE video knobs, as the robot itself reports them. */
+export interface RobotVideoKnobs {
+  fps?: number;
+  width?: number;
+  quality?: number;
+}
+
+export interface RobotVideoState {
+  ok?: boolean;
+  robot?: string;
+  /** What the publisher is running RIGHT NOW (read from the live process). */
+  running?: RobotVideoKnobs;
+  /** What video.env holds — differs from `running` until the publisher restarts. */
+  saved?: Record<string, string | undefined>;
+  /** Valid range per knob, owned by the robot so the UI never invents its own. */
+  limits?: Record<string, { min: number; max: number }>;
+  error?: string;
+}
+
+/** Read the robot's live video knobs: running values, saved values, and valid ranges. */
+export async function getRobotVideo(
+  robot: string,
+  signal?: AbortSignal,
+): Promise<RobotVideoState> {
+  const r = await fetch(
+    `${BACKEND_URL}/api/robot-video?robot=${encodeURIComponent(robot)}`, { signal });
+  return r.json();
+}
+
+/**
+ * Retune the robot's live view. Applies immediately with NO restart and no gap in the
+ * stream — which is the point: these are the knobs you want to move while driving, and
+ * a restart costs ~5 s of black screen.
+ *
+ * `persist` also writes the robot's video.env so the value survives a restart. Applying
+ * and saving are separate on purpose: you try many values and keep one.
+ */
+export async function setRobotVideo(cfg: {
+  robot: string;
+  fps?: number;
+  width?: number;
+  quality?: number;
+  persist?: boolean;
+}): Promise<{ ok?: boolean; running?: RobotVideoKnobs; saved?: boolean; error?: string }> {
+  const r = await fetch(`${BACKEND_URL}/api/robot-video`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(cfg),
+  });
+  return r.json();
+}
