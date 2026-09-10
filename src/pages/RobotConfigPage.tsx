@@ -109,8 +109,23 @@ export function RobotConfigPage() {
           <p className="text-muted">Not publishing (or not reported yet).</p>
         )}
         <p className="mb-1 text-sm text-muted">
-          The robot encodes H.264 in hardware and pushes it out; mediamtx re-serves it. Change
-          the destination on the robot:
+          The robot encodes H.264 in hardware and pushes it out; mediamtx re-serves it. The
+          values above are that RTMP push only.
+        </p>
+        <p className="mb-1 text-sm text-amber-500">
+          There is a <strong>second</strong> video stream the relay does not report: the raw
+          MJPEG on port 8093, which <code>robot_camera_bridge</code> pulls directly. Measured
+          on 2026-09-09 over the field link it was <strong>218 KB/s against the RTMP’s 42</strong>
+          — five times bigger. <code>MJPEG_FPS=0</code> means <em>no cap</em>, which is the
+          default. If you are trying to cut what the robot uploads, that is the knob, not{" "}
+          <code>BITRATE</code>.
+        </p>
+        <p className="mb-1 text-sm text-muted">
+          Both live in the same file. Useful keys: <code>PUBLISH_HOST</code>,{" "}
+          <code>BITRATE</code>, <code>IDR_FRAMES</code>, <code>NVR_FPS</code> for the RTMP
+          push; <code>MJPEG_FPS</code>, <code>MJPEG_QUALITY</code>, <code>MJPEG_WIDTH</code>{" "}
+          for the direct stream. All are read at start-up, so a restart is required — there is
+          no live knob.
         </p>
         <Steps
           lines={[
@@ -128,7 +143,14 @@ export function RobotConfigPage() {
               ["HEC endpoint", telemetry.hec_url],
               ["index", telemetry.index],
               ["interval", telemetry.period_s ? `${telemetry.period_s}s` : undefined],
-              ["daily byte cap", telemetry.daily_byte_cap],
+              [
+                "daily byte cap",
+                // The unit does not set DAILY_BYTE_CAP, so the relay reports "" while a cap
+                // IS in force: hec_shipper defaults to 150 MB. Facts drops empty rows, so
+                // without this the page would silently omit a limit that is active — the
+                // opposite of what this page promises.
+                telemetry.daily_byte_cap || "150 MB (hec_shipper default — not set in the unit)",
+              ],
               ["robot name", telemetry.robot_name],
             ]}
           />
@@ -136,8 +158,9 @@ export function RobotConfigPage() {
           <p className="text-muted">Not reported yet.</p>
         )}
         <p className="mb-1 text-sm text-muted">
-          The daily byte cap exists because the Splunk licence is shared: the agent stops
-          sending rather than eating someone else’s quota.
+          The daily byte cap stops the agent rather than letting it run away. It was sized
+          when the licence was a shared 500 MB/day trial; since 2026-09-04 the licence is a
+          50 GB/day Partner NFR, so the cap is now a runaway guard, not a budget.
         </p>
         <Steps
           lines={[
@@ -187,7 +210,8 @@ export function RobotConfigPage() {
         </p>
         <Steps
           lines={[
-            "ssh unitree@<robot>",
+            "ssh unitree@192.168.123.18      # robot on the local LAN",
+            "ssh unitree@10.1.254.18         # robot in the field, via the IR1101 tunnel",
             "",
             "# telemetry  ->  telemetry_reader (read-only; cannot move the robot)",
             `cd ${REPO_TELEMETRY} && git pull && ./build.sh`,
