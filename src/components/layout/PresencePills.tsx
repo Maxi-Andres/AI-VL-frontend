@@ -37,7 +37,12 @@ function robotState(
   net: TransportMap | null,
 ): { tone: PillTone; text: string; title: string } {
   const cam = p.robot_cam;
-  const isSource = cam.robot === id || cam.robot === "stream";
+  const probe = net?.[id];
+  // In `stream` mode the bridge pulls an HTTP URL, so cam.robot is the literal "stream" and
+  // does not name a robot. It belongs to whichever robot is on the `relay` transport — the
+  // one whose stream URL the bridge was pointed at. Matching "stream" for EVERY robot made
+  // the G1 report connected off the Go2's video; caught 2026-09-10.
+  const isSource = cam.robot === id || (cam.robot === "stream" && probe?.mode === "relay");
   const control = p.executor.online
     ? `control: executor up${p.executor.dry_run ? " (dry run)" : ""}`
     : "control: executor down";
@@ -50,7 +55,6 @@ function robotState(
         ? "camera: bridge streaming but no frames arrive"
         : "camera: bridge up, not started";
 
-  const probe = net?.[id];
   // A robot with no ping_ip comes back online:false, because the backend pinged an empty
   // string. That is "never measured", NOT "offline" — reporting it as down would repeat the
   // exact bug this function was rewritten to fix, just pointing the other way.
