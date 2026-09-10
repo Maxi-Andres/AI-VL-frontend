@@ -699,6 +699,7 @@ export function LivePage() {
         ) : (
           <RobotCameraStage
             frameUrl={robotFrameUrl}
+            getBlob={getLastFrameBlob}
             connected={robotViewConnected}
             objects={objects}
             overrideColor={overrideColor}

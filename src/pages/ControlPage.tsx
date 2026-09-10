@@ -9,6 +9,7 @@ import { IconDeviceGamepad2, IconPlayerStopFilled } from "@tabler/icons-react";
 import { ActionPad } from "../components/control/ActionPad";
 import { Button } from "../components/ui/Button";
 import { FullscreenButton } from "../components/ui/FullscreenButton";
+import { CameraCanvas } from "../components/live/CameraCanvas";
 import { useRobot } from "../components/layout/RobotContext";
 
 // Max velocities per speed preset (m/s, m/s, rad/s). The executor also clamps.
@@ -96,7 +97,7 @@ export function ControlPage() {
   }, [robot]);
 
   // The robot camera is the backdrop. Start the bridge on mount, stop on unmount.
-  const { frameUrl, connected } = useRobotCameraView(true, false);
+  const { frameUrl, connected, getLastFrameBlob } = useRobotCameraView(true, false);
   useEffect(() => {
     setRobotCamera("start").catch(() => {});
     return () => {
@@ -329,9 +330,9 @@ export function ControlPage() {
         className="relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-line bg-black"
       >
         {frameUrl ? (
-          <img
-            src={frameUrl}
-            alt=""
+          <CameraCanvas
+            frameUrl={frameUrl}
+            getBlob={getLastFrameBlob}
             className="absolute inset-0 h-full w-full object-contain"
           />
         ) : (
