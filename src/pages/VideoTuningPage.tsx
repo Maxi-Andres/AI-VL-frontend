@@ -7,7 +7,9 @@ import { Field } from "../components/ui/Field";
 import { NumberField } from "../components/ui/NumberField";
 import { StatusText, type Status } from "../components/ui/StatusText";
 
-/** The knobs, in the order they matter for latency. */
+/** The knobs, in the order they matter for latency.
+ *  `live` here is only the DEFAULT ordering hint — the robot is the authority and
+ *  reports it in `limits[key].live`. */
 const KNOBS = [
   {
     key: "fps" as const,
@@ -34,6 +36,60 @@ const KNOBS = [
     step: 5,
     hint: "Only has any effect while Downscale is above 0: at native size the bytes are " +
       "never re-encoded, so there is nothing to set the quality of.",
+  },
+  {
+    key: "nvr" as const,
+    label: "Feed the recorder",
+    unit: "(1 = on)",
+    step: 1,
+    hint: "The recording branch sends the SAME picture a second time, as H.264 over RTMP. " +
+      "On a constrained link that is what starves the live view — it already did once. " +
+      "Turn it off to hand the whole uplink to the view you steer by.",
+  },
+  {
+    key: "bitrate" as const,
+    label: "Recorder bitrate",
+    unit: "bps",
+    step: 100000,
+    hint: "H.264 bitrate for the recording branch only; the live view never passes " +
+      "through it. The floor exists because this sat at 60000 — 60 kbps for 1080p, a " +
+      "missing zero nobody caught.",
+  },
+  {
+    key: "maxfps" as const,
+    label: "Capture cap",
+    unit: "fps",
+    step: 1,
+    hint: "How fast the robot polls its own camera. 0 = as fast as it answers (~10 fps). " +
+      "This is upstream of everything, so lowering it lowers both branches at once.",
+  },
+  {
+    key: "idr" as const,
+    label: "Keyframe interval",
+    unit: "frames",
+    step: 15,
+    hint: "Recording branch only. Lower = a new viewer starts sooner, at more bitrate.",
+  },
+];
+
+/** Which knobs the robot applies without a restart, when it has not told us yet. The
+ *  robot is the authority (`limits[key].live`); this is only the pre-load fallback. */
+const LIVE_BY_DEFAULT = new Set(["fps", "width", "quality"]);
+
+const SECTIONS = [
+  {
+    liveSection: true,
+    title: "Applies immediately",
+    note: "Takes effect on the running publisher with no restart and no gap in the " +
+      "stream. Safe to move while someone is driving.",
+  },
+  {
+    liveSection: false,
+    title: "Needs a restart of the video service",
+    note: "⚠ These are read by the GStreamer pipeline when it starts, so they can only " +
+      "be SAVED here — they take effect the next time the robot's video service " +
+      "restarts, which costs a few seconds of black screen. Do not change these while " +
+      "someone is driving.",
   },
 ];
 
@@ -81,12 +137,17 @@ export function VideoTuningPage() {
         .then((s) => {
           if (signal?.aborted) return;
           setState(s);
-          const r = s.running ?? {};
-          setDraft({
-            fps: r.fps ?? 0,
-            width: r.width ?? 0,
-            quality: r.quality ?? 75,
-          });
+          // Live knobs seed from what is RUNNING; restart-only ones have no running
+          // value to read, so they seed from the file.
+          const r = (s.running ?? {}) as Record<string, number | undefined>;
+          const sv = s.saved ?? {};
+          const next: Record<string, number> = {};
+          for (const { key } of KNOBS) {
+            const fromFile = sv[key] !== undefined && sv[key] !== null
+              ? parseFloat(sv[key] as string) : NaN;
+            next[key] = r[key] ?? (Number.isFinite(fromFile) ? fromFile : 0);
+          }
+          setDraft(next);
         })
         .catch(() => {});
     },
@@ -108,15 +169,26 @@ export function VideoTuningPage() {
   const apply = async (persist: boolean) => {
     setBusy(true);
     setStatus({ tone: "busy", text: persist ? "Saving…" : "Applying…" });
-    const res = await setRobotVideo({ robot, ...draft, persist }).catch((e) => ({
+    // Without persist, send ONLY the live knobs: the robot refuses restart-only ones that
+    // are not being saved, because writing nowhere and doing nothing is a control that
+    // lies. Sending them here would just turn every plain Apply into an error.
+    const body: Record<string, number> = {};
+    for (const { key } of KNOBS) {
+      if ((persist || isLive(key)) && draft[key] !== undefined) body[key] = draft[key];
+    }
+    const res = await setRobotVideo({ robot, ...body, persist }).catch((e) => ({
       ok: false,
+      pending_restart: undefined as string[] | undefined,
       error: e instanceof Error ? e.message : String(e),
     }));
     setBusy(false);
     if (res.ok) {
+      const waiting = res.pending_restart ?? [];
       setStatus({
-        tone: "ok",
-        text: persist ? "Applied and saved to the robot" : "Applied (not saved)",
+        tone: waiting.length ? "warn" : "ok",
+        text: waiting.length
+          ? `Saved. ${waiting.join(", ")} apply when the video service restarts`
+          : persist ? "Applied and saved to the robot" : "Applied (not saved)",
       });
       loadStatus();
     } else {
@@ -124,7 +196,14 @@ export function VideoTuningPage() {
     }
   };
 
-  const running = state?.running ?? {};
+  /** The robot decides; fall back to the local set until it has answered. */
+  const isLive = (key: string) =>
+    limits[key]?.live ?? LIVE_BY_DEFAULT.has(key);
+
+  // Indexed by knob name across ALL knobs, not just the three the robot reports live
+  // values for: a restart-only knob genuinely has no running value, and `undefined` is
+  // the honest answer the render already handles.
+  const running = (state?.running ?? {}) as Record<string, number | undefined>;
   const saved = state?.saved ?? {};
   const limits = state?.limits ?? {};
   const reachable = state?.ok !== false;
@@ -145,76 +224,87 @@ export function VideoTuningPage() {
         </p>
       )}
 
-      <section className="mt-4 flex flex-col gap-4">
-        {KNOBS.map(({ key, label, unit, step, hint }) => {
-          const lim = limits[key] ?? { min: 0, max: 100 };
-          const value = draft[key] ?? 0;
-          const live = running[key];
-          const savedRaw = saved[key];
-          // Running vs saved are genuinely different things: the file can hold a value the
-          // publisher has never read. Say so rather than showing one number and implying
-          // both — that ambiguity is exactly why /health reads /proc instead of the file.
-          const drifted =
-            savedRaw !== undefined && savedRaw !== null &&
-            String(live) !== String(parseFloat(savedRaw));
-          return (
-            <div key={key}>
-              <Field
-                label={
-                  <>
-                    {label}{" "}
-                    <span className="text-fg">
-                      {value}
-                      {unit && ` ${unit}`}
-                    </span>
-                  </>
-                }
-              >
-                <div className="flex items-center gap-2">
-                  <input
-                    type="range"
-                    min={lim.min}
-                    max={lim.max}
-                    step={step}
-                    value={value}
-                    disabled={!reachable}
-                    onPointerDown={() => (editingRef.current = true)}
-                    onPointerUp={() => (editingRef.current = false)}
-                    onChange={(e) =>
-                      setDraft((d) => ({ ...d, [key]: parseFloat(e.target.value) }))
-                    }
-                    className="w-full"
-                  />
-                  <NumberField
-                    value={value}
-                    min={lim.min}
-                    max={lim.max}
-                    step={step}
-                    disabled={!reachable}
-                    onFocus={() => (editingRef.current = true)}
-                    onBlur={() => (editingRef.current = false)}
-                    onValueChange={(v) => setDraft((d) => ({ ...d, [key]: v }))}
-                  />
-                </div>
-              </Field>
-              <p className="mb-1 mt-1 text-xs text-muted">{hint}</p>
-              <p className="text-xs text-muted">
-                running: <span className="text-fg">{String(live ?? "?")}</span>
-                {savedRaw !== undefined && savedRaw !== null && (
-                  <>
-                    {" · "}saved: <span className="text-fg">{savedRaw}</span>
-                    {drifted && (
-                      <span className="text-amber-500">
-                        {" "}— differs; the saved value applies on the next restart
-                      </span>
-                    )}
-                  </>
-                )}
-              </p>
+      {SECTIONS.map(({ liveSection, title, note }) => {
+        const knobs = KNOBS.filter((k) => isLive(k.key) === liveSection);
+        if (!knobs.length) return null;
+        return (
+          <section key={title} className="mt-5">
+            <h3 className="mb-1 text-base font-semibold">{title}</h3>
+            <p className={`mb-3 text-xs ${liveSection ? "text-muted" : "text-amber-500"}`}>
+              {note}
+            </p>
+            <div className="flex flex-col gap-4">
+              {knobs.map(({ key, label, unit, step, hint }) => {
+                const lim = limits[key] ?? { min: 0, max: 100 };
+                const value = draft[key] ?? 0;
+                const runningValue = running[key];
+                const savedRaw = saved[key];
+                // Running and saved are genuinely different things: the file can hold a
+                // value the publisher has never read. Saying only one of them is how this
+                // report used to lie, which is why /health reads /proc and not the file.
+                const drifted =
+                  runningValue !== undefined && savedRaw !== undefined &&
+                  savedRaw !== null &&
+                  String(runningValue) !== String(parseFloat(savedRaw));
+                return (
+                  <div key={key}>
+                    <Field
+                      label={
+                        <>
+                          {label}{" "}
+                          <span className="text-fg">
+                            {value}
+                            {unit && ` ${unit}`}
+                          </span>
+                        </>
+                      }
+                    >
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="range"
+                          min={lim.min}
+                          max={lim.max}
+                          step={step}
+                          value={value}
+                          disabled={!reachable}
+                          onPointerDown={() => (editingRef.current = true)}
+                          onPointerUp={() => (editingRef.current = false)}
+                          onChange={(e) =>
+                            setDraft((d) => ({ ...d, [key]: parseFloat(e.target.value) }))
+                          }
+                          className="w-full"
+                        />
+                        <NumberField
+                          value={value}
+                          min={lim.min}
+                          max={lim.max}
+                          step={step}
+                          disabled={!reachable}
+                          onFocus={() => (editingRef.current = true)}
+                          onBlur={() => (editingRef.current = false)}
+                          onValueChange={(v) => setDraft((d) => ({ ...d, [key]: v }))}
+                        />
+                      </div>
+                    </Field>
+                    <p className="mb-1 mt-1 text-xs text-muted">{hint}</p>
+                    <p className="text-xs text-muted">
+                      {runningValue !== undefined && (
+                        <>running: <span className="text-fg">{String(runningValue)}</span>{" · "}</>
+                      )}
+                      saved: <span className="text-fg">{savedRaw ?? "unset"}</span>
+                      {drifted && (
+                        <span className="text-amber-500">
+                          {" "}— differs from what is running; applies on the next restart
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
-      </section>
+          </section>
+        );
+      })}
 
       <div className="mt-5 flex items-center gap-2.5">
         <Button variant="primary" disabled={busy || !reachable} onClick={() => apply(false)}>

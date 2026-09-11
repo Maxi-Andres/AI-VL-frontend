@@ -402,8 +402,10 @@ export interface RobotVideoState {
   running?: RobotVideoKnobs;
   /** What video.env holds — differs from `running` until the publisher restarts. */
   saved?: Record<string, string | undefined>;
-  /** Valid range per knob, owned by the robot so the UI never invents its own. */
-  limits?: Record<string, { min: number; max: number }>;
+  /** Range per knob AND whether it applies live, owned by the robot so the UI never
+   * invents its own — `live: false` means changing it costs a restart of the video
+   * service, which the operator must know before touching it mid-drive. */
+  limits?: Record<string, { min: number; max: number; live?: boolean }>;
   error?: string;
 }
 
@@ -430,8 +432,19 @@ export async function setRobotVideo(cfg: {
   fps?: number;
   width?: number;
   quality?: number;
+  bitrate?: number;
+  maxfps?: number;
+  idr?: number;
+  nvr?: number;
   persist?: boolean;
-}): Promise<{ ok?: boolean; running?: RobotVideoKnobs; saved?: boolean; error?: string }> {
+}): Promise<{
+  ok?: boolean;
+  running?: RobotVideoKnobs;
+  saved?: boolean;
+  /** Knobs written to the robot but waiting on a restart of its video service. */
+  pending_restart?: string[];
+  error?: string;
+}> {
   const r = await fetch(`${BACKEND_URL}/api/robot-video`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
