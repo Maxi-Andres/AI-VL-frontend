@@ -10,5 +10,5 @@ interface ImportMeta {
 
 // Runtime config injected by public/config.js (loaded before the app bundle).
 interface Window {
-  APP_CONFIG?: { BACKEND_URL?: string };
+  APP_CONFIG?: { BACKEND_URL?: string; WHEP_URL?: string };
 }

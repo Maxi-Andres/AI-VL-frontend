@@ -8,6 +8,13 @@
 // Set an absolute URL (e.g. "http://10.0.0.4:8000") ONLY for a direct/separate
 // deployment where the backend is itself exposed. The frontend still talks ONLY
 // to the backend, never to the iacore service.
+//
+// WHEP_URL turns the drive view into WebRTC straight off mediamtx instead of JPEGs over the
+// backend. Empty = keep the JPEG path, which is the fallback and the lower-latency option on
+// a LAN. Set it where the robot is on a constrained link: it is the same picture at a
+// seventh of the robot's uplink, and it does not grow with the number of viewers.
+//   WHEP_URL: "http://192.168.20.99:8889/robot/whep"
 window.APP_CONFIG = {
   BACKEND_URL: "",
+  WHEP_URL: "",
 };
