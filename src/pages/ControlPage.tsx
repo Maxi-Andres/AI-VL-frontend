@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { executeCommand, fetchSkills, setRobotCamera } from "../api/backend";
 import type { SkillInfo } from "../api/backend";
 import { useRobotCameraView } from "../hooks/useRobotCameraView";
+import { useVideoTransport } from "../components/layout/VideoTransportContext";
+import { VideoTransportSwitch } from "../components/live/VideoTransportSwitch";
 import { Joystick } from "../components/control/Joystick";
 import { useGamepad, PAD } from "../hooks/useGamepad";
 import { StatusText, type Status } from "../components/ui/StatusText";
@@ -98,6 +100,18 @@ export function ControlPage() {
 
   // The robot camera is the backdrop. Start the bridge on mount, stop on unmount.
   const { frameUrl, connected, getLastFrameBlob } = useRobotCameraView(true, false);
+  // The view socket stays connected on either transport: it still carries the shared config
+  // and the detection boxes. Only the PICTURE moves.
+  const { transport, stream: h264Stream } = useVideoTransport();
+  const videoRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !h264Stream) return;
+    el.srcObject = h264Stream;              // srcObject cannot be set from JSX
+    return () => {
+      el.srcObject = null;
+    };
+  }, [h264Stream]);
   useEffect(() => {
     setRobotCamera("start").catch(() => {});
     return () => {
@@ -329,7 +343,15 @@ export function ControlPage() {
         ref={stageRef}
         className="relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-line bg-black"
       >
-        {frameUrl ? (
+        {transport === "h264" && h264Stream ? (
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
+            className="absolute inset-0 h-full w-full object-contain"
+          />
+        ) : frameUrl ? (
           <CameraCanvas
             frameUrl={frameUrl}
             getBlob={getLastFrameBlob}
@@ -428,6 +450,12 @@ export function ControlPage() {
           </div>
         )}
       </div>
+
+          {/* Here rather than only on the tuning page: this is the view being judged, so
+              the switch has to be within reach of the person judging it. */}
+          <div className="mt-2.5">
+            <VideoTransportSwitch />
+          </div>
         </div>
 
         <aside className="rounded-lg border border-line bg-panel p-3 lg:w-[300px]">

@@ -22,8 +22,8 @@ import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { useCamera } from "../hooks/useCamera";
 import { useDetectionSocket } from "../hooks/useDetectionSocket";
 import { useOptions } from "../hooks/useOptions";
-import { WHEP_URL } from "../config";
-import { useWhepStream } from "../hooks/useWhepStream";
+import { useVideoTransport } from "../components/layout/VideoTransportContext";
+import { VideoTransportSwitch } from "../components/live/VideoTransportSwitch";
 import { useRobotCameraView } from "../hooks/useRobotCameraView";
 import { useVoiceAssistant } from "../hooks/useVoiceAssistant";
 import { StatusText, type Status } from "../components/ui/StatusText";
@@ -212,32 +212,9 @@ export function LivePage() {
   // shared config, so only the PICTURE moves off the backend.
   //
   // Only for the robot source — a session mirror has no mediamtx path behind it.
-  // Which transport carries the PICTURE. MJPEG by default: it is the path that has always
-  // worked, and on a LAN it is in fact the lower-latency of the two. The switch is here
-  // rather than in a config file on purpose — the two only compare honestly when they can be
-  // alternated on the SAME link, and the comparison has to be repeated on cable, on LTE and
-  // on Starlink.
-  const [transport, setTransport] = useState<"mjpeg" | "webrtc">("mjpeg");
-  const whepActive = viewing && source === "robot" && transport === "webrtc";
-  const { stream: whepStream, stats: whepStats, error: whepError } = useWhepStream(
-    WHEP_URL,
-    whepActive,
-  );
-
-  // Fall back rather than show a dead box: if WebRTC cannot connect, the drive view is the
-  // one thing that must not go dark.
-  useEffect(() => {
-    if (transport === "webrtc" && whepError) setTransport("mjpeg");
-  }, [transport, whepError]);
-
-  const videoDetail =
-    transport === "webrtc" && whepStats
-      ? `WebRTC ${whepStats.fps.toFixed(1)} fps · ${Math.round(whepStats.kbps)} kbps · ` +
-        `${whepStats.freezes} freezes (${whepStats.freezeSeconds.toFixed(1)}s) · ` +
-        `jitter ${whepStats.jitterBufferMs} ms · lost ${whepStats.packetsLost}`
-      : transport === "webrtc"
-        ? "WebRTC · connecting"
-        : "MJPEG over the backend";
+  // Transport comes from the app-wide context: Drive and Live must not disagree about
+  // which path is under test, or the comparison between them means nothing.
+  const { transport, stream: h264Stream, detail: videoDetail } = useVideoTransport();
 
   // While viewing, push config changes over the view socket (no-op when producing;
   // the detect socket below handles that case). The hub only rebroadcasts real
@@ -739,25 +716,12 @@ export function LivePage() {
             overrideColor={overrideColor}
             label={source === "robot" ? "Robot camera" : "Session mirror"}
             detail={source === "robot" ? videoDetail : undefined}
-            stream={transport === "webrtc" ? whepStream : null}
+            stream={transport === "h264" ? h264Stream : null}
           />
         )}
-        {/* Transport switch, only where there is something to switch to. */}
-        {WHEP_URL && source === "robot" && (
-          <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
-            <span className="text-xs text-muted">Video transport</span>
-            <Button
-              variant={transport === "mjpeg" ? "primary" : "secondary"}
-              onClick={() => setTransport("mjpeg")}
-            >
-              MJPEG
-            </Button>
-            <Button
-              variant={transport === "webrtc" ? "primary" : "secondary"}
-              onClick={() => setTransport("webrtc")}
-            >
-              WebRTC
-            </Button>
+        {source === "robot" && (
+          <div className="mt-2.5">
+            <VideoTransportSwitch />
           </div>
         )}
 

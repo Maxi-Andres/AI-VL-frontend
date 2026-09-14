@@ -3,6 +3,7 @@ import { Header } from "./Header";
 import { StatusBadge } from "./StatusBadge";
 import { StatusProvider, useStatus } from "./StatusContext";
 import { RobotProvider, useRobot } from "./RobotContext";
+import { VideoTransportProvider } from "./VideoTransportContext";
 import { CameraControls } from "./CameraControls";
 import { NetworkControls } from "./NetworkControls";
 import { PresencePills } from "./PresencePills";
@@ -44,8 +45,10 @@ export function Layout() {
   return (
     <StatusProvider>
       <RobotProvider>
+        <VideoTransportProvider>
         <HeaderWithStatus />
         <Outlet />
+        </VideoTransportProvider>
       </RobotProvider>
     </StatusProvider>
   );

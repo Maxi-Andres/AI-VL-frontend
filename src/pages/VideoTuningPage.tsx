@@ -9,10 +9,28 @@ import { StatusText, type Status } from "../components/ui/StatusText";
 
 /** The knobs, in the order they matter for latency.
  *  `live` here is only the DEFAULT ordering hint — the robot is the authority and
- *  reports it in `limits[key].live`. */
+ *  reports it in `limits[key].live`.
+ *
+ *  `kind` decides the CONTROL, and it is not cosmetic: "Feed the recorder" is on/off, and
+ *  rendering it as a slider asked the operator to drag a handle between two positions to
+ *  express a yes/no. With the robot unreachable it was worse — the range fell back to a
+ *  generic 0-100, so an on/off knob offered a hundred settings, 98 of which are invalid.
+ *
+ *  `fallback` replaces that generic range. It MIRRORS the relay's VIDEO_PARAMS table
+ *  (robot-command-relay/relay_server.py) and is only used until the robot answers — the
+ *  robot stays the authority. A wrong range is not a cosmetic problem here: it is the UI
+ *  telling the operator a value is settable when the robot will reject it.
+ *
+ *  `step` has to divide the range from `min`, or legal values become unreachable. Measured
+ *  against this very table: quality ran min 1 step 5, so the slider could offer 1, 6, 11 …
+ *  and never 75 — the robot's own default. idr ran min 1 step 15 and could never offer 15,
+ *  the value actually running. A control that cannot express the current state is worse
+ *  than no control. */
 const KNOBS = [
   {
     key: "fps" as const,
+    kind: "range" as const,
+    fallback: { min: 0, max: 60 },
     label: "Frame cap",
     unit: "fps",
     step: 1,
@@ -22,6 +40,8 @@ const KNOBS = [
   },
   {
     key: "width" as const,
+    kind: "range" as const,
+    fallback: { min: 0, max: 1920 },
     label: "Downscale to",
     unit: "px wide",
     step: 160,
@@ -31,16 +51,20 @@ const KNOBS = [
   },
   {
     key: "quality" as const,
+    kind: "range" as const,
+    fallback: { min: 1, max: 100 },
     label: "JPEG quality",
     unit: "",
-    step: 5,
+    step: 1,
     hint: "Only has any effect while Downscale is above 0: at native size the bytes are " +
       "never re-encoded, so there is nothing to set the quality of.",
   },
   {
     key: "nvr" as const,
+    kind: "toggle" as const,
+    fallback: { min: 0, max: 1 },
     label: "Feed the recorder",
-    unit: "(1 = on)",
+    unit: "",
     step: 1,
     hint: "The recording branch sends the SAME picture a second time, as H.264 over RTMP. " +
       "On a constrained link that is what starves the live view — it already did once. " +
@@ -48,6 +72,8 @@ const KNOBS = [
   },
   {
     key: "bitrate" as const,
+    kind: "range" as const,
+    fallback: { min: 200000, max: 8000000 },
     label: "Recorder bitrate",
     unit: "bps",
     step: 100000,
@@ -57,6 +83,8 @@ const KNOBS = [
   },
   {
     key: "maxfps" as const,
+    kind: "range" as const,
+    fallback: { min: 0, max: 30 },
     label: "Capture cap",
     unit: "fps",
     step: 1,
@@ -65,9 +93,11 @@ const KNOBS = [
   },
   {
     key: "idr" as const,
+    kind: "range" as const,
+    fallback: { min: 1, max: 300 },
     label: "Keyframe interval",
     unit: "frames",
-    step: 15,
+    step: 1,
     hint: "Recording branch only. Lower = a new viewer starts sooner, at more bitrate.",
   },
 ];
@@ -234,8 +264,10 @@ export function VideoTuningPage() {
               {note}
             </p>
             <div className="flex flex-col gap-4">
-              {knobs.map(({ key, label, unit, step, hint }) => {
-                const lim = limits[key] ?? { min: 0, max: 100 };
+              {knobs.map(({ key, kind, fallback, label, unit, step, hint }) => {
+                // The robot is the authority; `fallback` only covers the window before it
+                // answers, and it mirrors the relay's own table rather than inventing a range.
+                const lim = limits[key] ?? fallback;
                 const value = draft[key] ?? 0;
                 const runningValue = running[key];
                 const savedRaw = saved[key];
@@ -253,12 +285,30 @@ export function VideoTuningPage() {
                         <>
                           {label}{" "}
                           <span className="text-fg">
-                            {value}
-                            {unit && ` ${unit}`}
+                            {kind === "toggle" ? (value ? "on" : "off") : value}
+                            {kind !== "toggle" && unit ? ` ${unit}` : ""}
                           </span>
                         </>
                       }
                     >
+                      {kind === "toggle" ? (
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant={value ? "secondary" : "primary"}
+                            disabled={!reachable}
+                            onClick={() => setDraft((d) => ({ ...d, [key]: 0 }))}
+                          >
+                            Off
+                          </Button>
+                          <Button
+                            variant={value ? "primary" : "secondary"}
+                            disabled={!reachable}
+                            onClick={() => setDraft((d) => ({ ...d, [key]: 1 }))}
+                          >
+                            On
+                          </Button>
+                        </div>
+                      ) : (
                       <div className="flex items-center gap-2">
                         <input
                           type="range"
@@ -285,6 +335,7 @@ export function VideoTuningPage() {
                           onValueChange={(v) => setDraft((d) => ({ ...d, [key]: v }))}
                         />
                       </div>
+                      )}
                     </Field>
                     <p className="mb-1 mt-1 text-xs text-muted">{hint}</p>
                     <p className="text-xs text-muted">
