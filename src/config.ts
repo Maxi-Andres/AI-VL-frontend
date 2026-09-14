@@ -44,4 +44,16 @@ export const WS_VIEW_URL = wsUrl("/ws/view");
  * This URL points at mediamtx DIRECTLY, not at the backend — the only place in the app that
  * does. mediamtx has no STUN/TURN configured, so viewer and server must share the HQ LAN.
  */
-export const WHEP_URL = (window.APP_CONFIG?.WHEP_URL || import.meta.env.VITE_WHEP_URL || "").replace(/\/$/, "");
+const WHEP_DEFAULT_PORT = 8889;
+const WHEP_DEFAULT_PATH = "/robot/whep";
+
+export const WHEP_URL = (
+  window.APP_CONFIG?.WHEP_URL ??
+  import.meta.env.VITE_WHEP_URL ??
+  // Derived, not hardcoded, and not empty: mediamtx runs beside the backend, so the page's
+  // own host with mediamtx's port is right in every deployment we have. Defaulting to ""
+  // made the transport switch invisible until someone edited a config file, which is the
+  // wrong failure for a control whose entire purpose is being flipped back and forth while
+  // comparing links. A wrong guess is cheap — the switch simply falls back to MJPEG.
+  `${location.protocol}//${location.hostname}:${WHEP_DEFAULT_PORT}${WHEP_DEFAULT_PATH}`
+).replace(/\/$/, "");

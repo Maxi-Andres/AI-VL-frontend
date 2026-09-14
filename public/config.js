@@ -13,8 +13,10 @@
 // backend. Empty = keep the JPEG path, which is the fallback and the lower-latency option on
 // a LAN. Set it where the robot is on a constrained link: it is the same picture at a
 // seventh of the robot's uplink, and it does not grow with the number of viewers.
+// Leave it OUT (or delete the key) to derive it from the page's own host on mediamtx's
+// port 8889 — which is correct wherever mediamtx sits beside the backend. Set it only to
+// point somewhere else, or to "" to hide the switch entirely.
 //   WHEP_URL: "http://192.168.20.99:8889/robot/whep"
 window.APP_CONFIG = {
   BACKEND_URL: "",
-  WHEP_URL: "",
 };
