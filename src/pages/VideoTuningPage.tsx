@@ -140,6 +140,8 @@ export function VideoTuningPage() {
   const { robot } = useRobot();
   const [state, setState] = useState<RobotVideoState | null>(null);
   const [draft, setDraft] = useState<Record<string, number>>({});
+  // Which knobs this robot's relay actually reports. Anything outside it is unknown, not 0.
+  const [known, setKnown] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState(false);
   // While the user is dragging, the poll must not yank the control out from under them.
@@ -172,12 +174,23 @@ export function VideoTuningPage() {
           const r = (s.running ?? {}) as Record<string, number | undefined>;
           const sv = s.saved ?? {};
           const next: Record<string, number> = {};
+          const seen = new Set<string>();
           for (const { key } of KNOBS) {
             const fromFile = sv[key] !== undefined && sv[key] !== null
               ? parseFloat(sv[key] as string) : NaN;
-            next[key] = r[key] ?? (Number.isFinite(fromFile) ? fromFile : 0);
+            const value = r[key] ?? (Number.isFinite(fromFile) ? fromFile : undefined);
+            // A knob this robot never mentioned gets NO value. Defaulting it to 0 is how
+            // "Feed the recorder" came to read `off` on a robot that was recording: the
+            // relay deployed there is an older build that reports only fps/width/quality,
+            // and the page turned that silence into a confident answer. An unknown knob is
+            // shown as unknown and cannot be moved — its relay would reject it anyway.
+            if (value !== undefined) {
+              next[key] = value;
+              seen.add(key);
+            }
           }
           setDraft(next);
+          setKnown(seen);
         })
         .catch(() => {});
     },
@@ -268,7 +281,9 @@ export function VideoTuningPage() {
                 // The robot is the authority; `fallback` only covers the window before it
                 // answers, and it mirrors the relay's own table rather than inventing a range.
                 const lim = limits[key] ?? fallback;
+                const isKnown = known.has(key);
                 const value = draft[key] ?? 0;
+                const editable = reachable && isKnown;
                 const runningValue = running[key];
                 const savedRaw = saved[key];
                 // Running and saved are genuinely different things: the file can hold a
@@ -285,8 +300,12 @@ export function VideoTuningPage() {
                         <>
                           {label}{" "}
                           <span className="text-fg">
-                            {kind === "toggle" ? (value ? "on" : "off") : value}
-                            {kind !== "toggle" && unit ? ` ${unit}` : ""}
+                            {!isKnown
+                              ? "unknown"
+                              : kind === "toggle"
+                                ? value ? "on" : "off"
+                                : value}
+                            {isKnown && kind !== "toggle" && unit ? ` ${unit}` : ""}
                           </span>
                         </>
                       }
@@ -294,15 +313,15 @@ export function VideoTuningPage() {
                       {kind === "toggle" ? (
                         <div className="flex items-center gap-2">
                           <Button
-                            variant={value ? "secondary" : "primary"}
-                            disabled={!reachable}
+                            variant={isKnown && !value ? "primary" : "secondary"}
+                            disabled={!editable}
                             onClick={() => setDraft((d) => ({ ...d, [key]: 0 }))}
                           >
                             Off
                           </Button>
                           <Button
-                            variant={value ? "primary" : "secondary"}
-                            disabled={!reachable}
+                            variant={isKnown && value ? "primary" : "secondary"}
+                            disabled={!editable}
                             onClick={() => setDraft((d) => ({ ...d, [key]: 1 }))}
                           >
                             On
@@ -316,7 +335,7 @@ export function VideoTuningPage() {
                           max={lim.max}
                           step={step}
                           value={value}
-                          disabled={!reachable}
+                          disabled={!editable}
                           onPointerDown={() => (editingRef.current = true)}
                           onPointerUp={() => (editingRef.current = false)}
                           onChange={(e) =>
@@ -329,7 +348,7 @@ export function VideoTuningPage() {
                           min={lim.min}
                           max={lim.max}
                           step={step}
-                          disabled={!reachable}
+                          disabled={!editable}
                           onFocus={() => (editingRef.current = true)}
                           onBlur={() => (editingRef.current = false)}
                           onValueChange={(v) => setDraft((d) => ({ ...d, [key]: v }))}
@@ -338,6 +357,13 @@ export function VideoTuningPage() {
                       )}
                     </Field>
                     <p className="mb-1 mt-1 text-xs text-muted">{hint}</p>
+                    {!isKnown && (
+                      <p className="mb-1 text-xs text-amber-500">
+                        This robot does not report it — its relay is an older build that
+                        only knows the frame cap, the downscale and the quality. Nothing is
+                        shown because nothing is known; update the relay to tune it here.
+                      </p>
+                    )}
                     <p className="text-xs text-muted">
                       {runningValue !== undefined && (
                         <>running: <span className="text-fg">{String(runningValue)}</span>{" · "}</>
