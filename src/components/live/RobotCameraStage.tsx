@@ -27,6 +27,13 @@ interface Props {
    * off that path.
    */
   stream?: MediaStream | null;
+  /**
+   * Canvas for the all-intra H.264 branch. When set it REPLACES the picture the same way
+   * `stream` does; the overlay, the fullscreen button and the caption are untouched. The
+   * frames are painted by `useH264FrameStream`, which owns this ref — this component only
+   * puts it on the page.
+   */
+  intraCanvasRef?: React.RefObject<HTMLCanvasElement | null> | null;
 }
 
 /**
@@ -44,6 +51,7 @@ export function RobotCameraStage({
   label = "Robot camera",
   detail,
   stream = null,
+  intraCanvasRef = null,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -91,7 +99,12 @@ export function RobotCameraStage({
         ref={wrapRef}
         className="relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-line bg-black"
       >
-        {stream ? (
+        {intraCanvasRef ? (
+          <canvas
+            ref={intraCanvasRef}
+            className="absolute inset-0 h-full w-full object-contain"
+          />
+        ) : stream ? (
           <video
             ref={videoRef}
             autoPlay

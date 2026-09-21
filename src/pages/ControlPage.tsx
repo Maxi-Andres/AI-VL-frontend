@@ -102,7 +102,7 @@ export function ControlPage() {
   const { frameUrl, connected, getLastFrameBlob } = useRobotCameraView(true, false);
   // The view socket stays connected on either transport: it still carries the shared config
   // and the detection boxes. Only the PICTURE moves.
-  const { transport, stream: h264Stream } = useVideoTransport();
+  const { transport, stream: h264Stream, intraCanvasRef } = useVideoTransport();
   const videoRef = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     const el = videoRef.current;
@@ -343,7 +343,13 @@ export function ControlPage() {
         ref={stageRef}
         className="relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-line bg-black"
       >
-        {transport === "h264" && h264Stream ? (
+        {transport === "intra" && intraCanvasRef ? (
+          // The all-intra branch paints itself; this component only places the canvas.
+          <canvas
+            ref={intraCanvasRef}
+            className="absolute inset-0 h-full w-full object-contain"
+          />
+        ) : transport === "h264" && h264Stream ? (
           <video
             ref={videoRef}
             autoPlay

@@ -28,6 +28,13 @@ export function VideoTransportSwitch() {
       >
         H.264
       </Button>
+      <Button
+        variant={transport === "intra" ? "primary" : "secondary"}
+        onClick={() => setTransport("intra")}
+        title="All-intra H.264 from the robot, decoded here. Half the bytes of MJPEG, no jitter buffer."
+      >
+        H.264 intra
+      </Button>
       <span className="text-xs text-muted">{detail}</span>
       {lastError && (
         // The one failure a user can fix themselves, and the only one worth a link.

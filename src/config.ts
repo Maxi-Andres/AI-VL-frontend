@@ -33,6 +33,13 @@ export const WS_URL = wsUrl("/ws/detect");
 export const WS_VIEW_URL = wsUrl("/ws/view");
 
 /**
+ * The drive branch: all-intra H.264 access units, one per binary message, decoded here with
+ * WebCodecs. Same origin as everything else — unlike WHEP, which lives on mediamtx's own port
+ * and needs its certificate accepted separately on every machine.
+ */
+export const WS_VIEW_H264_URL = wsUrl("/ws/view-h264");
+
+/**
  * WebRTC (WHEP) endpoint for the robot camera, e.g. "http://192.168.20.99:8889/robot/whep".
  *
  * EMPTY BY DEFAULT ON PURPOSE: the MJPEG path over the backend's view socket stays the

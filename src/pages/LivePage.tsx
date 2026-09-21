@@ -214,7 +214,7 @@ export function LivePage() {
   // Only for the robot source — a session mirror has no mediamtx path behind it.
   // Transport comes from the app-wide context: Drive and Live must not disagree about
   // which path is under test, or the comparison between them means nothing.
-  const { transport, stream: h264Stream, detail: videoDetail } = useVideoTransport();
+  const { transport, stream: h264Stream, intraCanvasRef, detail: videoDetail } = useVideoTransport();
 
   // While viewing, push config changes over the view socket (no-op when producing;
   // the detect socket below handles that case). The hub only rebroadcasts real
@@ -709,6 +709,7 @@ export function LivePage() {
           />
         ) : (
           <RobotCameraStage
+            intraCanvasRef={intraCanvasRef}
             frameUrl={robotFrameUrl}
             getBlob={getLastFrameBlob}
             connected={robotViewConnected}

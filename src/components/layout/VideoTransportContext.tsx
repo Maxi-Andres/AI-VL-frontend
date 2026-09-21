@@ -1,8 +1,21 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { WHEP_URL } from "../../config";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { WHEP_URL, WS_VIEW_H264_URL } from "../../config";
+import { useH264FrameStream } from "../../hooks/useH264FrameStream";
 import { useWhepStream, type WhepStats } from "../../hooks/useWhepStream";
 
-export type VideoTransport = "mjpeg" | "h264";
+/**
+ * The three paths a picture can take here, and they are not variations of one another:
+ *
+ *   mjpeg  JPEG over the backend. Always worked; ~24 ms on a healthy link. Costs the most
+ *          bytes, and its size follows the SCENE — a textured one tripled the frame weight
+ *          and took the latency from 70 ms to 815 on a saturated LTE link.
+ *   h264   mediamtx's 1080p over WebRTC. The NVR's stream. Sharpest picture, ~300 ms behind,
+ *          and the delay is a jitter buffer that will not be argued down (measured: halving
+ *          SRT's own buffer moved the total by nothing).
+ *   intra  the robot's all-intra H.264 drive branch, decoded here with WebCodecs. Half the
+ *          bytes of the MJPEG at the same quality, no jitter buffer, every frame independent.
+ */
+export type VideoTransport = "mjpeg" | "h264" | "intra";
 
 interface VideoTransportValue {
   transport: VideoTransport;
@@ -26,6 +39,8 @@ interface VideoTransportValue {
   lastError: string | null;
   /** The WHEP endpoint, so the UI can point a human at it (see `lastError`). */
   whepUrl: string;
+  /** Canvas the all-intra branch paints into; null unless that transport is selected. */
+  intraCanvasRef: React.RefObject<HTMLCanvasElement | null> | null;
 }
 
 const Ctx = createContext<VideoTransportValue | null>(null);
@@ -76,8 +91,20 @@ export function VideoTransportProvider({ children }: { children: ReactNode }) {
     if (connected) setLastError(null);
   }, [connected]);
 
+  // One canvas for the whole app, like the one WebRTC connection above: Drive and Live show
+  // the same camera, and two decoders would be two copies of the same work.
+  const intraCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const intra = useH264FrameStream(WS_VIEW_H264_URL, transport === "intra", intraCanvasRef);
+
   const detail =
-    transport === "mjpeg"
+    transport === "intra"
+      ? intra.error
+        ? `H.264 all-intra · ${intra.error}`
+        : intra.stats
+          ? `H.264 all-intra ${intra.stats.fps.toFixed(1)} fps · ` +
+            `${Math.round(intra.stats.kbps)} kbps · ${intra.stats.errors} errors`
+          : "H.264 all-intra · connecting"
+      : transport === "mjpeg"
       ? "MJPEG over the backend"
       : stats
         ? `H.264/WebRTC ${stats.fps.toFixed(1)} fps · ${Math.round(stats.kbps)} kbps · ` +
@@ -88,8 +115,10 @@ export function VideoTransportProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider
       value={{
-        transport, setTransport, available, stream, connected, stats, detail,
+        transport, setTransport, available, stream, stats, detail,
         lastError, whepUrl: WHEP_URL,
+        connected: transport === "intra" ? intra.connected : connected,
+        intraCanvasRef: transport === "intra" ? intraCanvasRef : null,
       }}
     >
       {children}
