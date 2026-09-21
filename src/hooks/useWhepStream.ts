@@ -87,6 +87,12 @@ export function useWhepStream(url: string, active = true): WhepState {
       retry = setTimeout(connect, wait);
     };
 
+    /** Chromium exposes `playoutDelayHint` on the receiver; the typings do not. */
+    const setPlayoutDelay = (receiver: RTCRtpReceiver, seconds: number) => {
+      const r = receiver as RTCRtpReceiver & { playoutDelayHint?: number };
+      if ("playoutDelayHint" in r) r.playoutDelayHint = seconds;
+    };
+
     const connect = async () => {
       if (cancelled) return;
       teardown();
@@ -94,6 +100,18 @@ export function useWhepStream(url: string, active = true): WhepState {
         pc = new RTCPeerConnection({ iceServers: [] });
         pc.addTransceiver("video", { direction: "recvonly" });
         pc.ontrack = (e) => {
+          // Ask the jitter buffer for the smallest playout delay it can manage.
+          //
+          // WHY, and it is the one knob that was left: MEASURED 2026-09-21, the H.264 path
+          // arrives ~300 ms behind the MJPEG one, and halving SRT's receive buffer
+          // (129 -> 70 ms) moved that total by NOTHING — because whatever arrives earlier
+          // just waits longer downstream. The receiver's jitter buffer is what holds it, and
+          // this is the only handle on it from a page.
+          //
+          // Chromium-only and advisory: Firefox ignores it, and even where honoured it is a
+          // HINT, not a setting — the buffer still grows when the network makes it grow. The
+          // effect is visible in `stats.jitterBufferMs`, which this hook already reports.
+          setPlayoutDelay(e.receiver, 0);
           if (!cancelled) {
             setState((s) => ({ ...s, stream: e.streams[0], connected: true, error: null }));
             backoffRef.current = RETRY_MIN_MS;

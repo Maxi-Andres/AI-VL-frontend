@@ -15,6 +15,17 @@ interface VideoTransportValue {
   stats: WhepStats | null;
   /** One line describing the active path, for a caption under the video. */
   detail: string;
+  /**
+   * Why the last H.264 attempt failed, kept AFTER the fall-back to MJPEG.
+   *
+   * It has to be latched here: the fall-back disables the WHEP hook, whose own state resets
+   * to `error: null` on the way out, so the reason would vanish in the same tick that the
+   * picture went back to MJPEG. That is exactly what made this look like "the button does
+   * nothing" on a machine where WHEP cannot connect.
+   */
+  lastError: string | null;
+  /** The WHEP endpoint, so the UI can point a human at it (see `lastError`). */
+  whepUrl: string;
 }
 
 const Ctx = createContext<VideoTransportValue | null>(null);
@@ -49,9 +60,21 @@ export function VideoTransportProvider({ children }: { children: ReactNode }) {
   // Never leave the drive view dark: if WebRTC cannot connect, fall back rather than show
   // an empty box. The operator is steering by this picture. In an effect, not in the render
   // body — setting state while rendering is how a render loop starts.
+  //
+  // But SAY SO. Falling back silently is how this turned into "I press H.264 and nothing
+  // happens": the commonest cause is mediamtx's self-signed certificate, which lives on a
+  // different origin (:8889) from the app (:8443), so the browser refuses the WHEP request
+  // until someone accepts it there ONCE — and refuses it with no visible error.
+  const [lastError, setLastError] = useState<string | null>(null);
   useEffect(() => {
-    if (transport === "h264" && error) setTransport("mjpeg");
+    if (transport === "h264" && error) {
+      setLastError(error);
+      setTransport("mjpeg");
+    }
   }, [transport, error]);
+  useEffect(() => {
+    if (connected) setLastError(null);
+  }, [connected]);
 
   const detail =
     transport === "mjpeg"
@@ -64,7 +87,10 @@ export function VideoTransportProvider({ children }: { children: ReactNode }) {
 
   return (
     <Ctx.Provider
-      value={{ transport, setTransport, available, stream, connected, stats, detail }}
+      value={{
+        transport, setTransport, available, stream, connected, stats, detail,
+        lastError, whepUrl: WHEP_URL,
+      }}
     >
       {children}
     </Ctx.Provider>
