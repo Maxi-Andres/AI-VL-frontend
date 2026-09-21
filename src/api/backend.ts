@@ -229,6 +229,27 @@ export interface RobotTelemetryTarget {
   daily_byte_cap?: string;
 }
 
+/**
+ * The robot's own battery, as its relay reports it. Absent while the telemetry pipeline has
+ * not produced a reading yet.
+ *
+ * `charging` is derived on the robot from the sign of the BMS current, MEASURED rather than
+ * assumed: the same Go2 read +475 on its wireless dock and -5678 lifted off it a minute later.
+ * `stale` matters as much as the percentage — a battery reading that stops updating looks
+ * perfectly healthy, so the UI must be able to say "last known" instead of implying "now".
+ */
+export interface RobotBattery {
+  percent?: number;
+  charging?: boolean | null;
+  /** BMS current in mA: positive while charging. */
+  current?: number;
+  volts?: number;
+  cycles?: number;
+  temp_c?: number | null;
+  age_s?: number;
+  stale?: boolean;
+}
+
 export interface RobotTransports {
   ok: boolean;
   transports?: Record<
@@ -246,6 +267,7 @@ export interface RobotTransports {
         sender_alive?: boolean;
         video?: RobotVideoTarget;
         telemetry?: RobotTelemetryTarget;
+        battery?: RobotBattery;
         limits?: Record<string, string>;
       };
     }

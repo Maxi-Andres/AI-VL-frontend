@@ -1,4 +1,9 @@
 import {
+  IconBattery1,
+  IconBattery2,
+  IconBattery3,
+  IconBattery4,
+  IconBatteryCharging,
   IconBone,
   IconCpu,
   IconDeviceGamepad2,
@@ -83,6 +88,44 @@ function robotState(
   };
 }
 
+/**
+ * The robot's battery, when its relay has a reading to give.
+ *
+ * TONE BY CHARGE, not by charging: an operator about to drive wants to know how long they
+ * have, and a robot on the dock at 8% is still a robot at 8%.
+ *
+ * STALENESS IS SHOWN, NOT HIDDEN. A percentage that stopped updating looks perfectly healthy —
+ * this is the one number in the header that can be wrong for an hour without looking wrong. A
+ * stale reading drops to the idle tone and says so in the tooltip, because the last known
+ * value is still worth having as long as nobody mistakes it for now.
+ */
+function BatteryPill({ net, robotId }: { net: TransportMap | null; robotId: string }) {
+  const b = net?.[robotId]?.relay?.battery;
+  if (!b || typeof b.percent !== "number") return null;
+
+  const pct = Math.round(b.percent);
+  const stale = b.stale === true;
+  const tone: PillTone = stale ? "idle" : pct <= 15 ? "bad" : pct <= 35 ? "warn" : "good";
+  const Icon = b.charging
+    ? IconBatteryCharging
+    : pct > 75 ? IconBattery4 : pct > 50 ? IconBattery3 : pct > 25 ? IconBattery2 : IconBattery1;
+
+  const detail = [
+    b.charging === true ? "charging" : b.charging === false ? "on battery" : null,
+    typeof b.volts === "number" ? `${b.volts.toFixed(1)} V` : null,
+    typeof b.current === "number" ? `${(b.current / 1000).toFixed(2)} A` : null,
+    typeof b.temp_c === "number" ? `${b.temp_c} °C` : null,
+    typeof b.cycles === "number" ? `${b.cycles} cycles` : null,
+    stale ? `LAST KNOWN — no reading for ${Math.round(b.age_s ?? 0)} s` : null,
+  ].filter(Boolean).join(" · ");
+
+  return (
+    <Pill tone={tone} icon={<Icon size={13} stroke={2} />} title={`Battery — ${detail}`}>
+      {pct}%
+    </Pill>
+  );
+}
+
 function RobotPill(
   { p, robot, selected, net }:
   { p: Presence; robot: RobotInfo; selected: boolean; net: TransportMap | null },
@@ -132,6 +175,10 @@ export function PresencePills() {
       {robots.map((r) => (
         <RobotPill key={r.id} p={presence} robot={r} selected={r.id === selected} net={net} />
       ))}
+
+      {/* Only the robot being driven. One battery is a fact the operator acts on; one per
+          robot in the registry is a row of numbers nobody reads. */}
+      {selected && <BatteryPill net={net} robotId={selected} />}
 
       {testSource && (
         <Pill tone="warn" dot title="The camera bridge is streaming its synthetic test pattern">
