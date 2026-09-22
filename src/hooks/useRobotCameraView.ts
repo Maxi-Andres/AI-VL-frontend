@@ -11,9 +11,16 @@ import type { ConfigState, DetectedObject, ViewMessage, YoloConfig } from "../ty
  * which is what keeps a viewer from loading the single-process backend. Boxes come
  * in a small JSON `det` message just before each frame.
  *
- * `enabled` is the shared YOLO on/off flag, pushed to the backend so the producer
- * knows whether to run detection. `getLastFrameBlob()` returns the freshest JPEG
- * Blob so a caller can ask the VLM about the current robot-camera frame.
+ * `enabled` declares whether THIS connection wants detection boxes. It is sent as
+ * `{ boxes }`, which the backend keeps PER CONNECTION — it is deliberately not the
+ * shared `enabled` flag any more. That flag was one value every client could
+ * overwrite, so the drive view seeding `false` on connect switched detection off on
+ * the live machine; declaring per connection is what makes that impossible. A page
+ * that also wants to steer the SHARED config (model/conf/imgsz/classes/enabled)
+ * does it explicitly through `sendConfig`.
+ *
+ * `getLastFrameBlob()` returns the freshest JPEG Blob so a caller can ask the VLM
+ * about the current robot-camera frame.
  */
 export function useRobotCameraView(
   active: boolean,
@@ -40,11 +47,11 @@ export function useRobotCameraView(
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(patch));
   }, []);
 
-  // Push the on/off flag whenever it changes while connected.
+  // Re-declare this connection's own intent whenever it changes.
   useEffect(() => {
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ enabled }));
+      ws.send(JSON.stringify({ boxes: enabled }));
     }
   }, [enabled]);
 
@@ -55,7 +62,7 @@ export function useRobotCameraView(
     wsRef.current = ws;
     ws.onopen = () => {
       setConnected(true);
-      ws.send(JSON.stringify({ enabled: enabledRef.current })); // seed the flag
+      ws.send(JSON.stringify({ boxes: enabledRef.current })); // declare, never share
     };
     ws.onclose = () => setConnected(false);
     ws.onerror = () => setConnected(false);

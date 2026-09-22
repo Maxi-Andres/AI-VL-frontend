@@ -99,6 +99,12 @@ export function ControlPage() {
   }, [robot]);
 
   // The robot camera is the backdrop. Start the bridge on mount, stop on unmount.
+  //
+  // `false` DECLARES that the drive view wants no boxes — it no longer writes the shared
+  // detection flag, and that distinction is the whole fix: this page used to seed
+  // `{ enabled: false }` on every connect, so reloading the drive machine switched YOLO off
+  // on the live machine. Declaring per connection means the drive view cannot reach anyone
+  // else's state, and the producer skips iacore entirely while nobody wants boxes.
   const { frameUrl, connected, getLastFrameBlob } = useRobotCameraView(true, false);
   // The view socket stays connected on either transport: it still carries the shared config
   // and the detection boxes. Only the PICTURE moves.
