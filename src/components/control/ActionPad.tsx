@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "../ui/Button";
 import type { SkillInfo } from "../../api/backend";
+import type { ChoiceSendable } from "./unsendableSkills";
 
 interface Props {
   /** The robot's skill catalog (from GET /api/skills). */
@@ -15,6 +16,8 @@ interface Props {
   /** Skills this robot's transport cannot deliver (the relay's allowlist leaves them out).
    * Still drawn — struck through and disabled — so what is missing stays visible. */
   unsendable: Set<string>;
+  /** Per value of a choice skill: whether the transport can deliver it (struck out if not). */
+  choiceOk: ChoiceSendable;
   onAction: (skill: string, params?: Record<string, unknown>) => void;
 }
 
@@ -82,7 +85,9 @@ const NOT_ON_RELAY =
   "Not available over the relay yet: the executor refuses it before it reaches the robot. " +
   "It needs adding to the relay's allowlist (robot-command-relay) and the executor's map.";
 
-export function ActionPad({ skills, dangerous, disabled, safeMode, unsendable, onAction }: Props) {
+export function ActionPad({
+  skills, dangerous, disabled, safeMode, unsendable, choiceOk, onAction,
+}: Props) {
   const blockedBySafe = new Set(dangerous);
   // Which side (on/off) was last chosen per flag skill, so the pad shows the
   // current selection. Undefined until the user picks one.
@@ -210,13 +215,18 @@ export function ActionPad({ skills, dangerous, disabled, safeMode, unsendable, o
               {pretty(name, info)}
             </h3>
             <div className="grid grid-cols-2 gap-1.5">
-              {choice.values.map((v) => (
-                <Button key={v} variant="secondary" className="px-2 py-1.5 text-xs"
-                  disabled={disabled || blocked} title={info?.desc}
-                  onClick={() => onAction(name, { [choice.key]: v })}>
-                  {choice.labels?.[v] ?? prettify(v)}
-                </Button>
-              ))}
+              {choice.values.map((v) => {
+                const off = !choiceOk(name, v);
+                return (
+                  <Button key={v} variant="secondary"
+                    className={`px-2 py-1.5 text-xs${off ? " line-through opacity-60" : ""}`}
+                    disabled={disabled || blocked || off}
+                    title={off ? NOT_ON_RELAY : info?.desc}
+                    onClick={() => onAction(name, { [choice.key]: v })}>
+                    {choice.labels?.[v] ?? prettify(v)}
+                  </Button>
+                );
+              })}
             </div>
           </div>
         );

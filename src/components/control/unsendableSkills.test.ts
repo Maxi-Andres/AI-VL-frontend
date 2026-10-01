@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SkillInfo } from "../../api/backend";
-import { unsendableSkills } from "./unsendableSkills";
+import { choiceSendable, unsendableSkills } from "./unsendableSkills";
 
 const cat = (...names: string[]): Record<string, SkillInfo> =>
   Object.fromEntries(names.map((n) => [n, { desc: n, params: {} }]));
@@ -27,5 +27,25 @@ describe("unsendableSkills", () => {
 
   it("marks nothing while the transports are unknown", () => {
     expect(unsendableSkills(go2, null, "go2").size).toBe(0);
+  });
+});
+
+describe("choiceSendable", () => {
+  const t = {
+    g1: { mode: "relay", url: "u", allowed_values: { arm_action: { action: ["hug"] } } },
+  };
+
+  it("lets through only the listed values of a choice skill", () => {
+    const ok = choiceSendable(t, "g1");
+    expect(ok("arm_action", "hug")).toBe(true);
+    expect(ok("arm_action", "high_five")).toBe(false);
+  });
+
+  it("does not restrict a skill the relay sent no list for", () => {
+    expect(choiceSendable(t, "g1")("set_gait", "classic")).toBe(true);
+  });
+
+  it("restricts nothing while the transports are unknown", () => {
+    expect(choiceSendable(null, "g1")("arm_action", "high_five")).toBe(true);
   });
 });

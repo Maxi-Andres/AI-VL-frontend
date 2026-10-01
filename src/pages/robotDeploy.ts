@@ -140,7 +140,7 @@ export const DEPLOY: Record<RobotModel, RobotDeploy> = {
               "follows the app's waist lock, declared as G1_WAIST_LOCK in relay.env: 1 = " +
               "locked, FSM 500; unset = free, FSM 501. The robot runs with it locked " +
               "(2026-10-01): add G1_WAIST_LOCK=1 on the first pull after that date. " +
-              "Clamps 0.3 / 0.2 / 0.5 for the first drives. First-time step 6.",
+              "Clamps 1.2 / 0.5 / 1.2 (MAX_* in relay.env). First-time step 6.",
       },
       {
         unit: "robot-video",

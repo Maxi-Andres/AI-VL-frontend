@@ -9,18 +9,30 @@ import { useGamepad, PAD } from "../hooks/useGamepad";
 import { StatusText, type Status } from "../components/ui/StatusText";
 import { IconDeviceGamepad2, IconPlayerStopFilled } from "@tabler/icons-react";
 import { ActionPad } from "../components/control/ActionPad";
-import { unsendableSkills } from "../components/control/unsendableSkills";
+import { choiceSendable, unsendableSkills } from "../components/control/unsendableSkills";
 import { useRobotTransports } from "../hooks/useRobotTransports";
 import { Button } from "../components/ui/Button";
 import { FullscreenButton } from "../components/ui/FullscreenButton";
 import { CameraCanvas } from "../components/live/CameraCanvas";
 import { useRobot } from "../components/layout/RobotContext";
 
-// Max velocities per speed preset (m/s, m/s, rad/s). The executor also clamps.
-const SPEEDS: Record<string, { vx: number; vy: number; vyaw: number }> = {
-  slow: { vx: 0.3, vy: 0.2, vyaw: 0.6 },
-  normal: { vx: 0.6, vy: 0.4, vyaw: 1.0 },
-  fast: { vx: 1.0, vy: 0.6, vyaw: 1.6 },
+// Max velocities per speed preset (m/s, m/s, rad/s), PER ROBOT. Below these sit two more
+// clamps — the executor's (go2_/g1_commands MAX_*) and the relay's (MAX_* in its relay.env) —
+// and the lowest one wins: until 2026-10-01 the relay's 0.6 (Go2) and 0.3 (G1) made "normal"
+// and "fast" the same speed on the Go2 and all three the same on the G1. Keep the fast preset
+// at or under both clamps. The robot's own controller caps each mode on top (Walk is slower
+// than Run), so asking for more than a mode allows is harmless.
+const SPEEDS: Record<"go2" | "g1", Record<string, { vx: number; vy: number; vyaw: number }>> = {
+  go2: {
+    slow: { vx: 0.3, vy: 0.2, vyaw: 0.6 },
+    normal: { vx: 1.0, vy: 0.5, vyaw: 1.5 },
+    fast: { vx: 1.8, vy: 0.8, vyaw: 2.5 },
+  },
+  g1: {
+    slow: { vx: 0.3, vy: 0.2, vyaw: 0.5 },
+    normal: { vx: 0.6, vy: 0.3, vyaw: 0.8 },
+    fast: { vx: 1.2, vy: 0.5, vyaw: 1.2 },
+  },
 };
 const SPEED_NAMES = ["slow", "normal", "fast"] as const;
 type Speed = (typeof SPEED_NAMES)[number];
@@ -112,6 +124,7 @@ export function ControlPage() {
   const transports = useRobotTransports();
   const unsendable = useMemo(
     () => unsendableSkills(skills, transports, robot), [skills, transports, robot]);
+  const choiceOk = useMemo(() => choiceSendable(transports, robot), [transports, robot]);
 
   // The robot camera is the backdrop. Start the bridge on mount, stop on unmount.
   //
@@ -181,6 +194,8 @@ export function ControlPage() {
   }, [robot]);
   const speedRef = useRef<Speed>(speed);
   speedRef.current = speed;
+  const robotRef = useRef(robot);
+  robotRef.current = robot;
 
   const stoppedRef = useRef(true);
 
@@ -232,7 +247,7 @@ export function ControlPage() {
     lx = clamp1(lx);
     ly = clamp1(ly);
     rx = clamp1(rx);
-    const s = SPEEDS[speedRef.current];
+    const s = SPEEDS[robotRef.current === "g1" ? "g1" : "go2"][speedRef.current];
     // Robot frame: +vx forward, +vy left, +vyaw left. Screen: up=+ly, right=+lx/+rx.
     return {
       vx: +(ly * s.vx).toFixed(3),
@@ -565,6 +580,7 @@ export function ControlPage() {
           <ActionPad
             skills={skills}
             unsendable={unsendable}
+            choiceOk={choiceOk}
             dangerous={dangerous}
             disabled={!armed || !supported}
             safeMode={safeMode}

@@ -264,6 +264,9 @@ export interface RobotTransports {
       /** Catalog skills the executor can send this robot over its relay. Absent on DDS,
        * where the whole catalog gets through. */
       allowed_skills?: string[];
+      /** For a choice skill (arm_action, dance, set_gait), the values the relay can be sent:
+       * {skill: {param: [values]}}. Each value is its own relay verb. */
+      allowed_values?: Record<string, Record<string, string[]>>;
       /** What the ROBOT reports about itself, read from its running processes. */
       relay?: {
         ok?: boolean;

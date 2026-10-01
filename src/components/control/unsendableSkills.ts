@@ -13,6 +13,23 @@ import type { TransportMap } from "../../hooks/useRobotTransports";
  * Nothing is marked while the transports are unknown (null) or for a robot on DDS (no
  * `allowed_skills`): there the whole catalog gets through.
  */
+/** Whether one value of a choice skill (arm_action, dance, set_gait) can be delivered. One
+ * button block on the pad is one relay verb PER VALUE, and only some values have one.
+ * Everything is sendable on DDS or while the transports are unknown. */
+export type ChoiceSendable = (skill: string, value: string) => boolean;
+
+export function choiceSendable(
+  transports: TransportMap | null,
+  robot: string,
+): ChoiceSendable {
+  const byskill = transports?.[robot]?.allowed_values;
+  return (skill, value) => {
+    const params = byskill?.[skill];
+    if (!params) return true;
+    return Object.values(params).some((allowed) => allowed.includes(value));
+  };
+}
+
 export function unsendableSkills(
   skills: Record<string, SkillInfo>,
   transports: TransportMap | null,
