@@ -76,10 +76,16 @@ export const DEPLOY: Record<RobotModel, RobotDeploy> = {
       {
         unit: "robot-command-relay",
         repo: REPO_RELAY,
-        specific: "command_sender (go2::SportClient) — Go2-only despite no prefix yet",
+        specific: "go2_command_sender (go2::SportClient) on the shared sender_core.hpp",
         state: "running",
         update: [`cd ${REPO_RELAY} && git pull && ./build.sh`,
-                 "sudo systemctl restart robot-command-relay"],
+                 "sed -i '/^SENDER_BIN=/d' relay.env",
+                 "sudo cp systemd/robot-command-relay.service /etc/systemd/system/",
+                 "sudo systemctl daemon-reload && sudo systemctl restart robot-command-relay"],
+        note: "The FIRST pull after 2026-10-01 needs all four lines: the sender was renamed " +
+              "from command_sender, and the relay now refuses to start while SENDER_BIN still " +
+              "names the old binary (the old relay.env and unit both pin it). After that, " +
+              "pull + build + restart as usual.",
       },
       {
         unit: "robot-video",
@@ -125,16 +131,20 @@ export const DEPLOY: Record<RobotModel, RobotDeploy> = {
       {
         unit: "robot-command-relay",
         repo: REPO_RELAY,
-        specific: "G1 command sender (g1::LocoClient) — not written yet",
+        specific: "g1_command_sender (g1::LocoClient) on the shared sender_core.hpp — " +
+                  "verbs use the FSM ids measured on this robot",
         state: "pending",
-        update: [],
+        update: [`cd ${REPO_RELAY} && git pull && ./build.sh`,
+                 "sudo systemctl restart robot-command-relay"],
+        note: "No damp, no zero_torque, no SDK squat (it half-falls on this robot); walk is " +
+              "FSM 501. Clamps 0.3 / 0.2 / 0.5 for the first drives. First-time step 6.",
       },
       {
         unit: "robot-video",
         repo: REPO_VIDEO,
         specific: "videohub_jpeg_stream (shared with the Go2) reading Unitree's videohub_pc4 " +
                   "— SRT to HQ :8893, mediamtx path `g1`",
-        state: "pending",
+        state: "running",
         update: [`cd ${REPO_VIDEO} && git pull && ./build.sh`,
                  "sudo systemctl restart robot-video"],
         note: "Unitree's videohub_pc4 owns the RealSense colour node, so the G1 reads the camera " +
@@ -207,6 +217,22 @@ export const DEPLOY: Record<RobotModel, RobotDeploy> = {
         ],
         note: "Same unit as the Go2: everything that differs lives in video.env. HQ needs " +
               "srt-bridge-g1 (:8893) and the `g1` path in mediamtx, both set up 2026-10-01.",
+      },
+      {
+        title: "6. Command relay — with someone next to the robot",
+        lines: [
+          `cd ${REPO_RELAY} && ./build.sh`,
+          "cp relay.g1.env.example relay.env",
+          "read -rs -p 'G1 relay token: ' T; echo; printf %s \"$T\" > ~/.relay_token",
+          "chmod 600 ~/.relay_token",
+          "sudo cp systemd/robot-command-relay.g1.service \\",
+          "        /etc/systemd/system/robot-command-relay.service",
+          "sudo systemctl daemon-reload && sudo systemctl enable --now robot-command-relay",
+        ],
+        note: "Its OWN token, not the Go2's — the executor reads G1_RELAY_TOKEN first. On HQ, " +
+              "set G1_TRANSPORT=relay and G1_RELAY_URL=http://192.168.51.115:8092 for the " +
+              "executor. The first move: robot on its hanger, stand_up, walk_waist, then a " +
+              "short move — stop_move ready.",
       },
     ],
   },

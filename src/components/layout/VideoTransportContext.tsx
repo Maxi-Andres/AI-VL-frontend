@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { WHEP_URL, WS_VIEW_H264_URL } from "../../config";
 import { useH264FrameStream } from "../../hooks/useH264FrameStream";
+import { whepUrlFor } from "../../robotStreams";
+import { useRobot } from "./RobotContext";
 import { useWhepStream, type WhepStats } from "../../hooks/useWhepStream";
 
 /**
@@ -67,8 +69,11 @@ const Ctx = createContext<VideoTransportValue | null>(null);
 export function VideoTransportProvider({ children }: { children: ReactNode }) {
   const [transport, setTransport] = useState<VideoTransport>("mjpeg");
   const available = Boolean(WHEP_URL);
+  // The selected robot's own mediamtx path: picking the G1 must not keep showing the Go2.
+  const { robot } = useRobot();
+  const whepUrl = whepUrlFor(WHEP_URL, robot);
   const { stream, connected, stats, error } = useWhepStream(
-    WHEP_URL,
+    whepUrl,
     available && transport === "h264",
   );
 
@@ -116,7 +121,7 @@ export function VideoTransportProvider({ children }: { children: ReactNode }) {
     <Ctx.Provider
       value={{
         transport, setTransport, available, stream, stats, detail,
-        lastError, whepUrl: WHEP_URL,
+        lastError, whepUrl,
         connected: transport === "intra" ? intra.connected : connected,
         intraCanvasRef: transport === "intra" ? intraCanvasRef : null,
       }}
