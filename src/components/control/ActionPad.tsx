@@ -12,6 +12,9 @@ interface Props {
   disabled: boolean;
   /** When true, `dangerous` skills render disabled (the executor blocks them too). */
   safeMode: boolean;
+  /** Skills this robot's transport cannot deliver (the relay's allowlist leaves them out).
+   * Still drawn — struck through and disabled — so what is missing stays visible. */
+  unsendable: Set<string>;
   onAction: (skill: string, params?: Record<string, unknown>) => void;
 }
 
@@ -75,7 +78,11 @@ function freeParam(
   return { key: keys[0], type: p.type ?? "string", def: p.default };
 }
 
-export function ActionPad({ skills, dangerous, disabled, safeMode, onAction }: Props) {
+const NOT_ON_RELAY =
+  "Not available over the relay yet: the executor refuses it before it reaches the robot. " +
+  "It needs adding to the relay's allowlist (robot-command-relay) and the executor's map.";
+
+export function ActionPad({ skills, dangerous, disabled, safeMode, unsendable, onAction }: Props) {
   const blockedBySafe = new Set(dangerous);
   // Which side (on/off) was last chosen per flag skill, so the pad shows the
   // current selection. Undefined until the user picks one.
@@ -111,11 +118,16 @@ export function ActionPad({ skills, dangerous, disabled, safeMode, onAction }: P
 
   const renderSimple = (name: string) => {
     const info = skills[name];
-    const blocked = safeMode && blockedBySafe.has(name); // Safe mode disables these
-    const title = blocked
+    const offRelay = unsendable.has(name);
+    // Safe mode disables these; so does a transport that cannot deliver them.
+    const blocked = (safeMode && blockedBySafe.has(name)) || offRelay;
+    const title = offRelay
+      ? `${NOT_ON_RELAY}\n\n${info?.desc ?? ""}`
+      : blocked
       ? `Blocked by Safe mode: it can make the robot lose its support or change ` +
         `control mode. Turn Safe off to allow.\n\n${info?.desc ?? ""}`
       : info?.desc;
+    const strike = offRelay ? " line-through opacity-60" : "";
     const free = freeParam(info);
     if (free) {
       // One free value (an FSM/mode id): type it, then send. This is how an operator
@@ -123,7 +135,7 @@ export function ActionPad({ skills, dangerous, disabled, safeMode, onAction }: P
       const value = freeVals[name] ?? String(free.def ?? "");
       return (
         <div key={name} className="col-span-2 flex items-center gap-1.5">
-          <span className="flex-1 truncate text-xs text-fg" title={title}>
+          <span className={`flex-1 truncate text-xs text-fg${strike}`} title={title}>
             {pretty(name, info)}
           </span>
           <input
@@ -153,7 +165,7 @@ export function ActionPad({ skills, dangerous, disabled, safeMode, onAction }: P
       const sel = flagOn[name]; // true=on selected, false=off selected, undefined=none
       return (
         <div key={name} className="col-span-2 flex items-center gap-1.5">
-          <span className="flex-1 truncate text-xs text-fg" title={title}>
+          <span className={`flex-1 truncate text-xs text-fg${strike}`} title={title}>
             {pretty(name, info)}
           </span>
           <Button variant={sel === true ? "primary" : "secondary"}
@@ -168,7 +180,7 @@ export function ActionPad({ skills, dangerous, disabled, safeMode, onAction }: P
       );
     }
     return (
-      <Button key={name} variant="secondary" className="px-2 py-1.5 text-xs"
+      <Button key={name} variant="secondary" className={`px-2 py-1.5 text-xs${strike}`}
         disabled={disabled || blocked} title={title} onClick={() => onAction(name)}>
         {pretty(name, info)}
       </Button>
@@ -189,10 +201,12 @@ export function ActionPad({ skills, dangerous, disabled, safeMode, onAction }: P
       {choiceNames.map((name) => {
         const info = skills[name];
         const choice = choiceParam(info)!;
-        const blocked = safeMode && blockedBySafe.has(name);
+        const offRelay = unsendable.has(name);
+        const blocked = (safeMode && blockedBySafe.has(name)) || offRelay;
         return (
-          <div key={name}>
-            <h3 className="m-0 mb-1.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-muted">
+          <div key={name} title={offRelay ? NOT_ON_RELAY : undefined}>
+            <h3 className={`m-0 mb-1.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-muted${
+              offRelay ? " line-through opacity-60" : ""}`}>
               {pretty(name, info)}
             </h3>
             <div className="grid grid-cols-2 gap-1.5">

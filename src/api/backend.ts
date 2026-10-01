@@ -261,6 +261,9 @@ export interface RobotTransports {
       ping_ip?: string;
       /** Result of that probe, measured by the backend (the container cannot ping). */
       online?: boolean;
+      /** Catalog skills the executor can send this robot over its relay. Absent on DDS,
+       * where the whole catalog gets through. */
+      allowed_skills?: string[];
       /** What the ROBOT reports about itself, read from its running processes. */
       relay?: {
         ok?: boolean;

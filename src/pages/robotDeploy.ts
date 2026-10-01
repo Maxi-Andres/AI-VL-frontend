@@ -136,8 +136,11 @@ export const DEPLOY: Record<RobotModel, RobotDeploy> = {
         state: "pending",
         update: [`cd ${REPO_RELAY} && git pull && ./build.sh`,
                  "sudo systemctl restart robot-command-relay"],
-        note: "No damp, no zero_torque, no SDK squat (it half-falls on this robot); walk is " +
-              "FSM 501. Clamps 0.3 / 0.2 / 0.5 for the first drives. First-time step 6.",
+        note: "No damp, no zero_torque, no SDK squat (it half-falls on this robot). Walk " +
+              "follows the app's waist lock, declared as G1_WAIST_LOCK in relay.env: 1 = " +
+              "locked, FSM 500; unset = free, FSM 501. The robot runs with it locked " +
+              "(2026-10-01): add G1_WAIST_LOCK=1 on the first pull after that date. " +
+              "Clamps 0.3 / 0.2 / 0.5 for the first drives. First-time step 6.",
       },
       {
         unit: "robot-video",

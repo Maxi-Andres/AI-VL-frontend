@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { executeCommand, fetchSkills, setRobotCamera } from "../api/backend";
 import type { SkillInfo } from "../api/backend";
 import { useRobotCameraView } from "../hooks/useRobotCameraView";
@@ -9,6 +9,8 @@ import { useGamepad, PAD } from "../hooks/useGamepad";
 import { StatusText, type Status } from "../components/ui/StatusText";
 import { IconDeviceGamepad2, IconPlayerStopFilled } from "@tabler/icons-react";
 import { ActionPad } from "../components/control/ActionPad";
+import { unsendableSkills } from "../components/control/unsendableSkills";
+import { useRobotTransports } from "../hooks/useRobotTransports";
 import { Button } from "../components/ui/Button";
 import { FullscreenButton } from "../components/ui/FullscreenButton";
 import { CameraCanvas } from "../components/live/CameraCanvas";
@@ -89,14 +91,27 @@ export function ControlPage() {
   supportedRef.current = supported;
 
   // Load the selected robot's skill catalog (single source of truth for the buttons).
+  // Cleared on a switch and guarded against a late reply: a slow Go2 answer landing after
+  // the G1 was picked would otherwise put the Go2's buttons under the G1.
   useEffect(() => {
+    let current = true;
+    setSkills({});
+    setDangerous([]);
     fetchSkills(robot)
       .then((c) => {
+        if (!current) return;
         setSkills(c.skills);
         setDangerous(c.dangerous);
       })
       .catch(console.error);
+    return () => {
+      current = false;
+    };
   }, [robot]);
+  // What this robot's transport cannot deliver stays on the pad, marked and disabled.
+  const transports = useRobotTransports();
+  const unsendable = useMemo(
+    () => unsendableSkills(skills, transports, robot), [skills, transports, robot]);
 
   // The robot camera is the backdrop. Start the bridge on mount, stop on unmount.
   //
@@ -147,6 +162,23 @@ export function ControlPage() {
 
   const armedRef = useRef(armed);
   armedRef.current = armed;
+
+  // Switching robots disarms and puts Safe back on: the next robot starts from the same safe
+  // state as a fresh page, never armed with the last robot's Safe: OFF. The stop goes to the
+  // robot being LEFT — the dispatch loop's own stop would only reach the newly selected one.
+  const prevRobotRef = useRef(robot);
+  useEffect(() => {
+    const left = prevRobotRef.current;
+    if (left === robot) return;
+    prevRobotRef.current = robot;
+    if (armedRef.current) executeCommand(left, "stop", {}, false).catch(() => {});
+    keysRef.current.clear();
+    leftRef.current = { x: 0, y: 0 };
+    rightRef.current = { x: 0 };
+    setArmed(false);
+    setSafeMode(true);
+    setStatus(null);
+  }, [robot]);
   const speedRef = useRef<Speed>(speed);
   speedRef.current = speed;
 
@@ -321,7 +353,7 @@ export function ControlPage() {
         });
         return;
       }
-      const skill = PAD_SKILLS[index]?.find((n) => n in skills);
+      const skill = PAD_SKILLS[index]?.find((n) => n in skills && !unsendable.has(n));
       if (!skill) {
         trace(
           PAD_SKILLS[index]
@@ -338,7 +370,7 @@ export function ControlPage() {
       trace(`skill "${skill}"`);
       runAction(skill);
     },
-    [estop, robot, runAction, skills],
+    [estop, robot, runAction, skills, unsendable],
   );
   padPressRef.current = handlePadPress;
 
@@ -532,6 +564,7 @@ export function ControlPage() {
 
           <ActionPad
             skills={skills}
+            unsendable={unsendable}
             dangerous={dangerous}
             disabled={!armed || !supported}
             safeMode={safeMode}
