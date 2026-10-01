@@ -84,7 +84,8 @@ export const DEPLOY: Record<RobotModel, RobotDeploy> = {
       {
         unit: "robot-video",
         repo: REPO_VIDEO,
-        specific: "go2_jpeg_stream / go2_h264_stream (camera over DDS)",
+        specific: "videohub_jpeg_stream (shared with the G1) or go2_h264_stream (Go2-only " +
+                  "multicast) — SRT to HQ :8891, mediamtx path `robot`",
         state: "running",
         update: [`cd ${REPO_VIDEO} && git pull && ./build.sh`,
                  "sudo systemctl restart robot-video"],
@@ -131,9 +132,14 @@ export const DEPLOY: Record<RobotModel, RobotDeploy> = {
       {
         unit: "robot-video",
         repo: REPO_VIDEO,
-        specific: "RealSense D435i over V4L2 on PC2 — not written yet",
+        specific: "videohub_jpeg_stream (shared with the Go2) reading Unitree's videohub_pc4 " +
+                  "— SRT to HQ :8893, mediamtx path `g1`",
         state: "pending",
-        update: [],
+        update: [`cd ${REPO_VIDEO} && git pull && ./build.sh`,
+                 "sudo systemctl restart robot-video"],
+        note: "Unitree's videohub_pc4 owns the RealSense colour node, so the G1 reads the camera " +
+              "through it, like the Go2 — never by opening /dev/video4. Config: " +
+              "robot/video.g1.env.example (first-time step 5).",
       },
       {
         unit: "docker: g1-jetson-01",
@@ -190,6 +196,17 @@ export const DEPLOY: Record<RobotModel, RobotDeploy> = {
         ],
         note: "Done on 2026-09-30 (from a copy in ~/uplink-failover; after the clone, reinstall " +
               "from the repo with these same lines).",
+      },
+      {
+        title: "5. Video",
+        lines: [
+          `cd ${REPO_VIDEO} && ./build.sh`,
+          "cp robot/video.g1.env.example robot/video.env",
+          "sudo cp robot/robot-video.service /etc/systemd/system/",
+          "sudo systemctl daemon-reload && sudo systemctl enable --now robot-video",
+        ],
+        note: "Same unit as the Go2: everything that differs lives in video.env. HQ needs " +
+              "srt-bridge-g1 (:8893) and the `g1` path in mediamtx, both set up 2026-10-01.",
       },
     ],
   },
