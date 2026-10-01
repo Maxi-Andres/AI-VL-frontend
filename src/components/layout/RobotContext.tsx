@@ -30,18 +30,34 @@ const RobotContext = createContext<RobotContextValue | null>(null);
  * STARTS ON THE ROBOT THE CAMERA IS ON, not on a fixed default. The camera bridge is shared
  * server state and outlives a reload; the selector was not. A reload used to show "Go2" over
  * the G1's picture (2026-10-01), and the commands followed the selector — so the drive view
- * steered one robot while showing the other. "go2" is only the value until that answer lands,
- * and a robot picked by hand before it does is never overwritten. */
+ * steered one robot while showing the other. A robot picked by hand before that answer
+ * lands is never overwritten.
+ *
+ * A camera on NO robot ("test", the bridge's start-up source in its .env since 2026-09-23 so
+ * nothing streams over the field link until someone looks) is sent to the last robot this
+ * browser picked instead — it used to leave the test pattern up under a "Go2" selector. */
+const LAST_ROBOT_KEY = "aivl.robot";
+
+function savedRobot(): string {
+  try {
+    const v = localStorage.getItem(LAST_ROBOT_KEY);
+    return v === "g1" ? "g1" : "go2";
+  } catch {
+    return "go2";
+  }
+}
+
 export function RobotProvider({ children }: { children: ReactNode }) {
-  const [robot, setRobotState] = useState("go2");
+  const [robot, setRobotState] = useState(savedRobot);
   const [robots, setRobots] = useState<RobotInfo[]>([]);
   const pickedRef = useRef(false);
   useEffect(() => {
     fetchRobots().then(setRobots).catch(console.error);
     getRobotCameraStatus()
       .then((s) => {
-        if (!pickedRef.current && (s.robot === "go2" || s.robot === "g1"))
-          setRobotState(s.robot);
+        if (pickedRef.current) return;
+        if (s.robot === "go2" || s.robot === "g1") setRobotState(s.robot);
+        else setRobotCameraConfig({ robot: savedRobot() }).catch(() => {});
       })
       .catch(() => {});
   }, []);
@@ -53,6 +69,11 @@ export function RobotProvider({ children }: { children: ReactNode }) {
   const setRobot = useCallback((v: string) => {
     pickedRef.current = true;
     setRobotState(v);
+    try {
+      localStorage.setItem(LAST_ROBOT_KEY, v);
+    } catch {
+      // Private window or blocked storage: the choice just is not remembered.
+    }
     setRobotCameraConfig({ robot: v }).catch(() => {});
   }, []);
   return (

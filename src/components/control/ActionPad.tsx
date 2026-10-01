@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "../ui/Button";
 import type { SkillInfo } from "../../api/backend";
 import type { ChoiceSendable } from "./unsendableSkills";
+import { choiceGroups } from "./choiceGroups";
 
 interface Props {
   /** The robot's skill catalog (from GET /api/skills). */
@@ -58,12 +59,15 @@ const pretty = (name: string, info?: SkillInfo) =>
  * `action`, set_gait's `gait`) — rendered as a row of value buttons. */
 function choiceParam(
   info: SkillInfo | undefined,
-): { key: string; values: string[]; labels?: Record<string, string> } | null {
+): {
+  key: string; values: string[]; labels?: Record<string, string>;
+  groups?: Record<string, string[]>;
+} | null {
   const params = info?.params ?? {};
   for (const key of Object.keys(params)) {
     const values = params[key]?.values;
     if (Array.isArray(values) && values.length)
-      return { key, values, labels: params[key]?.labels };
+      return { key, values, labels: params[key]?.labels, groups: params[key]?.groups };
   }
   return null;
 }
@@ -214,20 +218,28 @@ export function ActionPad({
               offRelay ? " line-through opacity-60" : ""}`}>
               {pretty(name, info)}
             </h3>
-            <div className="grid grid-cols-2 gap-1.5">
-              {choice.values.map((v) => {
-                const off = !choiceOk(name, v);
-                return (
-                  <Button key={v} variant="secondary"
-                    className={`px-2 py-1.5 text-xs${off ? " line-through opacity-60" : ""}`}
-                    disabled={disabled || blocked || off}
-                    title={off ? NOT_ON_RELAY : info?.desc}
-                    onClick={() => onAction(name, { [choice.key]: v })}>
-                    {choice.labels?.[v] ?? prettify(v)}
-                  </Button>
-                );
-              })}
-            </div>
+            {choiceGroups(choice.values, choice.groups).map((g) => (
+              <div key={g.title ?? ""} className="mb-1.5">
+                {g.title && (
+                  <h4 className="m-0 mb-1 text-[10px] font-medium text-muted">{g.title}</h4>
+                )}
+                <div className="grid grid-cols-2 gap-1.5">
+                  {g.values.map((v) => {
+                    const off = !choiceOk(name, v);
+                    return (
+                      <Button key={v} variant="secondary"
+                        className={`px-2 py-1.5 text-xs${off ? " line-through opacity-60" : ""}`}
+                        disabled={disabled || blocked || off}
+                        title={off ? NOT_ON_RELAY
+                          : g.title ? `Needs: ${g.title}.\n\n${info?.desc ?? ""}` : info?.desc}
+                        onClick={() => onAction(name, { [choice.key]: v })}>
+                        {choice.labels?.[v] ?? prettify(v)}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         );
       })}

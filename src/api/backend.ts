@@ -340,6 +340,9 @@ export interface SkillParamSpec {
   values?: string[];
   /** Display name per value, matched to the Unitree app's wording (arm actions). */
   labels?: Record<string, string>;
+  /** Values grouped under a heading, in display order — the G1's arm actions by the
+   * locomotion mode each needs ("Run mode", "Walk or Run", "Walk mode"). */
+  groups?: Record<string, string[]>;
 }
 export interface SkillInfo {
   desc: string;
