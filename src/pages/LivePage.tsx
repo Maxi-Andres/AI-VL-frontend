@@ -205,7 +205,7 @@ export function LivePage() {
     objects: robotObjects,
     getLastFrameBlob,
     sendConfig: sendViewConfig,
-  } = useRobotCameraView(viewing, yoloEnabled, applyServerConfig);
+  } = useRobotCameraView(viewing, yoloEnabled, applyServerConfig, cmdRobot);
 
   // WebRTC picture straight off mediamtx, when this deployment has WHEP_URL set. The view
   // socket above stays connected either way: it still carries the detection boxes and the

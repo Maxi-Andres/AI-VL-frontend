@@ -101,6 +101,14 @@ export function VideoTransportProvider({ children }: { children: ReactNode }) {
   const intraCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const intra = useH264FrameStream(WS_VIEW_H264_URL, transport === "intra", intraCanvasRef);
 
+  // The bridge retargets the drive branch to the newly picked robot, but the canvas still
+  // holds the last frame of the old one until a new frame paints over it — which never
+  // happens if the new robot is off. Blank it on the switch, like the MJPEG view.
+  useEffect(() => {
+    const c = intraCanvasRef.current;
+    c?.getContext("2d")?.clearRect(0, 0, c.width, c.height);
+  }, [robot]);
+
   const detail =
     transport === "intra"
       ? intra.error

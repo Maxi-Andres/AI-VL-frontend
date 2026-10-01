@@ -6,10 +6,15 @@ import {
   setRobotTransport,
   type RobotNet,
 } from "../../api/backend";
-import { useRobot } from "./RobotContext";
+import { useRobot } from "../layout/RobotContext";
 
 /**
- * Header control for WHERE THE ROBOT IS ON THE NETWORK.
+ * How this machine reaches the SELECTED robot: the online-check address, the command
+ * transport (DDS or the relay on the robot) and the relay URL — all per robot. Lived in a
+ * header popover ("Net") until 2026-10-01, mixed with the global DDS peer list below; it moved
+ * to the Robot page because none of it is something you flip while driving.
+ *
+ * ADVANCED, collapsed: the DDS peer list.
  *
  * Only one field matters: the robot's IP. DDS discovery is multicast, and multicast is
  * link-local — a router never forwards it — so a robot on another subnet (e.g. moved
@@ -23,7 +28,7 @@ import { useRobot } from "./RobotContext";
  * Applying restarts the executor: CycloneDDS reads its config once per process, so
  * there is no way to re-point DDS in place.
  */
-export function NetworkControls() {
+export function ConnectionSettings() {
   const [net, setNet] = useState<RobotNet | null>(null);
   const [ip, setIp] = useState("");
   const [busy, setBusy] = useState(false);
@@ -154,117 +159,114 @@ export function NetworkControls() {
     }
   };
 
+  const field =
+    "w-full rounded-md border border-line bg-bg px-1.5 py-1 text-xs text-fg focus:border-accent focus:outline-none";
+
   return (
-    <details className="relative">
-      <summary className="cursor-pointer list-none rounded-md border border-line px-2 py-1 text-xs text-muted hover:text-fg">
-        Net
-      </summary>
-      <div className="absolute right-0 z-30 mt-1 w-60 space-y-2 rounded-md border border-line bg-panel p-2.5 shadow-lg">
-        <div className="flex items-center justify-between text-[11px]">
-          <span className="text-muted">{robot}</span>
-          <span className="flex items-center gap-1">
-            <span
-              className={`inline-block h-1.5 w-1.5 rounded-full ${
-                robotInfo?.online ? "bg-emerald-500" : "bg-zinc-600"
-              }`}
-            />
-            <span className={robotInfo?.online ? "text-emerald-500" : "text-muted"}>
-              {pingIp
-                ? robotInfo?.online
-                  ? "online"
-                  : "offline"
-                : "no address set"}
-            </span>
-          </span>
-        </div>
+    <div className="max-w-md space-y-3">
+      <div className="flex items-center gap-2 text-sm">
+        <span
+          className={`inline-block h-2 w-2 rounded-full ${
+            robotInfo?.online ? "bg-emerald-500" : "bg-zinc-600"
+          }`}
+        />
+        <span className={robotInfo?.online ? "text-emerald-500" : "text-muted"}>
+          {robot}: {pingIp ? (robotInfo?.online ? "online" : "offline") : "no address set"}
+        </span>
+        {mode === "relay" && robotInfo?.senderAlive === false && (
+          <span className="text-amber-500">· relay up, sender down</span>
+        )}
+      </div>
 
+      <label className="block text-[11px] text-muted">
+        Command transport
+        <select
+          value={mode}
+          disabled={busy}
+          onChange={(e) => applyTransport(e.target.value, relayUrl)}
+          className={field}
+        >
+          <option value="relay">Relay on the robot — any network</option>
+          <option value="dds">DDS from this machine — same subnet only</option>
+        </select>
+        <span className="mt-0.5 block text-[10px] leading-tight text-muted/70">
+          {mode === "relay"
+            ? "Commands go over HTTP to the relay on the robot, which publishes DDS there."
+            : "Commands are published as DDS from this machine — only while the robot shares its subnet."}
+        </span>
+      </label>
+
+      {mode === "relay" && (
         <label className="block text-[11px] text-muted">
-          Online check address
+          Relay URL
           <input
-            value={pingIp}
-            onChange={(e) => setPingIp(e.target.value)}
-            onBlur={savePingIp}
+            value={relayUrl}
+            onChange={(e) => setRelayUrl(e.target.value)}
+            onBlur={() => relayUrl && applyTransport("relay", relayUrl)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") savePingIp();
+              if (e.key === "Enter" && relayUrl) applyTransport("relay", relayUrl);
             }}
-            placeholder="192.168.123.18"
+            placeholder={robot === "g1" ? "http://192.168.51.115:8092" : "http://10.1.254.18:8092"}
+            title="Applies on Enter or when the field loses focus"
             spellCheck={false}
-            className="w-full rounded-md border border-line bg-bg px-1.5 py-1 text-xs text-fg focus:border-accent focus:outline-none"
+            className={field}
           />
-          <span className="mt-0.5 block text-[10px] leading-tight text-muted/70">
-            Pinged from the server ONLY to light the online dot — it does not affect
-            commands or video. Empty = no check.
-          </span>
         </label>
+      )}
 
-        <label className="block text-[11px] text-muted">
-          Command transport ({robot})
-          <select
-            value={mode}
-            disabled={busy}
-            onChange={(e) => applyTransport(e.target.value, relayUrl)}
-            className="w-full rounded-md border border-line bg-bg px-1.5 py-1 text-xs text-fg focus:border-accent focus:outline-none"
-          >
-            <option value="dds">DDS — same subnet only</option>
-            <option value="relay">Relay on the robot — any network</option>
-          </select>
-          <span className="mt-0.5 block text-[10px] leading-tight text-muted/70">
-            {mode === "relay"
-              ? "Commands go over HTTP to an agent on the robot, which publishes DDS there."
-              : "Commands are published as DDS from this machine — only works while the robot shares this subnet."}
-          </span>
-        </label>
+      <label className="block text-[11px] text-muted">
+        Online check address
+        <input
+          value={pingIp}
+          onChange={(e) => setPingIp(e.target.value)}
+          onBlur={savePingIp}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") savePingIp();
+          }}
+          placeholder={robot === "g1" ? "192.168.51.115" : "10.1.254.18"}
+          spellCheck={false}
+          className={field}
+        />
+        <span className="mt-0.5 block text-[10px] leading-tight text-muted/70">
+          Pinged from the server ONLY to light the online dot — it does not affect commands or
+          video. Empty = no check.
+        </span>
+      </label>
 
-        {mode === "relay" && (
+      {msg && <p className="m-0 text-[11px] leading-tight text-accent">{msg}</p>}
+
+      <details className="rounded-md border border-line p-2">
+        <summary className="cursor-pointer text-[11px] text-muted">
+          Advanced — DDS discovery peers (all robots, same-subnet DDS only)
+        </summary>
+        <div className="mt-2 space-y-2">
           <label className="block text-[11px] text-muted">
-            Relay URL
+            Robot IP(s), comma-separated — empty = multicast
             <input
-              value={relayUrl}
-              onChange={(e) => setRelayUrl(e.target.value)}
-              onBlur={() => relayUrl && applyTransport("relay", relayUrl)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && relayUrl) applyTransport("relay", relayUrl);
-              }}
-              placeholder="http://10.1.254.18:8092"
-              title="Applies on Enter or when the field loses focus"
+              value={ip}
+              onChange={(e) => setIp(e.target.value)}
+              placeholder="192.168.123.161"
               spellCheck={false}
-              className="w-full rounded-md border border-line bg-bg px-1.5 py-1 text-xs text-fg focus:border-accent focus:outline-none"
+              className={field}
             />
           </label>
-        )}
-
-        <label className="block text-[11px] text-muted">
-          Robot IP (empty = same subnet)
-          <input
-            value={ip}
-            onChange={(e) => setIp(e.target.value)}
-            placeholder="192.168.51.115"
-            spellCheck={false}
-            className="w-full rounded-md border border-line bg-bg px-1.5 py-1 text-xs text-fg focus:border-accent focus:outline-none"
-          />
-        </label>
-
-        <button
-          type="button"
-          disabled={busy}
-          onClick={apply}
-          className="w-full rounded-md border border-line px-2 py-1 text-[11px] text-fg hover:border-accent disabled:opacity-50"
-        >
-          {busy ? "Applying…" : "Apply + restart executor"}
-        </button>
-
-        {msg && <p className="m-0 text-[10px] leading-tight text-accent">{msg}</p>}
-
-        <p className="m-0 text-[10px] leading-tight text-muted">
-          {net?.error
-            ? net.error
-            : `Interface ${net?.iface ?? "?"} · discovery ${net?.discovery ?? "?"}`}
-        </p>
-        <p className="m-0 text-[10px] leading-tight text-muted">
-          Needed only when the robot is on another subnet: DDS discovery is multicast and
-          multicast does not cross a router. Several IPs: separate with commas.
-        </p>
-      </div>
-    </details>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={apply}
+            className="rounded-md border border-line px-2 py-1 text-[11px] text-fg hover:border-accent disabled:opacity-50"
+          >
+            {busy ? "Applying…" : "Apply + restart executor"}
+          </button>
+          <p className="m-0 text-[10px] leading-tight text-muted">
+            {net?.error
+              ? net.error
+              : `Interface ${net?.iface ?? "?"} · discovery ${net?.discovery ?? "?"}`}
+            . Only for DDS from this machine with the robot on ANOTHER subnet of the same site:
+            discovery is multicast and multicast does not cross a router. Not used with the relay.
+          </p>
+        </div>
+      </details>
+    </div>
   );
 }

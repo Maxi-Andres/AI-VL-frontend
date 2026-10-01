@@ -4,8 +4,6 @@ import { StatusBadge } from "./StatusBadge";
 import { StatusProvider, useStatus } from "./StatusContext";
 import { RobotProvider, useRobot } from "./RobotContext";
 import { VideoTransportProvider } from "./VideoTransportContext";
-import { CameraControls } from "./CameraControls";
-import { NetworkControls } from "./NetworkControls";
 import { PresencePills } from "./PresencePills";
 import { VoiceStatusBadge } from "./VoiceStatusBadge";
 
@@ -29,8 +27,6 @@ function HeaderWithStatus() {
             ))}
           </select>
         )}
-        <CameraControls />
-        <NetworkControls />
         <VoiceStatusBadge phase={voicePhase} />
         <PresencePills />
         <StatusBadge connected={connected} />
@@ -40,7 +36,9 @@ function HeaderWithStatus() {
 }
 
 /** App shell: header (nav + robot selector + who-is-connected pills + live/voice
- * status) over the page. */
+ * status) over the page. Settings live on the Robot page, not here: the header holds what
+ * you look at while driving, and the camera/network popovers that used to sit here wrote the
+ * same values as the robot selector under other names. */
 export function Layout() {
   return (
     <StatusProvider>

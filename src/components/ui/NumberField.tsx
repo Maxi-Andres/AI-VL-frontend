@@ -9,7 +9,7 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "onChange"> & 
  * A small numeric input, styled like every other control in the app.
  *
  * WHY IT EXISTS: this exact class string was copy-pasted into four places
- * (`NetworkControls`, `ActionPad`, `ControlPage`, and as `selCls` in `CameraControls`).
+ * (`ConnectionSettings`, `ActionPad`, `ControlPage`, and as `selCls` in `CameraSettils`).
  * Three copies is the project's hard limit, so the fifth was not written — this is it.
  * The other four are not migrated here; that is a separate, mechanical change.
  *

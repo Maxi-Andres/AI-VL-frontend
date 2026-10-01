@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { getRobotTransport, type RobotTransports } from "../api/backend";
 import { useRobot } from "../components/layout/RobotContext";
+import { CameraSettings } from "../components/robot/CameraSettings";
+import { ConnectionSettings } from "../components/robot/ConnectionSettings";
 import { StatusText } from "../components/ui/StatusText";
 import { NAMING_RULE, REPO_RELAY, REPO_VIDEO, deployFor, type RobotService } from "./robotDeploy";
 
@@ -124,11 +126,21 @@ export function RobotConfigPage() {
         </p>
       </section>
 
+      <section>
+        <h3 className="mb-1 text-base font-semibold">Connection — {robot}</h3>
+        <ConnectionSettings />
+      </section>
+
+      <section>
+        <h3 className="mb-1 text-base font-semibold">Camera stream</h3>
+        <CameraSettings />
+      </section>
+
       {cur?.mode !== "relay" && (
         <p className="rounded-md border border-line bg-panel p-2 text-sm text-muted">
-          Command transport for {robot} is <strong>{cur?.mode ?? "dds"}</strong>. These values
-          travel through the on-robot relay, so switch <em>Net → Command transport</em> to
-          “relay” to read them.
+          Command transport for {robot} is <strong>{cur?.mode ?? "dds"}</strong>. The values
+          below travel through the on-robot relay, so set the transport to “relay” in
+          <em> Connection</em> above to read them.
         </p>
       )}
 

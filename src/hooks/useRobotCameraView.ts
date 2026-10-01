@@ -21,11 +21,21 @@ import type { ConfigState, DetectedObject, ViewMessage, YoloConfig } from "../ty
  *
  * `getLastFrameBlob()` returns the freshest JPEG Blob so a caller can ask the VLM
  * about the current robot-camera frame.
+ *
+ * A FRAME THAT STOPPED IS NOT SHOWN. When frames stop for STALE_MS, or `resetKey` (the
+ * selected robot) changes, the picture is dropped and callers show their "waiting" state.
+ * Before 2026-10-01 the last frame stayed up indefinitely: picking the Go2 while it was off
+ * kept showing the G1's last frame as if it were live — the one thing a drive view must
+ * never do. 3 s is well above the slowest healthy cadence (5 fps) and still obvious to a
+ * person looking at it.
  */
+const STALE_MS = 3000;
+
 export function useRobotCameraView(
   active: boolean,
   enabled: boolean,
   onConfig?: (state: ConfigState) => void,
+  resetKey = "",
 ) {
   const [frameUrl, setFrameUrl] = useState("");
   const [connected, setConnected] = useState(false);
@@ -39,6 +49,21 @@ export function useRobotCameraView(
   const urlRef = useRef<string>(""); // current object URL, revoked on replace/cleanup
 
   const getLastFrameBlob = useCallback(() => lastBlobRef.current, []);
+
+  const staleTimer = useRef<number | undefined>(undefined);
+  const dropFrame = useCallback(() => {
+    window.clearTimeout(staleTimer.current);
+    lastBlobRef.current = null;
+    if (urlRef.current) {
+      URL.revokeObjectURL(urlRef.current);
+      urlRef.current = "";
+    }
+    setFrameUrl("");
+    setObjects([]);
+  }, []);
+
+  // Another robot picked: whatever is on screen belongs to the previous one.
+  useEffect(() => dropFrame, [resetKey, dropFrame]);
 
   // Push a shared-config change into the session over the view socket (so a
   // viewer/mirror can steer YOLO on the producer, like the old monitor did).
@@ -75,6 +100,8 @@ export function useRobotCameraView(
         if (urlRef.current) URL.revokeObjectURL(urlRef.current);
         urlRef.current = url;
         setFrameUrl(url);
+        window.clearTimeout(staleTimer.current);
+        staleTimer.current = window.setTimeout(dropFrame, STALE_MS);
         return;
       }
       try {
@@ -90,15 +117,9 @@ export function useRobotCameraView(
       ws.close();
       wsRef.current = null;
       setConnected(false);
-      setFrameUrl("");
-      setObjects([]);
-      lastBlobRef.current = null;
-      if (urlRef.current) {
-        URL.revokeObjectURL(urlRef.current);
-        urlRef.current = "";
-      }
+      dropFrame();
     };
-  }, [active]);
+  }, [active, dropFrame]);
 
   return { frameUrl, connected, objects, getLastFrameBlob, sendConfig };
 }

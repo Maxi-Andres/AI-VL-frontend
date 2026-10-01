@@ -105,7 +105,8 @@ export function ControlPage() {
   // `{ enabled: false }` on every connect, so reloading the drive machine switched YOLO off
   // on the live machine. Declaring per connection means the drive view cannot reach anyone
   // else's state, and the producer skips iacore entirely while nobody wants boxes.
-  const { frameUrl, connected, getLastFrameBlob } = useRobotCameraView(true, false);
+  const { frameUrl, connected, getLastFrameBlob } = useRobotCameraView(
+    true, false, undefined, robot);
   // The view socket stays connected on either transport: it still carries the shared config
   // and the detection boxes. Only the PICTURE moves.
   const { transport, stream: h264Stream, intraCanvasRef } = useVideoTransport();

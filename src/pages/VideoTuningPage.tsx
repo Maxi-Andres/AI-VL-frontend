@@ -148,7 +148,7 @@ export function VideoTuningPage() {
   const editingRef = useRef(false);
 
   /** Poll-safe: refreshes what the robot reports, never the fields being edited.
-   * `NetworkControls` learned this the hard way — polling into inputs overwrites what
+   * `ConnectionSettings` learned this the hard way — polling into inputs overwrites what
    * the operator is doing mid-gesture. With sliders it is worse: the handle jumps. */
   const loadStatus = useCallback(
     (signal?: AbortSignal) => {

@@ -9,7 +9,7 @@ import { getRobotTransport, type RobotTransports } from "../api/backend";
  * when the robot is in the field and every other signal is about some subsystem instead
  * of the robot. That is why the presence pill uses this and not the camera bridge.
  *
- * `NetworkControls` and `RobotConfigPage` still call `getRobotTransport` directly. They
+ * `ConnectionSettings` and `RobotConfigPage` still call `getRobotTransport` directly. They
  * should move here — three copies of the same poll is the threshold in the standard — but
  * that is a separate change from fixing the pill.
  */
