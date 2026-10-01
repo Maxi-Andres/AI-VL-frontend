@@ -194,6 +194,7 @@ export function ControlPage() {
     rightRef.current = { x: 0 };
     setArmed(false);
     setSafeMode(true);
+    setPosing(false);
     setStatus(null);
   }, [robot]);
   const speedRef = useRef<Speed>(speed);
@@ -202,6 +203,12 @@ export function ControlPage() {
   robotRef.current = robot;
 
   const stoppedRef = useRef(true);
+  // POSE (Go2): while on, the sticks tilt the body instead of walking — the robot reads them
+  // from its joystick topic, so they go out as `joy`, not `move` (read off the bus 2026-10-01).
+  // Ends with anything else sent to the robot: the relay's sender drops `joy` at any other verb.
+  const [posing, setPosing] = useState(false);
+  const posingRef = useRef(false);
+  posingRef.current = posing;
 
   const setStatusFrom = useCallback(
     (r: { ok?: boolean; blocked?: boolean; detail?: string; error?: string }) => {
@@ -230,8 +237,21 @@ export function ControlPage() {
     executeCommand(robot, "stop", {}, false).catch(() => {});
   }, [robot]);
 
-  // Compute the current velocity from sticks + keys, scaled by the speed preset.
-  const computeVel = useCallback((): Vel => {
+  const sendJoy = useCallback(
+    (rx: number, ry: number) => {
+      executeCommand(robot, "joy", { lx: 0, ly: 0, rx, ry }, true)
+        .then((r) => {
+          // The sender refuses joy once pose is gone (any other verb ended it): stop tilting.
+          if (!r.ok && /only in pose/.test(r.detail ?? "")) setPosing(false);
+          setStatusFrom(r);
+        })
+        .catch(() => {});
+    },
+    [robot, setStatusFrom],
+  );
+
+  // The raw stick vector (-1..1) from touch, gamepad and keys, before any speed preset.
+  const computeSticks = useCallback(() => {
     let lx = leftRef.current.x;
     let ly = leftRef.current.y;
     let rx = rightRef.current.x;
@@ -248,9 +268,12 @@ export function ControlPage() {
     if (k.has("a")) lx -= 1;
     if (k.has("arrowright")) rx += 1;
     if (k.has("arrowleft")) rx -= 1;
-    lx = clamp1(lx);
-    ly = clamp1(ly);
-    rx = clamp1(rx);
+    return { lx: clamp1(lx), ly: clamp1(ly), rx: clamp1(rx) };
+  }, [padRef]);
+
+  // The current velocity: the sticks scaled by the speed preset.
+  const computeVel = useCallback((): Vel => {
+    const { lx, ly, rx } = computeSticks();
     const s = SPEEDS[robotRef.current === "g1" ? "g1" : "go2"][speedRef.current];
     // Robot frame: +vx forward, +vy left, +vyaw left. Screen: up=+ly, right=+lx/+rx.
     return {
@@ -258,12 +281,28 @@ export function ControlPage() {
       vy: +(-lx * s.vy).toFixed(3),
       vyaw: +(-rx * s.vyaw).toFixed(3),
     };
-  }, [padRef]);
+  }, [computeSticks]);
 
   // Dispatch loop: send a fresh `move` when the vector meaningfully changes, and a
   // single `stop` when it returns to zero (or whenever disarmed).
   useEffect(() => {
     const id = setInterval(() => {
+      if (posingRef.current) {
+        // Pose: the translate stick becomes the app's right stick (screen right = +rx,
+        // up = +ry), raw. Released or disarmed, ONE zero goes out and the sticks rest.
+        const { lx, ly } = computeSticks();
+        const idle = !armedRef.current || (Math.abs(lx) < DEAD && Math.abs(ly) < DEAD);
+        if (idle) {
+          if (!stoppedRef.current) {
+            sendJoy(0, 0);
+            stoppedRef.current = true;
+          }
+          return;
+        }
+        sendJoy(+lx.toFixed(3), +ly.toFixed(3));
+        stoppedRef.current = false;
+        return;
+      }
       const v = computeVel();
       const isZero =
         Math.abs(v.vx) < DEAD && Math.abs(v.vy) < DEAD && Math.abs(v.vyaw) < DEAD;
@@ -280,7 +319,7 @@ export function ControlPage() {
       stoppedRef.current = false;
     }, SEND_MS);
     return () => clearInterval(id);
-  }, [computeVel, sendMove, sendStop]);
+  }, [computeSticks, computeVel, sendJoy, sendMove, sendStop]);
 
   // Keyboard (desktop): track pressed keys; swallow the page's default scroll.
   useEffect(() => {
@@ -323,6 +362,7 @@ export function ControlPage() {
 
   const estop = useCallback(() => {
     setArmed(false);
+    setPosing(false);
     keysRef.current.clear();
     leftRef.current = { x: 0, y: 0 };
     rightRef.current = { x: 0 };
@@ -333,8 +373,13 @@ export function ControlPage() {
   // Fire one preset skill (sit, hello, dance, gait…) from the side pad.
   const runAction = useCallback(
     (skill: string, params?: Record<string, unknown>) => {
+      // Any skill ends pose steering (the sender drops joy); pose On starts it once accepted.
+      setPosing(false);
       executeCommand(robot, skill, params ?? {}, safeMode)
-        .then(setStatusFrom)
+        .then((r) => {
+          if (r.ok && skill === "pose" && params?.on !== false) setPosing(true);
+          setStatusFrom(r);
+        })
         .catch((e) =>
           setStatus({
             tone: "error",
@@ -457,6 +502,14 @@ export function ControlPage() {
               </button>
             ))}
           </div>
+          {posing && (
+            <span
+              className="rounded-full bg-accent/80 px-2 py-0.5 text-[11px] font-semibold text-black"
+              title="Pose is on: the sticks tilt the body instead of walking. Turn Pose off (or press Stop) to walk again."
+            >
+              Pose: sticks tilt
+            </span>
+          )}
           {pad && (
             <span
               className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[11px] text-white/80"
