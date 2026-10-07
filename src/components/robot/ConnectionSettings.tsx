@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getRobotNet,
   getRobotTransport,
@@ -41,6 +41,15 @@ export function ConnectionSettings() {
     online?: boolean;
   } | null>(null);
   const [pingIp, setPingIp] = useState("");
+  // WHICH ROBOT the fields currently hold, and the values as loaded. The fields are shared
+  // by both robots, and on 2026-10-07 the G1 ended up with the Go2's relay URL: after a robot
+  // switch whose reload did not land, the fields still showed the Go2's values, and the URL
+  // field saves on blur — clicking in and out was enough to write them into the G1. Now
+  // nothing can be saved until the selected robot's own values have arrived, and a blur
+  // saves only a value that actually changed.
+  const [loadedFor, setLoadedFor] = useState("");
+  const loadedRef = useRef({ url: "", ping: "" });
+  const ready = loadedFor === robot;
 
   // The transport is per robot, so re-read it whenever the selected robot changes.
   /** Status only — safe to call on a timer: it never touches the editable fields. */
@@ -70,6 +79,8 @@ export function ConnectionSettings() {
           setMode(cur.mode || "dds");
           setRelayUrl(cur.url || "");
           setPingIp(cur.ping_ip || "");
+          loadedRef.current = { url: cur.url || "", ping: cur.ping_ip || "" };
+          setLoadedFor(robot);
         }
       })
       .catch(() => {});
@@ -80,6 +91,11 @@ export function ConnectionSettings() {
     // robot's in-flight reads. Without it a slow answer for the OLD robot could land after
     // the switch and repaint the fields with the wrong robot's transport.
     const ac = new AbortController();
+    // Blank first: until this robot's values arrive, the fields show nothing rather than
+    // the previous robot's, and every save is locked (`ready`).
+    setLoadedFor("");
+    setRelayUrl("");
+    setPingIp("");
     loadConfig(ac.signal);
     loadStatus(ac.signal);
     const t = setInterval(() => loadStatus(ac.signal), 6000);
@@ -92,8 +108,10 @@ export function ConnectionSettings() {
   // Saving the probe address does NOT restart the executor (nothing about the transport
   // changes), so no reload delay is needed here — unlike a mode or URL change.
   const savePingIp = () => {
+    if (!ready || pingIp === loadedRef.current.ping) return;
     setRobotTransport({ robot, ping_ip: pingIp })
       .then((r) => {
+        if (r.ok) loadedRef.current = { ...loadedRef.current, ping: pingIp };
         setMsg(r.ok ? `${robot}: address saved` : r.error || "invalid address");
         setTimeout(loadStatus, 1500);
       })
@@ -101,6 +119,7 @@ export function ConnectionSettings() {
   };
 
   const applyTransport = (nextMode: string, url: string) => {
+    if (!ready) return;
     setBusy(true);
     setMsg("");
     setRobotTransport({ robot, mode: nextMode, url: url || undefined })
@@ -182,7 +201,7 @@ export function ConnectionSettings() {
         Command transport
         <select
           value={mode}
-          disabled={busy}
+          disabled={busy || !ready}
           onChange={(e) => applyTransport(e.target.value, relayUrl)}
           className={field}
         >
@@ -202,9 +221,13 @@ export function ConnectionSettings() {
           <input
             value={relayUrl}
             onChange={(e) => setRelayUrl(e.target.value)}
-            onBlur={() => relayUrl && applyTransport("relay", relayUrl)}
+            disabled={!ready}
+            onBlur={() =>
+              relayUrl && relayUrl !== loadedRef.current.url && applyTransport("relay", relayUrl)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && relayUrl) applyTransport("relay", relayUrl);
+              if (e.key === "Enter" && relayUrl && relayUrl !== loadedRef.current.url) {
+                applyTransport("relay", relayUrl);
+              }
             }}
             placeholder={robot === "g1" ? "http://192.168.51.115:8092" : "http://10.1.254.18:8092"}
             title="Applies on Enter or when the field loses focus"
@@ -218,6 +241,7 @@ export function ConnectionSettings() {
         Online check address
         <input
           value={pingIp}
+          disabled={!ready}
           onChange={(e) => setPingIp(e.target.value)}
           onBlur={savePingIp}
           onKeyDown={(e) => {
