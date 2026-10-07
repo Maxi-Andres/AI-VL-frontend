@@ -43,7 +43,21 @@ interface VideoTransportValue {
   whepUrl: string;
   /** Canvas the all-intra branch paints into; null unless that transport is selected. */
   intraCanvasRef: React.RefObject<HTMLCanvasElement | null> | null;
+  /** MJPEG is retired for the selected robot: the switch shows it struck through. */
+  mjpegRetired: boolean;
 }
+
+/**
+ * Robots whose drive view no longer offers MJPEG.
+ *
+ * The Go2, since 2026-10-07. Measured that day over LTE (Movistar, 0% loss, RTT 19/53/325 ms),
+ * both drive views read at the backend at the same time, from the same robot instant: the
+ * all-intra H.264 arrived no later (p50 94 vs 96 ms) with a far shorter tail (p99 140 vs 301),
+ * 13.7 fps against 9.8, for 0.34 Mbps against 0.55 — on an uplink with 1.04 Mbps left over.
+ * The MJPEG costs the scarcest resource and buys nothing. The G1 keeps it: it has not been
+ * measured there.
+ */
+const MJPEG_RETIRED_FOR = new Set(["go2"]);
 
 const Ctx = createContext<VideoTransportValue | null>(null);
 
@@ -67,10 +81,18 @@ const Ctx = createContext<VideoTransportValue | null>(null);
  * because it leaves the robot ONCE (1.4 Mbps) instead of once per viewer (8.9 Mbps each).
  */
 export function VideoTransportProvider({ children }: { children: ReactNode }) {
-  const [transport, setTransport] = useState<VideoTransport>("mjpeg");
+  const [transport, setTransportState] = useState<VideoTransport>("mjpeg");
   const available = Boolean(WHEP_URL);
   // The selected robot's own mediamtx path: picking the G1 must not keep showing the Go2.
   const { robot } = useRobot();
+  const mjpegRetired = MJPEG_RETIRED_FOR.has(robot);
+  // Where a dead path falls back to, and what the robot starts on.
+  const fallback: VideoTransport = mjpegRetired ? "intra" : "mjpeg";
+  const setTransport = (t: VideoTransport) => setTransportState(t === "mjpeg" ? fallback : t);
+  // Picking a robot that retired MJPEG while on it moves the view to the all-intra branch.
+  useEffect(() => {
+    if (mjpegRetired) setTransportState((t) => (t === "mjpeg" ? "intra" : t));
+  }, [mjpegRetired]);
   const whepUrl = whepUrlFor(WHEP_URL, robot);
   const { stream, connected, stats, error } = useWhepStream(
     whepUrl,
@@ -89,9 +111,9 @@ export function VideoTransportProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (transport === "h264" && error) {
       setLastError(error);
-      setTransport("mjpeg");
+      setTransportState(fallback);
     }
-  }, [transport, error]);
+  }, [transport, error, fallback]);
   useEffect(() => {
     if (connected) setLastError(null);
   }, [connected]);
@@ -132,6 +154,7 @@ export function VideoTransportProvider({ children }: { children: ReactNode }) {
         lastError, whepUrl,
         connected: transport === "intra" ? intra.connected : connected,
         intraCanvasRef: transport === "intra" ? intraCanvasRef : null,
+        mjpegRetired,
       }}
     >
       {children}

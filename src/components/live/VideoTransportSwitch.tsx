@@ -10,7 +10,7 @@ import { useVideoTransport } from "../layout/VideoTransportContext";
  * thing, and that comparison has to be repeated on cable, on LTE and on Starlink.
  */
 export function VideoTransportSwitch() {
-  const { transport, setTransport, available, detail, lastError, whepUrl } =
+  const { transport, setTransport, available, detail, lastError, whepUrl, mjpegRetired } =
     useVideoTransport();
   if (!available) return null;
   return (
@@ -19,6 +19,11 @@ export function VideoTransportSwitch() {
       <Button
         variant={transport === "mjpeg" ? "primary" : "secondary"}
         onClick={() => setTransport("mjpeg")}
+        disabled={mjpegRetired}
+        className={mjpegRetired ? "line-through" : ""}
+        title={mjpegRetired
+          ? "Retired for this robot: H.264 intra arrives as early with fewer bytes (measured 2026-10-07)"
+          : undefined}
       >
         MJPEG
       </Button>
