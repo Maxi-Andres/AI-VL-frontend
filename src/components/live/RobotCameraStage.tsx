@@ -34,6 +34,18 @@ interface Props {
    * puts it on the page.
    */
   intraCanvasRef?: React.RefObject<HTMLCanvasElement | null> | null;
+  /**
+   * The WebRTC <video>, owned by the caller so it can grab the frame on screen
+   * (lib/capture.ts). Omitted, the stage keeps a ref of its own.
+   */
+  videoElRef?: React.RefObject<HTMLVideoElement | null>;
+  /**
+   * A frame held on screen INSTEAD of the live picture: the browser-side YOLO pairing shows
+   * the exact grab its boxes were computed from (lib/framePairing.ts). The live element stays
+   * mounted underneath at opacity 0 — not display:none, which can stop a <video> decoding —
+   * so the next grab still has something to read.
+   */
+  still?: HTMLCanvasElement | null;
 }
 
 /**
@@ -52,26 +64,48 @@ export function RobotCameraStage({
   detail,
   stream = null,
   intraCanvasRef = null,
+  videoElRef,
+  still = null,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const stillRef = useRef<HTMLCanvasElement>(null);
+  const ownVideoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = videoElRef ?? ownVideoRef;
   // The frame's native size, reported by CameraCanvas. The overlay must match it so the
   // normalized bboxes land in the right place; it used to come off the <img>'s
   // naturalWidth, which no longer exists.
   const [size, setSize] = useState({ w: 1280, h: 960 });
   const onSize = useCallback((w: number, h: number) => setSize({ w, h }), []);
 
-  const redraw = () => {
+  // The overlay must take the size of whatever is ON SCREEN, read at draw time. The intra
+  // canvas never reported its size, so boxes over it would have been laid out on the
+  // 1280x960 default — off by the aspect ratio. Read from the element, it cannot be stale.
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const intra = intraCanvasRef?.current;
+    const video = videoRef.current;
+    const [w, h] = still ? [still.width, still.height]
+      : intra?.width ? [intra.width, intra.height]
+        : stream && video?.videoWidth ? [video.videoWidth, video.videoHeight]
+          : [size.w, size.h];
     // The overlay stays a SEPARATE canvas from the video: drawBoxes() clears before it
     // draws, so sharing one surface would wipe the frame every time boxes change.
-    if (canvas.width !== size.w) canvas.width = size.w;
-    if (canvas.height !== size.h) canvas.height = size.h;
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== h) canvas.height = h;
     drawBoxes(canvas, objects, overrideColor);
-  };
-  useEffect(redraw, [objects, overrideColor, frameUrl, size]);
+  }, [objects, overrideColor, frameUrl, size, still, stream, intraCanvasRef, videoRef]);
+
+  // Paint the held frame. Its boxes arrive in the same render (the pairing hands both over
+  // together), so the overlay effect above lays them out on this frame's size.
+  useEffect(() => {
+    const c = stillRef.current;
+    if (!c || !still) return;
+    c.width = still.width;
+    c.height = still.height;
+    c.getContext("2d")?.drawImage(still, 0, 0);
+  }, [still]);
 
   // srcObject cannot be set from JSX. Track the video's native size the same way
   // CameraCanvas reports the JPEG's, so the normalized bboxes keep landing in the right
@@ -91,7 +125,7 @@ export function RobotCameraStage({
       video.removeEventListener("resize", report);
       video.srcObject = null;
     };
-  }, [stream, onSize]);
+  }, [stream, onSize, videoRef]);
 
   return (
     <section className="min-w-0">
@@ -102,7 +136,7 @@ export function RobotCameraStage({
         {intraCanvasRef ? (
           <canvas
             ref={intraCanvasRef}
-            className="absolute inset-0 h-full w-full object-contain"
+            className={`absolute inset-0 h-full w-full object-contain${still ? " opacity-0" : ""}`}
           />
         ) : stream ? (
           <video
@@ -110,7 +144,7 @@ export function RobotCameraStage({
             autoPlay
             muted
             playsInline
-            className="absolute inset-0 h-full w-full object-contain"
+            className={`absolute inset-0 h-full w-full object-contain${still ? " opacity-0" : ""}`}
           />
         ) : frameUrl ? (
           <CameraCanvas
@@ -123,6 +157,9 @@ export function RobotCameraStage({
           <div className="absolute inset-0 flex items-center justify-center text-sm text-muted">
             {connected ? "Waiting for frames…" : "Connecting…"}
           </div>
+        )}
+        {still && (
+          <canvas ref={stillRef} className="absolute inset-0 h-full w-full object-contain" />
         )}
         <canvas
           ref={canvasRef}

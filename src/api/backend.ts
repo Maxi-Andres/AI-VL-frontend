@@ -3,6 +3,7 @@
 import { BACKEND_URL } from "../config";
 import type {
   CommandResponse,
+  DetectedObject,
   ExecuteResponse,
   Options,
   Presence,
@@ -27,6 +28,32 @@ export async function fetchClasses(model: string): Promise<string[]> {
   if (!r.ok) throw new Error(`GET /api/classes -> ${r.status}`);
   const data = (await r.json()) as { classes: string[] };
   return data.classes;
+}
+
+/** What `POST /api/detect` answers: iacore's /detect contract, passed through. */
+export interface DetectResult {
+  objects: DetectedObject[];
+  n: number;
+  elapsed_ms: number;
+}
+
+/**
+ * Boxes for ONE frame this page already holds — the browser-side pairing of the H.264
+ * transports (lib/framePairing.ts). Detect-only on purpose: `/ws/detect` would fan the
+ * uploaded frame out to every monitor, putting this screen on the drive machine's.
+ * Analysed with the session's shared YOLO params, exactly like the live path.
+ */
+export async function detectFrame(jpeg: Blob, signal?: AbortSignal): Promise<DetectResult> {
+  const r = await fetch(`${BACKEND_URL}/api/detect`, {
+    method: "POST",
+    headers: { "Content-Type": "image/jpeg" },
+    body: jpeg,
+    signal,
+  });
+  if (!r.ok) throw new Error(`POST /api/detect -> ${r.status}`);
+  const d = (await r.json()) as DetectResult & { error?: string };
+  if (d.error) throw new Error(`POST /api/detect: ${d.error}`);
+  return d;
 }
 
 export interface VlmRequest {

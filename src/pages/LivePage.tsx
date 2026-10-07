@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   askVlm,
   askVlmStream,
+  detectFrame,
   executeCommand,
   fetchClasses,
   interpretCommand,
@@ -26,6 +27,8 @@ import { useVideoTransport } from "../components/layout/VideoTransportContext";
 import { VideoTransportSwitch } from "../components/live/VideoTransportSwitch";
 import { useRobotCameraView } from "../hooks/useRobotCameraView";
 import { useVoiceAssistant } from "../hooks/useVoiceAssistant";
+import { captureFrame, encodeFrame, snapshotFrame } from "../lib/capture";
+import { startPairing } from "../lib/framePairing";
 import { StatusText, type Status } from "../components/ui/StatusText";
 import type {
   CommandResponse,
@@ -196,6 +199,24 @@ export function LivePage() {
     [yoloModel],
   );
 
+  // WebRTC picture straight off mediamtx, when this deployment has WHEP_URL set. The view
+  // socket below stays connected either way: it still carries the shared config (and, on
+  // MJPEG, the boxes), so only the PICTURE moves off the backend.
+  //
+  // Only for the robot source — a session mirror has no mediamtx path behind it.
+  // Transport comes from the app-wide context: Drive and Live must not disagree about
+  // which path is under test, or the comparison between them means nothing.
+  const { transport, stream: h264Stream, intraCanvasRef, detail: videoDetail } = useVideoTransport();
+
+  // WHO PAIRS A FRAME WITH ITS BOXES (PLAN_YOLO_FRAME_PAIRING.md §3.2 and §7: what you see is
+  // what gets analysed). On MJPEG the picture comes through the backend, so the backend holds
+  // each frame until its boxes are ready. On the two H.264 transports it never does — they go
+  // browser <-> mediamtx or robot -> canvas — so THIS page pairs: grab what is on screen,
+  // detect that grab, show that grab with its boxes. The backend then must not detect for us
+  // at all, which is why `boxes` goes false on the view socket.
+  const pairsLocally =
+    source === "robot" && yoloEnabled && (transport === "h264" || transport === "intra");
+
   // Viewer/mirror source (robot camera or plain mirror of the session). Adopts the
   // server's shared config so the panels stay in sync, and exposes `sendViewConfig`
   // so panel changes here propagate to the producer + robot-cam detection.
@@ -205,16 +226,51 @@ export function LivePage() {
     objects: robotObjects,
     getLastFrameBlob,
     sendConfig: sendViewConfig,
-  } = useRobotCameraView(viewing, yoloEnabled, applyServerConfig, cmdRobot);
+  } = useRobotCameraView(viewing, yoloEnabled && !pairsLocally, applyServerConfig, cmdRobot);
 
-  // WebRTC picture straight off mediamtx, when this deployment has WHEP_URL set. The view
-  // socket above stays connected either way: it still carries the detection boxes and the
-  // shared config, so only the PICTURE moves off the backend.
-  //
-  // Only for the robot source — a session mirror has no mediamtx path behind it.
-  // Transport comes from the app-wide context: Drive and Live must not disagree about
-  // which path is under test, or the comparison between them means nothing.
-  const { transport, stream: h264Stream, intraCanvasRef, detail: videoDetail } = useVideoTransport();
+  // The element showing the robot picture on the H.264 transports, or null on MJPEG (whose
+  // picture IS the view socket's JPEG). The one place that answers "what is on screen".
+  const videoElRef = useRef<HTMLVideoElement | null>(null);
+  const shownElement = useCallback(
+    () =>
+      transport === "h264" ? videoElRef.current
+        : transport === "intra" ? intraCanvasRef?.current ?? null
+          : null,
+    [transport, intraCanvasRef],
+  );
+  const shownElementRef = useRef(shownElement);
+  shownElementRef.current = shownElement;
+
+  // The frame held on screen while its boxes are computed, and the pacing knobs the loop
+  // reads every cycle (refs, so a slider move does not restart the loop).
+  const [still, setStill] = useState<HTMLCanvasElement | null>(null);
+  const pacingRef = useRef({ maxFps, imgsz });
+  pacingRef.current = { maxFps, imgsz };
+
+  useEffect(() => {
+    if (!pairsLocally) return;
+    const stop = startPairing<HTMLCanvasElement, Awaited<ReturnType<typeof detectFrame>>>({
+      grab: async () => {
+        const el = shownElementRef.current();
+        const frame = el ? snapshotFrame(el) : null;
+        if (!frame) return null;
+        // Uploaded at YOLO's input size: iacore resizes to imgsz anyway, so more pixels only
+        // cost upload time. Encoded FROM the snapshot, so shown and analysed are one image.
+        const blob = await encodeFrame(frame, pacingRef.current.imgsz || 640);
+        return blob ? { frame, blob } : null;
+      },
+      detect: (blob, signal) => detectFrame(blob, signal),
+      onPair: (frame, det) => {
+        setStill(frame);
+        onResult({ type: "detections", ...det });
+      },
+      minIntervalMs: () => (pacingRef.current.maxFps > 0 ? 1000 / pacingRef.current.maxFps : 0),
+    });
+    return () => {
+      stop();
+      setStill(null);
+    };
+  }, [pairsLocally, transport, onResult]);
 
   // While viewing, push config changes over the view socket (no-op when producing;
   // the detect socket below handles that case). The hub only rebroadcasts real
@@ -226,11 +282,11 @@ export function LivePage() {
   // While viewing, the live boxes come from the fan-out (`robotObjects`); mirror
   // them into the shared overlay state (a VLM ask can still override with blue).
   useEffect(() => {
-    if (viewing) {
+    if (viewing && !pairsLocally) {
       setObjects(robotObjects);
       setOverrideColor(undefined);
     }
-  }, [viewing, robotObjects]);
+  }, [viewing, pairsLocally, robotObjects]);
 
   const { connected } = useDetectionSocket({
     active,
@@ -301,15 +357,17 @@ export function LivePage() {
     setSource("view");
   }, [handleStop, source]);
 
-  // The current JPEG frame for a VLM ask, from whichever source is active: capture
-  // from our webcam, or convert the latest fanned-out frame Blob to a data URL.
+  // The current JPEG frame for a VLM ask: THE PICTURE ON SCREEN (plan §7), whichever source
+  // and transport put it there — our webcam, the frame held by the YOLO pairing, the WebRTC
+  // video or the intra canvas. Only on MJPEG is that picture the view socket's last JPEG.
   const getCurrentFrame = useCallback(async (): Promise<string | null> => {
     if (source === "own") {
       const video = videoRef.current;
       if (!video?.videoWidth) return null;
-      const { captureFrame } = await import("../lib/capture");
       return captureFrame(video, 0.85, vlmMaxSize);
     }
+    const shown = source === "robot" ? still ?? shownElement() : null;
+    if (shown) return captureFrame(shown, 0.85, vlmMaxSize);
     const blob = getLastFrameBlob();
     if (!blob) return null;
     return await new Promise((resolve) => {
@@ -318,7 +376,7 @@ export function LivePage() {
       r.onerror = () => resolve(null);
       r.readAsDataURL(blob);
     });
-  }, [source, videoRef, vlmMaxSize, getLastFrameBlob]);
+  }, [source, videoRef, vlmMaxSize, getLastFrameBlob, still, shownElement]);
 
   const handleModelChange = useCallback((model: string) => {
     setYoloModel(model);
@@ -718,6 +776,8 @@ export function LivePage() {
             label={source === "robot" ? "Robot camera" : "Session mirror"}
             detail={source === "robot" ? videoDetail : undefined}
             stream={transport === "h264" ? h264Stream : null}
+            videoElRef={videoElRef}
+            still={still}
           />
         )}
         {source === "robot" && (
