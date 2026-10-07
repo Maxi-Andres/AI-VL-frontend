@@ -26,9 +26,6 @@ export function Header({ children }: Props) {
         <NavLink to="/video" className={linkClass}>
           Video
         </NavLink>
-        <NavLink to="/about" className={linkClass}>
-          About
-        </NavLink>
       </nav>
       <div className="ml-auto">{children}</div>
     </header>

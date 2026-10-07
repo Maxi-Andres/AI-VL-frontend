@@ -4,7 +4,6 @@ import { LivePage } from "./pages/LivePage";
 import { ControlPage } from "./pages/ControlPage";
 import { RobotConfigPage } from "./pages/RobotConfigPage";
 import { VideoTuningPage } from "./pages/VideoTuningPage";
-import { AboutPage } from "./pages/AboutPage";
 
 /** Routing: a shared Layout (header + nav) wraps the routed pages. */
 export function App() {
@@ -16,7 +15,6 @@ export function App() {
           <Route path="drive" element={<ControlPage />} />
           <Route path="robot" element={<RobotConfigPage />} />
           <Route path="video" element={<VideoTuningPage />} />
-          <Route path="about" element={<AboutPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

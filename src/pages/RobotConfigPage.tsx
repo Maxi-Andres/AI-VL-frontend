@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { getRobotTransport, type RobotTransports } from "../api/backend";
+import { BACKEND_URL } from "../config";
 import { useRobot } from "../components/layout/RobotContext";
 import { CameraSettings } from "../components/robot/CameraSettings";
 import { ConnectionSettings } from "../components/robot/ConnectionSettings";
@@ -167,40 +168,51 @@ export function RobotConfigPage() {
         ) : (
           <p className="text-muted">Not publishing (or not reported yet).</p>
         )}
+        <p className="mb-1 text-sm text-muted">
+          The robot sends <strong>two</strong> H.264 streams, both encoded in hardware on its own
+          computer:
+        </p>
+        <ul className="mb-1 mt-0 pl-5 text-sm text-muted">
+          <li>
+            <strong>Recorder</strong> — the full-size picture over SRT to mediamtx, which Frigate
+            records and the camera bridge re-reads (WHEP) for YOLO and the VLM. Lost packets are
+            repaired within the SRT latency, set on THIS machine's receiver
+            (<code>srt-bridge.service</code>, 900 ms): raise it there, not on the robot, if the
+            recording breaks up.
+          </li>
+          <li>
+            <strong>Drive view</strong> — small all-intra frames over UDP, one picture per
+            message, so a lost one costs a single frame and never a freeze. This is what Drive
+            shows ({robot === "g1" ? "480×270 at QP 36 by default on the G1" : "640×360 at QP 38 on the Go2"}).
+          </li>
+        </ul>
         {robot === "g1" ? (
           <p className="mb-1 text-sm text-muted">
-            The G1 has no video path yet. Its camera is a RealSense D435i on PC2's USB, so it
-            will not go through DDS like the Go2's, and none of the Go2's video settings apply.
+            On the G1 the camera bridge still reads the robot&apos;s own MJPEG (port 8093) for
+            YOLO and the VLM. The G1 runs the same video code as the Go2 with
+            <code> video.g1.env.example</code>, publishing to its own mediamtx path,
+            <code> g1</code>.
           </p>
         ) : (
-          <>
           <p className="mb-1 text-sm text-muted">
-            The robot encodes H.264 in hardware and pushes it out; mediamtx re-serves it. The
-            values above are that push only.
+            The robot&apos;s MJPEG on port 8093 still exists, but nothing reads it on the Go2 any
+            more: Drive uses the all-intra stream and the camera bridge reads the recorder. That
+            took ~0.55 Mbps off an LTE uplink with about 1 Mbps to spare.
           </p>
-          <p className="mb-1 text-sm text-amber-500">
-            There is a <strong>second</strong> video stream the relay does not report: the raw
-            MJPEG on port 8093, which <code>robot_camera_bridge</code> pulls directly. Measured
-            on 2026-09-09 over the field link it was <strong>218 KB/s against the RTMP’s 42</strong>
-            — five times bigger. <code>MJPEG_FPS=0</code> means <em>no cap</em>, which is the
-            default. If you are trying to cut what the robot uploads, that is the knob, not{" "}
-            <code>BITRATE</code>.
-          </p>
-          <p className="mb-1 text-sm text-muted">
-            Both live in the same file. Useful keys: <code>PUBLISH_HOST</code>,{" "}
-            <code>BITRATE</code>, <code>IDR_FRAMES</code>, <code>NVR_FPS</code> for the RTMP
-            push; <code>MJPEG_FPS</code>, <code>MJPEG_QUALITY</code>, <code>MJPEG_WIDTH</code>{" "}
-            for the direct stream. All are read at start-up, so a restart is required — there is
-            no live knob.
-          </p>
-          <Steps
-            lines={[
-              `nano ${REPO_VIDEO}/robot/video.env`,
-              "sudo systemctl restart robot-video",
-            ]}
-          />
-          </>
         )}
+        <p className="mb-1 text-sm text-muted">
+          Useful keys in <code>video.env</code>: <code>BITRATE</code>, <code>IDR_FRAMES</code>,{" "}
+          <code>NVR_FPS</code> for the recorder; <code>H264_QP</code>, <code>H264_WIDTH</code>,{" "}
+          <code>H264_HEIGHT</code> for the drive view; <code>PUBLISH_HOST</code> for where it all
+          goes. The file is read when the service starts, so editing it needs a restart; the
+          Video tab changes a few values on the running service without one.
+        </p>
+        <Steps
+          lines={[
+            `nano ${REPO_VIDEO}/robot/video.env`,
+            "sudo systemctl restart robot-video",
+          ]}
+        />
       </section>
 
       <section>
@@ -332,6 +344,20 @@ export function RobotConfigPage() {
             "journalctl -u robot-telemetry-agent -f    # Ctrl-C closes the view, not the service",
           ]}
         />
+      </section>
+
+      {/* Moved here from the About page (removed 2026-10-07): the one live fact it had. */}
+      <section>
+        <h3 className="mb-1 text-base font-semibold">This app</h3>
+        <p className="mb-1 text-sm text-muted">
+          The browser talks only to the backend, which reaches iacore and the robots for it. It
+          is pointed at:
+        </p>
+        <Steps lines={[BACKEND_URL || "same origin (the backend serves this page)"]} />
+        <p className="m-0 text-xs text-muted">
+          Change it in <code>public/config.js</code> (read at runtime, no rebuild) or with{" "}
+          <code>VITE_BACKEND_URL</code> at build time.
+        </p>
       </section>
     </main>
   );

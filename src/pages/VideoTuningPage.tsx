@@ -27,37 +27,56 @@ import { StatusText, type Status } from "../components/ui/StatusText";
  *  the value actually running. A control that cannot express the current state is worse
  *  than no control. */
 const KNOBS = [
+  // --- Drive view: what Drive shows -----------------------------------------------------
   {
-    key: "fps" as const,
+    key: "h264_qp" as const,
     kind: "range" as const,
-    fallback: { min: 0, max: 60 },
-    label: "Frame cap",
-    unit: "fps",
+    fallback: { min: 10, max: 51 },
+    label: "Drive quality",
+    unit: "QP",
     step: 1,
-    hint: "0 = every frame the robot produces. The cap is applied PER VIEWER, so it also " +
-      "throttles the bridge that feeds this app. Lower = less bandwidth, but you see the " +
-      "robot less often: at 5 fps you are looking at a picture up to 200 ms old.",
+    options: [] as number[],
+    hint: "Lower = sharper and more bytes per frame. Measured on the Go2 over LTE: QP 40 at " +
+      "480×270 ≈ 3 kB a frame (0.34 Mbps), QP 38 at 640×360 ≈ 6 kB (0.6-0.7 Mbps), latency " +
+      "unchanged. Every frame stands alone, so a lost one costs one picture, never a freeze.",
   },
   {
-    key: "width" as const,
-    kind: "range" as const,
-    fallback: { min: 0, max: 1920 },
-    label: "Downscale to",
+    key: "h264_width" as const,
+    kind: "choice" as const,
+    fallback: { min: 64, max: 1920 },
+    label: "Drive size",
     unit: "px wide",
-    step: 160,
-    hint: "0 = native 1920, forwarded untouched with no decode. Anything else makes the " +
-      "Jetson decode, resize and re-encode every frame — measured at ~100 ms per frame, " +
-      "which lands straight in the latency you steer by. Only worth it on a slow link.",
+    step: 1,
+    // Fixed choices, not a slider: 64-1920 in any step skips the sizes that matter.
+    options: [320, 480, 640, 854, 960, 1280],
+    hint: "16:9; the robot sets the height to match (640 → 640×360). Bigger costs bytes at " +
+      "the same quality — raise the size or lower the QP, rarely both on LTE.",
+  },
+  // --- Recorder: the full-size stream Frigate records, and YOLO/VLM read ------------------
+  {
+    key: "bitrate" as const,
+    kind: "range" as const,
+    fallback: { min: 200000, max: 8000000 },
+    label: "Recorder bitrate",
+    unit: "bps",
+    step: 100000,
+    options: [] as number[],
+    hint: "H.264 over SRT, the stream Frigate records and the camera bridge re-reads for YOLO " +
+      "and the VLM. 1.3 Mbps holds over LTE because this machine's SRT receiver waits 900 ms " +
+      "to repair losses (srt-bridge.service); at 150 ms the same bitrate dropped 10-15% of " +
+      "packets and the recording broke into blocks and drifted purple.",
   },
   {
-    key: "quality" as const,
+    key: "idr" as const,
     kind: "range" as const,
-    fallback: { min: 1, max: 100 },
-    label: "JPEG quality",
-    unit: "",
+    fallback: { min: 1, max: 300 },
+    label: "Recorder keyframe interval",
+    unit: "frames",
     step: 1,
-    hint: "Only has any effect while Downscale is above 0: at native size the bytes are " +
-      "never re-encoded, so there is nothing to set the quality of.",
+    options: [] as number[],
+    hint: "Lower = a damaged picture heals sooner and a new viewer starts sooner, at more " +
+      "bitrate. A keyframe is ~22 packets at 1080p; one lost and the picture is wrong until " +
+      "the next one.",
   },
   {
     key: "nvr" as const,
@@ -66,20 +85,10 @@ const KNOBS = [
     label: "Feed the recorder",
     unit: "",
     step: 1,
-    hint: "The recording branch sends the SAME picture a second time, as H.264 over RTMP. " +
-      "On a constrained link that is what starves the live view — it already did once. " +
-      "Turn it off to hand the whole uplink to the view you steer by.",
-  },
-  {
-    key: "bitrate" as const,
-    kind: "range" as const,
-    fallback: { min: 200000, max: 8000000 },
-    label: "Recorder bitrate",
-    unit: "bps",
-    step: 100000,
-    hint: "H.264 bitrate for the recording branch only; the live view never passes " +
-      "through it. The floor exists because this sat at 60000 — 60 kbps for 1080p, a " +
-      "missing zero nobody caught.",
+    options: [] as number[],
+    hint: "Off stops the SRT stream entirely: nothing recorded, and no picture for YOLO and " +
+      "the VLM on the Go2 (its camera bridge reads this stream). Drive is unaffected — it has " +
+      "its own stream.",
   },
   {
     key: "maxfps" as const,
@@ -88,38 +97,71 @@ const KNOBS = [
     label: "Capture cap",
     unit: "fps",
     step: 1,
-    hint: "How fast the robot polls its own camera. 0 = as fast as it answers (~10 fps). " +
-      "This is upstream of everything, so lowering it lowers both branches at once.",
+    options: [] as number[],
+    hint: "How fast the robot takes pictures from its camera, upstream of every stream. 0 = " +
+      "every new frame the camera makes (~14 fps on the Go2).",
+  },
+  // --- MJPEG: the robot's JPEG server, port 8093 ------------------------------------------
+  {
+    key: "fps" as const,
+    kind: "range" as const,
+    fallback: { min: 0, max: 60 },
+    label: "MJPEG frame cap",
+    unit: "fps",
+    step: 1,
+    options: [] as number[],
+    hint: "0 = every frame. Applied per viewer.",
   },
   {
-    key: "idr" as const,
+    key: "width" as const,
     kind: "range" as const,
-    fallback: { min: 1, max: 300 },
-    label: "Keyframe interval",
-    unit: "frames",
+    fallback: { min: 0, max: 1920 },
+    label: "MJPEG downscale to",
+    unit: "px wide",
+    step: 160,
+    options: [] as number[],
+    hint: "0 = native, forwarded untouched. Anything else costs the robot a decode and " +
+      "re-encode per frame.",
+  },
+  {
+    key: "quality" as const,
+    kind: "range" as const,
+    fallback: { min: 1, max: 100 },
+    label: "MJPEG quality",
+    unit: "",
     step: 1,
-    hint: "Recording branch only. Lower = a new viewer starts sooner, at more bitrate.",
+    options: [] as number[],
+    hint: "Only matters while the downscale is above 0: at native size nothing is re-encoded.",
   },
 ];
 
 /** Which knobs the robot applies without a restart, when it has not told us yet. The
  *  robot is the authority (`limits[key].live`); this is only the pre-load fallback. */
-const LIVE_BY_DEFAULT = new Set(["fps", "width", "quality"]);
+const LIVE_BY_DEFAULT = new Set(["fps", "width", "quality", "h264_qp", "h264_width"]);
 
-const SECTIONS = [
+/** Grouped by STREAM, not by live/restart: the operator thinks "Drive looks bad" or "the
+ *  recording is broken", and each knob carries its own live/restart tag. */
+const GROUPS: { title: string; keys: string[]; note: (robot: string) => string }[] = [
   {
-    liveSection: true,
-    title: "Applies immediately",
-    note: "Takes effect on the running publisher with no restart and no gap in the " +
-      "stream. Safe to move while someone is driving.",
+    title: "Drive view",
+    keys: ["h264_qp", "h264_width"],
+    note: () => "The all-intra stream Drive shows, over UDP. Both apply to the running " +
+      "stream immediately — safe to move while someone is driving.",
   },
   {
-    liveSection: false,
-    title: "Needs a restart of the video service",
-    note: "⚠ These are read by the GStreamer pipeline when it starts, so they can only " +
-      "be SAVED here — they take effect the next time the robot's video service " +
-      "restarts, which costs a few seconds of black screen. Do not change these while " +
-      "someone is driving.",
+    title: "Recorder",
+    keys: ["bitrate", "idr", "nvr", "maxfps"],
+    note: () => "The full-size stream, over SRT. Read when the video service starts, so " +
+      "these only take effect after a restart — a few seconds of black on every stream. " +
+      "Not while someone is driving.",
+  },
+  {
+    title: "MJPEG",
+    keys: ["fps", "width", "quality"],
+    note: (robot) => robot === "go2"
+      ? "Nothing reads it on the Go2 any more (Drive uses the stream above, the camera bridge " +
+        "the recorder), so these change nothing you see."
+      : "What the camera bridge reads on this robot — YOLO's and the VLM's picture.",
   },
 ];
 
@@ -131,8 +173,9 @@ const POLL_MS = 4000;
  * WHY THIS PAGE EXISTS: these values decide the trade-off between latency and bandwidth,
  * and the right ones differ per link — cable, LTE, Starlink. Finding them used to mean an
  * SSH session, an editor, and a service restart per attempt, so in practice nobody tried.
- * Everything here applies to the running publisher with NO restart and no gap in the
- * stream, which is what makes it usable while someone is actually driving.
+ * The drive-view and MJPEG knobs apply to the running publisher with NO restart and no gap,
+ * which is what makes them usable while someone is driving; the recorder's need a restart,
+ * and each knob says which (the robot reports it, `limits[key].live`).
  *
  * Applying and saving are deliberately separate: you try many values and keep one.
  */
@@ -255,9 +298,9 @@ export function VideoTuningPage() {
     <main className="mx-auto max-w-3xl p-6 leading-relaxed">
       <h2 className="mt-0 text-lg font-semibold">Video tuning — {robot}</h2>
       <p className="mb-1 text-sm text-muted">
-        Applies to the running publisher immediately: no restart, no gap in the stream.
-        These are the knobs that trade latency against bandwidth, and the right values are
-        different on cable and on LTE.
+        The robot&apos;s video knobs, by stream. The right values differ on cable, LTE and
+        Starlink, which is why they are here and not behind SSH. Each knob says whether it
+        applies now or needs a restart of the robot&apos;s video service.
       </p>
 
       {!reachable && (
@@ -267,17 +310,14 @@ export function VideoTuningPage() {
         </p>
       )}
 
-      {SECTIONS.map(({ liveSection, title, note }) => {
-        const knobs = KNOBS.filter((k) => isLive(k.key) === liveSection);
-        if (!knobs.length) return null;
+      {GROUPS.map(({ title, keys, note }) => {
+        const knobs = KNOBS.filter((k) => keys.includes(k.key));
         return (
           <section key={title} className="mt-5">
             <h3 className="mb-1 text-base font-semibold">{title}</h3>
-            <p className={`mb-3 text-xs ${liveSection ? "text-muted" : "text-amber-500"}`}>
-              {note}
-            </p>
+            <p className="mb-3 text-xs text-muted">{note(robot)}</p>
             <div className="flex flex-col gap-4">
-              {knobs.map(({ key, kind, fallback, label, unit, step, hint }) => {
+              {knobs.map(({ key, kind, fallback, label, unit, step, options, hint }) => {
                 // The robot is the authority; `fallback` only covers the window before it
                 // answers, and it mirrors the relay's own table rather than inventing a range.
                 const lim = limits[key] ?? fallback;
@@ -306,11 +346,27 @@ export function VideoTuningPage() {
                                 ? value ? "on" : "off"
                                 : value}
                             {isKnown && kind !== "toggle" && unit ? ` ${unit}` : ""}
+                          </span>{" "}
+                          <span className={`text-[11px] ${isLive(key) ? "text-emerald-500" : "text-amber-500"}`}>
+                            {isLive(key) ? "· applies now" : "· needs a restart"}
                           </span>
                         </>
                       }
                     >
-                      {kind === "toggle" ? (
+                      {kind === "choice" ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          {options.map((o) => (
+                            <Button
+                              key={o}
+                              variant={isKnown && value === o ? "primary" : "secondary"}
+                              disabled={!editable}
+                              onClick={() => setDraft((d) => ({ ...d, [key]: o }))}
+                            >
+                              {o}
+                            </Button>
+                          ))}
+                        </div>
+                      ) : kind === "toggle" ? (
                         <div className="flex items-center gap-2">
                           <Button
                             variant={isKnown && !value ? "primary" : "secondary"}

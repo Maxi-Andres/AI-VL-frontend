@@ -19,7 +19,8 @@ speak, with wake-word). The Live page picks its own video source — "My camera"
 "Robot camera", or "View only", the last being a read-only mirror of whatever the
 session is streaming (this replaced the old separate `/monitor` page).
 Routes: `/` (live), `/drive` (robot drive pad), `/robot` (on-robot config),
-`/about`. It talks **only** to the backend — it never knows the iacore service
+`/video` (live video tuning). There is no `/about` since 2026-10-07: its only live fact, the
+backend URL, is on the Robot page. It talks **only** to the backend — it never knows the iacore service
 exists.
 
 ## Toolchain

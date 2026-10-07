@@ -451,6 +451,9 @@ export interface RobotVideoKnobs {
   fps?: number;
   width?: number;
   quality?: number;
+  /** Drive view (all-intra H.264): quantizer and width; the robot derives the height. */
+  h264_qp?: number;
+  h264_width?: number;
 }
 
 export interface RobotVideoState {
@@ -490,6 +493,8 @@ export async function setRobotVideo(cfg: {
   fps?: number;
   width?: number;
   quality?: number;
+  h264_qp?: number;
+  h264_width?: number;
   bitrate?: number;
   maxfps?: number;
   idr?: number;

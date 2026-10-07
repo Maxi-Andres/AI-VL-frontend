@@ -20,7 +20,7 @@ talks **only** to the backend.
 
 - **React 19** + **TypeScript** (strict)
 - **Tailwind CSS v4** (via the official Vite plugin — theme lives in `src/index.css`)
-- **React Router v7** (`/` live, `/drive` drive pad, `/robot` config, `/about`)
+- **React Router v7** (`/` live, `/drive` drive pad, `/robot` config, `/video` video tuning)
 - **Vite** dev server / bundler
 - **bun** as the package manager and runtime
 
@@ -71,7 +71,7 @@ src/
   hooks/      useCamera, useDetectionSocket (frame pacing), useOptions,
               useAudioRecorder, useSpeech, useVoiceAssistant, useWakeWord
   lib/        draw (canvas boxes), capture (frame -> JPEG), speechQueue, format
-  pages/      LivePage (live container), MonitorPage (read-only), AboutPage
+  pages/      LivePage, ControlPage (drive), RobotConfigPage, VideoTuningPage
   config.ts   backend URL resolution (the single source)
   types.ts    shared backend contract types
 ```
