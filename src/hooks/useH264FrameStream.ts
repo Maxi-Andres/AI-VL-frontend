@@ -59,9 +59,15 @@ export function useH264FrameStream(
     const ws = new WebSocket(url);
     ws.binaryType = "arraybuffer";
 
-    const ctx = canvasRef.current?.getContext("2d") ?? null;
+    // The canvas is looked up PER FRAME, never captured when the socket opens. Drive and Live
+    // each mount their own <canvas> on this one ref, so navigating between them swaps the
+    // element under a socket that stays open; a context captured at open kept painting the
+    // detached old canvas and the new page stayed black until the transport was toggled
+    // (2026-10-07: "drive is on intra but black; pick H.264 then intra and it shows").
+    // getContext() on the same canvas returns the same context, so this costs nothing.
     const paint = (frame: VideoFrame) => {
       const canvas = canvasRef.current;
+      const ctx = canvas?.getContext("2d") ?? null;
       if (canvas && ctx) {
         if (canvas.width !== frame.displayWidth || canvas.height !== frame.displayHeight) {
           canvas.width = frame.displayWidth;

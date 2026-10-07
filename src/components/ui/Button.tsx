@@ -15,7 +15,9 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
 export function Button({ variant = "primary", className = "", ...props }: Props) {
   return (
     <button
-      className={`cursor-pointer rounded-md px-3.5 py-2 font-semibold transition disabled:cursor-default disabled:opacity-40 ${variants[variant]} ${className}`}
+      // active: press feedback — a quick shrink and dim while held, so a click visibly lands.
+      // disabled:active cancels it: a button that does nothing must not look pressed.
+      className={`cursor-pointer rounded-md px-3.5 py-2 font-semibold transition duration-100 active:scale-95 active:brightness-90 disabled:cursor-default disabled:opacity-40 disabled:active:scale-100 disabled:active:brightness-100 ${variants[variant]} ${className}`}
       {...props}
     />
   );

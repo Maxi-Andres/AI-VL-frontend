@@ -24,7 +24,7 @@ export function CollapsibleColumn({ title, collapsed, onToggle, children }: Prop
           onClick={onToggle}
           title={`Expand ${title}`}
           aria-expanded={false}
-          className="flex w-full items-center gap-2 px-3 py-2 text-[13px] font-semibold uppercase tracking-[0.04em] text-muted hover:text-fg lg:w-9 lg:flex-col lg:gap-3 lg:px-0 lg:py-3"
+          className="flex w-full items-center gap-2 px-3 py-2 text-[13px] font-semibold uppercase tracking-[0.04em] text-muted transition duration-100 hover:text-fg active:brightness-75 lg:w-9 lg:flex-col lg:gap-3 lg:px-0 lg:py-3"
         >
           <IconChevronRight size={16} stroke={2} className="shrink-0" />
           <span className="lg:[writing-mode:vertical-rl]">{title}</span>
@@ -42,7 +42,7 @@ export function CollapsibleColumn({ title, collapsed, onToggle, children }: Prop
           title={`Collapse ${title}`}
           aria-expanded
           aria-label={`Collapse ${title}`}
-          className="rounded p-1 text-muted hover:bg-white/5 hover:text-fg"
+          className="rounded p-1 text-muted transition duration-100 hover:bg-white/5 hover:text-fg active:scale-90"
         >
           <IconChevronLeft size={16} stroke={2} />
         </button>

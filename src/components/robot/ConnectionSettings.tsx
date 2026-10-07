@@ -254,7 +254,7 @@ export function ConnectionSettings() {
             type="button"
             disabled={busy}
             onClick={apply}
-            className="rounded-md border border-line px-2 py-1 text-[11px] text-fg hover:border-accent disabled:opacity-50"
+            className="rounded-md border border-line px-2 py-1 text-[11px] text-fg transition duration-100 hover:border-accent active:scale-95 disabled:opacity-50 disabled:active:scale-100"
           >
             {busy ? "Applying…" : "Apply + restart executor"}
           </button>

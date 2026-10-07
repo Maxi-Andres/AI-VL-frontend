@@ -26,7 +26,7 @@ export function FullscreenButton<T extends HTMLElement>({
       onClick={toggle}
       title="Fullscreen"
       aria-label="Toggle fullscreen"
-      className="absolute right-2 top-2 z-10 flex items-center justify-center rounded bg-black/50 p-1.5 text-white hover:bg-black/70"
+      className="absolute right-2 top-2 z-10 flex items-center justify-center rounded bg-black/50 p-1.5 text-white transition duration-100 hover:bg-black/70 active:scale-90"
     >
       <IconMaximize size={18} stroke={2} />
     </button>

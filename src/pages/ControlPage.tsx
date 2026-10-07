@@ -494,7 +494,7 @@ export function ControlPage() {
                 key={s}
                 type="button"
                 onClick={() => setSpeed(s)}
-                className={`px-2 py-1 text-[11px] capitalize ${
+                className={`px-2 py-1 text-[11px] capitalize transition duration-100 active:scale-95 active:brightness-90 ${
                   speed === s ? "bg-white/80 text-black" : "bg-black/40 text-white/70"
                 }`}
               >
