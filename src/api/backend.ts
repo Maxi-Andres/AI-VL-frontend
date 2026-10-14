@@ -446,6 +446,51 @@ export async function synthesizeSpeech(
   return r.blob();
 }
 
+/** The robot's own speaker (Go2): the server makes the voice, the robot only plays it. */
+export interface RobotAudioReply {
+  ok?: boolean;
+  /** How long the robot will be speaking; it replies once it HAS the audio, not when done. */
+  seconds?: number;
+  volume?: number;
+  error?: string;
+}
+
+async function robotAudio(path: string, init?: RequestInit): Promise<RobotAudioReply> {
+  const r = await fetch(`${BACKEND_URL}/api/robot-audio/${path}`, init);
+  try {
+    return await r.json();
+  } catch {
+    return { ok: false, error: `HTTP ${r.status}` };
+  }
+}
+
+/** Say `text` through the robot's speaker, in a Piper voice (server default if omitted). */
+export function sayOnRobot(robot: string, text: string, voice?: string) {
+  return robotAudio("say", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ robot, text, voice }),
+  });
+}
+
+/** Cut whatever the robot is saying. */
+export function stopRobotAudio(robot: string) {
+  return robotAudio(`stop?robot=${encodeURIComponent(robot)}`, { method: "POST" });
+}
+
+/** The robot speaker's volume, 0-10. */
+export function getRobotVolume(robot: string, signal?: AbortSignal) {
+  return robotAudio(`volume?robot=${encodeURIComponent(robot)}`, { signal });
+}
+
+export function setRobotVolume(robot: string, level: number) {
+  return robotAudio("volume", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ robot, level }),
+  });
+}
+
 /** The robot's LIVE video knobs, as the robot itself reports them. */
 export interface RobotVideoKnobs {
   fps?: number;

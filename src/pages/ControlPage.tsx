@@ -10,6 +10,7 @@ import { useGamepad, PAD } from "../hooks/useGamepad";
 import { StatusText, type Status } from "../components/ui/StatusText";
 import { IconDeviceGamepad2, IconPlayerStopFilled } from "@tabler/icons-react";
 import { ActionPad } from "../components/control/ActionPad";
+import { RobotSpeaker } from "../components/control/RobotSpeaker";
 import { choiceSendable, unsendableSkills } from "../components/control/unsendableSkills";
 import { useRobotTransports } from "../hooks/useRobotTransports";
 import { Button } from "../components/ui/Button";
@@ -609,7 +610,11 @@ export function ControlPage() {
             )
           )}
 
-          {/* G1 speaks through its onboard speaker (TTS). Go2 has no TTS. */}
+          {/* The Go2's own speaker: the server makes the voice, the robot plays it. Not gated
+              by Arm — nothing here moves the robot. */}
+          {robot === "go2" && <RobotSpeaker robot={robot} />}
+
+          {/* G1 speaks through its onboard speaker with its own TTS (a skill, so it needs Arm). */}
           {robot === "g1" && (
             <form
               className="mb-3 flex gap-1.5"

@@ -237,5 +237,10 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
     voices: speech.voices,
     voiceURI: speech.voiceURI,
     onVoiceChange: speech.setVoiceURI,
+    // Browser or the robot's own speaker.
+    speechOutput: speech.output,
+    onSpeechOutputChange: speech.setOutput,
+    robotSpeaker: speech.robotSpeaker,
+    robotSpeakerError: speech.robotError,
   };
 }

@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchTtsVoices, synthesizeSpeech } from "../api/backend";
+import {
+  fetchTtsVoices,
+  sayOnRobot,
+  stopRobotAudio,
+  synthesizeSpeech,
+} from "../api/backend";
+import { useRobot } from "../components/layout/RobotContext";
 import { SpeechQueue, type Player } from "../lib/speechQueue";
 
 /**
@@ -16,6 +22,14 @@ import { SpeechQueue, type Player } from "../lib/speechQueue";
  * inside a user gesture; the voice loop is armed by a tap, which usually suffices.
  */
 const LS_VOICE_URI = "aivl.voiceURI";
+const LS_OUTPUT = "aivl.speechOutput";
+
+/** Where the voice comes out: this browser, or the selected robot's own speaker. */
+export type SpeechOutput = "browser" | "robot";
+
+/** Robots whose speaker this app can drive: the Go2's audiohub, through its relay. The G1's
+ * audio is a different SDK client and is not wired. */
+const ROBOTS_WITH_SPEAKER = new Set(["go2"]);
 
 export interface VoiceOption {
   uri: string;
@@ -31,6 +45,20 @@ export function useSpeech() {
       ? localStorage.getItem(LS_VOICE_URI)
       : null,
   );
+  const { robot } = useRobot();
+  const robotRef = useRef(robot);
+  robotRef.current = robot;
+  const robotSpeaker = ROBOTS_WITH_SPEAKER.has(robot);
+  const [output, setOutputState] = useState<SpeechOutput>(() =>
+    typeof localStorage !== "undefined" && localStorage.getItem(LS_OUTPUT) === "robot"
+      ? "robot"
+      : "browser",
+  );
+  // "robot" is remembered across robots, but only USED on one that has a speaker: switching
+  // to the G1 falls back to the browser instead of going silent.
+  const toRobot = output === "robot" && robotSpeaker;
+  const [robotError, setRobotError] = useState<string | null>(null);
+  const robotPlayerRef = useRef<Player | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   // Object URL of the one-shot Piper clip currently playing (via speak()), so we
   // can revoke it if playback is cancelled before onended/onerror fires.
@@ -84,6 +112,54 @@ export function useSpeech() {
   const effectiveURI =
     voiceURI ?? (piperVoices[0] ? `piper:${piperVoices[0]}` : null);
 
+  const setOutput = useCallback((next: SpeechOutput) => {
+    setOutputState(next);
+    setRobotError(null);
+    if (typeof localStorage !== "undefined") localStorage.setItem(LS_OUTPUT, next);
+  }, []);
+
+  /**
+   * A sentence spoken by the ROBOT. The server makes the voice (the selected Piper voice, or
+   * its default when a browser voice is selected) and the robot plays it. The robot answers
+   * once it has the audio, with its length, so play() resolves after that many seconds — that
+   * is what keeps the streaming queue's sentences in order instead of cutting each other.
+   */
+  const robotPlayer = useCallback(
+    (text: string): Player => {
+      const voice = effectiveURI?.startsWith("piper:")
+        ? effectiveURI.slice("piper:".length)
+        : undefined;
+      let timer: number | undefined;
+      let finish: (() => void) | undefined;
+      return {
+        play: () =>
+          new Promise<void>((res) => {
+            finish = res;
+            sayOnRobot(robotRef.current, text, voice)
+              .then((r) => {
+                if (!r.ok) {
+                  setRobotError(r.error ?? "the robot did not take the audio");
+                  res();
+                  return;
+                }
+                setRobotError(null);
+                timer = window.setTimeout(res, (r.seconds ?? 0) * 1000);
+              })
+              .catch((e) => {
+                setRobotError(`backend unreachable: ${String(e)}`);
+                res();
+              });
+          }),
+        stop: () => {
+          if (timer !== undefined) window.clearTimeout(timer);
+          void stopRobotAudio(robotRef.current);
+          finish?.();
+        },
+      };
+    },
+    [effectiveURI],
+  );
+
   const setVoiceURI = useCallback((uri: string) => {
     setVoiceURIState(uri);
     if (typeof localStorage !== "undefined")
@@ -107,6 +183,10 @@ export function useSpeech() {
       queueRef.current.cancel();
       queueRef.current = null;
     }
+    if (robotPlayerRef.current) {
+      robotPlayerRef.current.stop();
+      robotPlayerRef.current = null;
+    }
     if (browserSupported) window.speechSynthesis.cancel();
     setSpeaking(false);
   }, [browserSupported]);
@@ -118,6 +198,7 @@ export function useSpeech() {
   // Prepare ONE sentence for playback, using the chosen voice (Piper or browser).
   const synthSentence = useCallback(
     async (text: string): Promise<Player> => {
+      if (toRobot) return robotPlayer(text);
       const uri = effectiveURI;
       if (uri && uri.startsWith("piper:")) {
         const blob = await synthesizeSpeech(text, uri.slice("piper:".length));
@@ -161,7 +242,7 @@ export function useSpeech() {
         stop: () => window.speechSynthesis.cancel(),
       };
     },
-    [effectiveURI],
+    [effectiveURI, toRobot, robotPlayer],
   );
 
   /**
@@ -221,6 +302,18 @@ export function useSpeech() {
       cancel(); // stop anything already playing
       const uri = effectiveURI;
 
+      if (toRobot) {
+        const player = robotPlayer(text);
+        robotPlayerRef.current = player;
+        setSpeaking(true);
+        void player.play().then(() => {
+          if (robotPlayerRef.current === player) robotPlayerRef.current = null;
+          setSpeaking(false);
+          onEnd?.();
+        });
+        return;
+      }
+
       if (uri && uri.startsWith("piper:")) {
         const name = uri.slice("piper:".length);
         setSpeaking(true);
@@ -251,7 +344,7 @@ export function useSpeech() {
 
       speakBrowser(text, uri, onEnd);
     },
-    [cancel, effectiveURI, speakBrowser],
+    [cancel, effectiveURI, speakBrowser, toRobot, robotPlayer],
   );
 
   return {
@@ -263,5 +356,11 @@ export function useSpeech() {
     voices,
     voiceURI: effectiveURI,
     setVoiceURI,
+    output,
+    setOutput,
+    /** The selected robot has a speaker this app can drive. */
+    robotSpeaker,
+    /** Why the last sentence did not play on the robot, if it did not. */
+    robotError,
   };
 }

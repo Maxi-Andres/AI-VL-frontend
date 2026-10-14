@@ -747,6 +747,10 @@ export function LivePage() {
                   voices: va.voices,
                   voiceURI: va.voiceURI,
                   onVoiceChange: va.onVoiceChange,
+                  speechOutput: va.speechOutput,
+                  onSpeechOutputChange: va.onSpeechOutputChange,
+                  robotSpeaker: va.robotSpeaker,
+                  robotSpeakerError: va.robotSpeakerError,
                 }}
               />
             ),

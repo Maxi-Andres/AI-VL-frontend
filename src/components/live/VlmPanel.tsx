@@ -10,6 +10,7 @@ import {
 import { Button } from "../ui/Button";
 import { Field } from "../ui/Field";
 import { Select } from "../ui/Select";
+import { StatusText } from "../ui/StatusText";
 
 // Longer-side sizes (px) offered for the frame sent to the VLM; "Full" = native.
 const VLM_IMG_SIZES = ["512", "768", "1024", "Full"];
@@ -38,6 +39,13 @@ export interface VoiceControls {
   voices: { uri: string; label: string }[];
   voiceURI: string | null;
   onVoiceChange: (uri: string) => void;
+  /** Where spoken answers come out: this browser or the robot's own speaker. */
+  speechOutput: "browser" | "robot";
+  onSpeechOutputChange: (output: "browser" | "robot") => void;
+  /** The selected robot has a speaker the app can drive (the Go2 today). */
+  robotSpeaker: boolean;
+  /** Why the last sentence did not play on the robot. */
+  robotSpeakerError: string | null;
 }
 
 interface Props {
@@ -220,6 +228,32 @@ export function VlmPanel({
             <span className="mt-1 block text-xs text-muted">{voice.status}</span>
           )}
         </div>
+      )}
+
+      {/* Where the spoken answer comes out. Only offered where the robot has a speaker. */}
+      {voice.speechSupported && voice.robotSpeaker && (
+        <Field label="Speak through" hint="The robot's own speaker plays the same neural voice.">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant={voice.speechOutput === "browser" ? "primary" : "secondary"}
+              onClick={() => voice.onSpeechOutputChange("browser")}
+            >
+              This device
+            </Button>
+            <Button
+              variant={voice.speechOutput === "robot" ? "primary" : "secondary"}
+              onClick={() => voice.onSpeechOutputChange("robot")}
+            >
+              Robot
+            </Button>
+            {voice.speechOutput === "robot" && voice.robotSpeakerError && (
+              <StatusText
+                status={{ tone: "warn", text: voice.robotSpeakerError }}
+                className="text-xs text-muted"
+              />
+            )}
+          </div>
+        </Field>
       )}
 
       {/* Pick the text-to-speech voice (list comes from the device). */}
