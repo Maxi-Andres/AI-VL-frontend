@@ -329,9 +329,15 @@ export function ControlPage() {
     const KEYS = new Set([
       "w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright",
     ]);
+    // Keys typed INTO a field are text, not driving. This listener is on the whole window, so
+    // without this check typing "hola" in the robot's say box lost every "a" (swallowed by
+    // preventDefault) — and with the robot armed, every w/a/s/d in a word walked it.
+    const typing = (t: EventTarget | null) =>
+      t instanceof HTMLElement &&
+      (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName));
     const down = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
-      if (!KEYS.has(key)) return;
+      if (!KEYS.has(key) || typing(e.target)) return;
       e.preventDefault();
       keysRef.current.add(key);
     };
