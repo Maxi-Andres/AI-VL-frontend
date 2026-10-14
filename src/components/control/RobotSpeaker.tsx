@@ -4,10 +4,8 @@ import { getRobotVolume, sayOnRobot, setRobotVolume, stopRobotAudio } from "../.
 import { Button } from "../ui/Button";
 import { StatusText, type Status } from "../ui/StatusText";
 
-const VOLUME_MAX = 10; // the Go2's own scale
-
 /**
- * The Go2's own speaker: type something and the robot says it, stop it, and set its volume.
+ * The robot's own speaker: type something and the robot says it, stop it, and set its volume.
  *
  * Not gated by "Arm": nothing here moves the robot. The voice is the server's default Piper
  * voice, the same one the browser plays; the robot only plays the audio it is sent.
@@ -15,6 +13,8 @@ const VOLUME_MAX = 10; // the Go2's own scale
 export function RobotSpeaker({ robot }: { robot: string }) {
   const [text, setText] = useState("");
   const [volume, setVolume] = useState<number | null>(null);
+  // Each robot's own scale (Go2 0-10, G1 0-100), as the robot reports it.
+  const [volumeMax, setVolumeMax] = useState(10);
   const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState(false);
   const commitTimer = useRef<number | undefined>(undefined);
@@ -23,7 +23,10 @@ export function RobotSpeaker({ robot }: { robot: string }) {
     const ctl = new AbortController();
     getRobotVolume(robot, ctl.signal)
       .then((r) => {
-        if (r.ok && typeof r.volume === "number") setVolume(r.volume);
+        if (r.ok && typeof r.volume === "number") {
+          setVolume(r.volume);
+          if (typeof r.max === "number") setVolumeMax(r.max);
+        }
         else if (!ctl.signal.aborted) setStatus({ tone: "warn", text: r.error ?? "no volume" });
       })
       .catch(() => {
@@ -110,15 +113,15 @@ export function RobotSpeaker({ robot }: { robot: string }) {
         <input
           type="range"
           min={0}
-          max={VOLUME_MAX}
-          step={1}
+          max={volumeMax}
+          step={volumeMax > 10 ? 5 : 1}
           value={volume ?? 0}
           disabled={volume === null}
           onChange={(e) => changeVolume(Number(e.target.value))}
           className="min-w-0 flex-1 accent-[var(--color-accent)]"
         />
-        <span className="w-8 text-right tabular-nums">
-          {volume === null ? "—" : `${volume}/${VOLUME_MAX}`}
+        <span className="w-12 text-right tabular-nums">
+          {volume === null ? "—" : `${volume}/${volumeMax}`}
         </span>
       </label>
       <StatusText status={status} className="text-xs text-muted" />

@@ -23,8 +23,8 @@ const HINTS: Record<string, string> = {
  * (MJPEG, H.264, intra, the NVR) follows the switch, because it happens on the robot, upstream
  * of all of them.
  *
- * Go2 only. The G1's RealSense IS its front camera, owned by Unitree's videohub, and cannot be
- * opened a second time — so on the G1 there is nothing to switch to.
+ * Go2 and G1. Each robot says which cameras it has: the Go2 offers all three; the G1 offers its
+ * front camera and the depth, because its RealSense colour IS its front camera.
  *
  * Renders nothing until the robot reports its cameras, so a robot running an older video
  * service simply shows no switch instead of buttons that can only fail.
@@ -37,7 +37,7 @@ export function RobotCameraSwitch() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (robot !== "go2") return;
+    if (robot !== "go2" && robot !== "g1") return;
     const ctl = new AbortController();
     getRobotVideo(robot, ctl.signal)
       .then((s) => {
@@ -83,7 +83,7 @@ export function RobotCameraSwitch() {
     [robot],
   );
 
-  if (robot !== "go2" || cameras.length === 0) return null;
+  if ((robot !== "go2" && robot !== "g1") || cameras.length === 0) return null;
   return (
     <div className="flex flex-wrap items-center gap-2.5">
       <span className="text-xs text-muted">Camera</span>

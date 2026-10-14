@@ -452,6 +452,8 @@ export interface RobotAudioReply {
   /** How long the robot will be speaking; it replies once it HAS the audio, not when done. */
   seconds?: number;
   volume?: number;
+  /** Top of this robot's volume scale: 10 on the Go2, 100 on the G1. */
+  max?: number;
   error?: string;
 }
 

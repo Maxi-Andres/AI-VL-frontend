@@ -95,7 +95,6 @@ export function ControlPage() {
   const [safeMode, setSafeMode] = useState(true);
   const [skills, setSkills] = useState<Record<string, SkillInfo>>({});
   const [dangerous, setDangerous] = useState<string[]>([]);
-  const [sayText, setSayText] = useState(""); // G1 TTS text
   const [isTouch] = useState(
     () => typeof window !== "undefined" &&
       window.matchMedia?.("(pointer: coarse)").matches,
@@ -616,36 +615,10 @@ export function ControlPage() {
             )
           )}
 
-          {/* The Go2's own speaker: the server makes the voice, the robot plays it. Not gated
-              by Arm — nothing here moves the robot. */}
-          {robot === "go2" && <RobotSpeaker robot={robot} />}
-
-          {/* G1 speaks through its onboard speaker with its own TTS (a skill, so it needs Arm). */}
-          {robot === "g1" && (
-            <form
-              className="mb-3 flex gap-1.5"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const t = sayText.trim();
-                if (t) runAction("say", { text: t });
-              }}
-            >
-              <input
-                value={sayText}
-                onChange={(e) => setSayText(e.target.value)}
-                placeholder="Type something to say…"
-                className="min-w-0 flex-1 rounded-md border border-line bg-bg px-2 py-1 text-xs text-fg focus:border-accent focus:outline-none"
-              />
-              <Button
-                type="submit"
-                variant="secondary"
-                className="px-2 py-1 text-[11px]"
-                disabled={!armed || !sayText.trim()}
-              >
-                Say
-              </Button>
-            </form>
-          )}
+          {/* The robot's own speaker (Go2 and G1): the server makes the voice — the same Piper
+              voice the browser plays — and the robot plays it. Not gated by Arm: nothing here
+              moves the robot. The G1's built-in TTS is still the `say` skill. */}
+          {supported && <RobotSpeaker robot={robot} />}
 
           <ActionPad
             skills={skills}

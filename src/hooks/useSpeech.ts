@@ -27,9 +27,9 @@ const LS_OUTPUT = "aivl.speechOutput";
 /** Where the voice comes out: this browser, or the selected robot's own speaker. */
 export type SpeechOutput = "browser" | "robot";
 
-/** Robots whose speaker this app can drive: the Go2's audiohub, through its relay. The G1's
- * audio is a different SDK client and is not wired. */
-const ROBOTS_WITH_SPEAKER = new Set(["go2"]);
+/** Robots whose speaker this app can drive, both through their relay: the Go2's audiohub and
+ * the G1's SDK AudioClient. */
+const ROBOTS_WITH_SPEAKER = new Set(["go2", "g1"]);
 
 export interface VoiceOption {
   uri: string;
@@ -54,8 +54,8 @@ export function useSpeech() {
       ? "robot"
       : "browser",
   );
-  // "robot" is remembered across robots, but only USED on one that has a speaker: switching
-  // to the G1 falls back to the browser instead of going silent.
+  // "robot" is remembered across robots, but only USED on one that has a speaker: a robot
+  // without one falls back to the browser instead of going silent.
   const toRobot = output === "robot" && robotSpeaker;
   const [robotError, setRobotError] = useState<string | null>(null);
   const robotPlayerRef = useRef<Player | null>(null);
