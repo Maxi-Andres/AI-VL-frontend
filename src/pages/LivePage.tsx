@@ -25,6 +25,7 @@ import { useDetectionSocket } from "../hooks/useDetectionSocket";
 import { useOptions } from "../hooks/useOptions";
 import { useVideoTransport } from "../components/layout/VideoTransportContext";
 import { VideoTransportSwitch } from "../components/live/VideoTransportSwitch";
+import { RobotCameraSwitch } from "../components/live/RobotCameraSwitch";
 import { useRobotCameraView } from "../hooks/useRobotCameraView";
 import { useVoiceAssistant } from "../hooks/useVoiceAssistant";
 import { captureFrame, encodeFrame, snapshotFrame } from "../lib/capture";
@@ -781,8 +782,9 @@ export function LivePage() {
           />
         )}
         {source === "robot" && (
-          <div className="mt-2.5">
+          <div className="mt-2.5 flex flex-col gap-2">
             <VideoTransportSwitch />
+            <RobotCameraSwitch />
           </div>
         )}
 

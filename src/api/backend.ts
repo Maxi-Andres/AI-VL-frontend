@@ -454,6 +454,13 @@ export interface RobotVideoKnobs {
   /** Drive view (all-intra H.264): quantizer and width; the robot derives the height. */
   h264_qp?: number;
   h264_width?: number;
+  /** Which camera the robot is sending: front | rs_color | rs_depth. One at a time. */
+  camera?: string;
+  /** Why the last camera switch did not land (no RealSense, library missing). The robot
+   * fell back to a camera that works; this is the reason, not a failure of the request. */
+  camera_error?: string | null;
+  /** Asked for, still opening when the robot answered. */
+  camera_pending?: string;
 }
 
 export interface RobotVideoState {
@@ -467,6 +474,8 @@ export interface RobotVideoState {
    * invents its own — `live: false` means changing it costs a restart of the video
    * service, which the operator must know before touching it mid-drive. */
   limits?: Record<string, { min: number; max: number; live?: boolean }>;
+  /** The cameras the robot can send, for the switch. Absent on an older video service. */
+  cameras?: string[];
   error?: string;
 }
 
@@ -495,6 +504,7 @@ export async function setRobotVideo(cfg: {
   quality?: number;
   h264_qp?: number;
   h264_width?: number;
+  camera?: string;
   bitrate?: number;
   maxfps?: number;
   idr?: number;

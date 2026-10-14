@@ -4,6 +4,7 @@ import type { SkillInfo } from "../api/backend";
 import { useRobotCameraView } from "../hooks/useRobotCameraView";
 import { useVideoTransport } from "../components/layout/VideoTransportContext";
 import { VideoTransportSwitch } from "../components/live/VideoTransportSwitch";
+import { RobotCameraSwitch } from "../components/live/RobotCameraSwitch";
 import { Joystick } from "../components/control/Joystick";
 import { useGamepad, PAD } from "../hooks/useGamepad";
 import { StatusText, type Status } from "../components/ui/StatusText";
@@ -570,8 +571,9 @@ export function ControlPage() {
 
           {/* Here rather than only on the tuning page: this is the view being judged, so
               the switch has to be within reach of the person judging it. */}
-          <div className="mt-2.5">
+          <div className="mt-2.5 flex flex-col gap-2">
             <VideoTransportSwitch />
+            <RobotCameraSwitch />
           </div>
         </div>
 
