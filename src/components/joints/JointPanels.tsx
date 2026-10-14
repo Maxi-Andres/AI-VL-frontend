@@ -66,17 +66,20 @@ function linkStatus(s: JointSourceState): Status {
   }
 }
 
-export function SourcePanel({ kind, onKind, state }: {
+export function SourcePanel({ kind, onKind, state, locked = false }: {
   kind: JointSourceKind;
   onKind: (k: JointSourceKind) => void;
   state: JointSourceState;
+  /** While the page holds an arm the source stays Live: the operator must see the robot. */
+  locked?: boolean;
 }) {
   const opt = (k: JointSourceKind, label: string) => (
     <button
       type="button"
       onClick={() => onKind(k)}
       aria-pressed={kind === k}
-      className={`flex-1 cursor-pointer rounded px-2 py-1 text-xs ${
+      disabled={locked && kind !== k}
+      className={`flex-1 cursor-pointer rounded px-2 py-1 text-xs disabled:cursor-default disabled:opacity-40 ${
         kind === k ? "bg-[#2a2e3a] font-semibold text-fg" : "text-muted hover:text-fg"
       }`}
     >
@@ -94,7 +97,7 @@ export function SourcePanel({ kind, onKind, state }: {
       <StatusText status={linkStatus(state)} className={`text-xs ${tone}`} />
       {state.note && <p className="m-0 mt-1 text-xs text-muted">{state.note}</p>}
       <p className="m-0 mt-2 text-xs text-muted">
-        Read-only: this page shows the robot, it cannot move it yet.
+        Watching is read-only. Moving a joint is a separate step: Take control, below.
       </p>
     </Section>
   );
@@ -160,6 +163,11 @@ export function JointInspector({ urdf, frame, limits }: {
         <p className="m-0 text-xs text-muted">
           Locked on this robot: it is the lock-waist variant (mode_machine 6), so this joint has
           no motor and always reads 0.
+        </p>
+      ) : j.source !== "body" && !r ? (
+        <p className="m-0 text-xs text-muted">
+          No reading yet: the Inspire hands are driven by their own service, which is not wired
+          to this page (step J4). The fingers are drawn at rest.
         </p>
       ) : (
         <>

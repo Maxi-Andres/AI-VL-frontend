@@ -16,6 +16,12 @@ import urdf from "../../public/g1/g1.urdf?raw";
 const urdfJoints = new Map(
   [...urdf.matchAll(/<joint name="([^"]+)" type="([^"]+)"/g)].map((m) => [m[1], m[2]]),
 );
+/** Joints that only follow another one (the Inspire fingers' outer segments): no motor. */
+const mimicJoints = new Set(
+  [...urdf.matchAll(/<joint name="([^"]+)"[^>]*>((?:(?!<\/joint>)[\s\S])*)<\/joint>/g)]
+    .filter((m) => m[2].includes("<mimic"))
+    .map((m) => m[1]),
+);
 
 const line = (over: Record<string, unknown> = {}) =>
   JSON.stringify({
@@ -26,8 +32,8 @@ const line = (over: Record<string, unknown> = {}) =>
     q: BODY_JOINTS.map((_, i) => i / 100),
     tau: BODY_JOINTS.map(() => 0.5),
     temp: BODY_JOINTS.map(() => 40),
-    left: { age_ms: 3, q: [0, -0.1, -0.2, -0.3, -0.4, -0.5, -0.6], tau: [0, 0, 0, 0, 0, 0, 0],
-            temp: [30, 30, 30, 30, 30, 30, 30] },
+    left: { age_ms: 3, q: [0, -0.1, -0.2, -0.3, -0.4, -0.5], tau: [0, 0, 0, 0, 0, 0],
+            temp: [30, 30, 30, 30, 30, 30] },
     right: null,
     ...over,
   });
@@ -43,7 +49,9 @@ describe("the joint table against the model", () => {
     // Catches: the model swapped for another variant, or a typo in a name — either of which
     // leaves a joint that silently never moves.
     for (const j of JOINTS) expect(urdfJoints.has(j.urdf), j.urdf).toBe(true);
-    const revolute = [...urdfJoints].filter(([, t]) => t === "revolute").map(([n]) => n);
+    const revolute = [...urdfJoints]
+      .filter(([n, t]) => t === "revolute" && !mimicJoints.has(n))
+      .map(([n]) => n);
     expect(new Set(revolute)).toEqual(
       new Set(JOINTS.map((j) => j.urdf).filter((n) => !LOCKED_JOINTS.has(n.replace(/_joint$/, "")))),
     );
@@ -55,9 +63,16 @@ describe("the joint table against the model", () => {
     expect(urdfJoints.get("waist_yaw_joint")).toBe("revolute");
   });
 
-  it("has 29 body joints and 7 per hand, each id unique", () => {
+  it("draws Inspire five-finger hands, not Dex3", () => {
+    // The robot's hands, seen 2026-10-14. Every finger's outer joint follows its inner one.
+    expect(mimicJoints.size).toBe(12);
+    expect(urdfJoints.has("L_pinky_proximal_joint")).toBe(true);
+    expect(urdfJoints.has("left_hand_thumb_0_joint")).toBe(false);
+  });
+
+  it("has 29 body joints and 6 per hand, each id unique", () => {
     expect(JOINTS.filter((j) => j.source === "body")).toHaveLength(29);
-    expect(JOINTS.filter((j) => j.source === "left")).toHaveLength(7);
+    expect(JOINTS.filter((j) => j.source === "left")).toHaveLength(6);
     expect(new Set(JOINTS.map((j) => j.urdf)).size).toBe(JOINTS.length);
   });
 });
@@ -68,7 +83,7 @@ describe("parseStreamMessage", () => {
     expect(f.modeMachine).toBe(6);
     expect(f.imu).toEqual([0.01, -0.05, 1.2]);
     expect(f.q?.[3]).toBe(0.03);
-    expect(f.left?.q[6]).toBe(-0.6);
+    expect(f.left?.q[5]).toBe(-0.5);
     expect(f.right).toBeNull();
   });
 
@@ -101,9 +116,9 @@ describe("readJoint", () => {
     const f = frameOf(line());
     const elbow = JOINTS.find((j) => j.urdf === "left_elbow_joint")!;
     expect(readJoint(f, elbow)).toEqual({ q: 0.18, tau: 0.5, temp: 40 });
-    const thumb2 = JOINTS.find((j) => j.urdf === "left_hand_thumb_2_joint")!;
-    expect(readJoint(f, thumb2)?.q).toBe(-0.2);
-    const rightThumb = JOINTS.find((j) => j.urdf === "right_hand_thumb_0_joint")!;
+    const index = JOINTS.find((j) => j.urdf === "L_index_proximal_joint")!;
+    expect(readJoint(f, index)?.q).toBe(-0.2);
+    const rightThumb = JOINTS.find((j) => j.urdf === "R_thumb_proximal_yaw_joint")!;
     expect(readJoint(f, rightThumb)).toBeNull();
   });
 });

@@ -6,7 +6,6 @@ import {
   GridHelper,
   Group,
   HemisphereLight,
-  LoadingManager,
   Mesh,
   MeshStandardMaterial,
   type Object3D,
@@ -17,6 +16,7 @@ import {
   WebGLRenderer,
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import URDFLoader, { type URDFJoint, type URDFRobot } from "urdf-loader";
 import { JOINTS, JOINT_BY_URDF, readJoint, tempLevel, type JointFrame } from "../../lib/g1Joints";
 import { StatusText } from "../ui/StatusText";
@@ -31,6 +31,10 @@ import { StatusText } from "../ui/StatusText";
  *
  * Every mesh belongs to the nearest MOVING joint above it (a palm, under a fixed joint, belongs
  * to the wrist yaw). That one mapping drives hover, selection highlight and temperature colour.
+ *
+ * THE GHOST: while the page moves a joint, a translucent copy of what hangs from that joint (the
+ * forearm and hand, for an elbow) shows where it was told to go. The solid model is always the
+ * robot's own reading, so the gap between the two is the move still to come.
  */
 
 /** A joint's range in the model, radians. */
@@ -47,6 +51,8 @@ interface Props {
   showTilt: boolean;
   /** Called once the model is loaded, with each moving joint's range from the URDF. */
   onLimits?: (limits: JointLimits) => void;
+  /** Targets by URDF joint name, drawn as the ghost; null or empty hides it. */
+  ghost?: Record<string, number> | null;
 }
 
 const MODEL_URL = `${import.meta.env.BASE_URL}g1/g1.urdf`;
@@ -56,6 +62,7 @@ const COLORS = {
   gridMajor: "#262a36",
   gridMinor: "#1a1d26",
   selected: new Color("#60a5fa"),
+  ghost: new Color("#60a5fa"),
   hovered: new Color("#8b90a0"),
   none: new Color(0x000000),
   temp: {
@@ -74,6 +81,9 @@ interface Part {
 
 interface Model {
   robot: URDFRobot;
+  ghost: URDFRobot;
+  /** Each ghost mesh with every joint above it: it is drawn only below a joint being moved. */
+  ghostMeshes: { mesh: Mesh; above: Set<string> }[];
   /** urdf joint name -> the meshes it moves directly. */
   parts: Map<string, Part[]>;
   meshes: Mesh[];
@@ -89,7 +99,7 @@ function owningJoint(obj: Object3D | null): string | null {
 }
 
 export function RobotViewer({
-  frame, selected, hovered, onHover, onSelect, colorByTemp, showTilt, onLimits,
+  frame, selected, hovered, onHover, onSelect, colorByTemp, showTilt, onLimits, ghost,
 }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const modelRef = useRef<Model | null>(null);
@@ -150,12 +160,19 @@ export function RobotViewer({
     scene.add(upright);
 
     let disposed = false;
-    const manager = new LoadingManager();
-    const loader = new URDFLoader(manager);
+    const loader = new URDFLoader();
     loader.parseCollision = false;
     let robot: URDFRobot | null = null;
-    manager.onLoad = () => {
-      if (disposed || !robot) return;
+    // Completion is counted HERE, not by a LoadingManager. three's FileLoader shares a download
+    // already in flight with a second loader WITHOUT telling that loader's manager, so after a
+    // quick remount (React's development double-mount, or leaving the page and coming straight
+    // back) the new manager saw only the URDF, reported "done" with no meshes in the robot, and
+    // the model was stood on the grid at y = -Infinity: an empty scene (2026-10-14).
+    let pending = 0;
+    let finished = false;
+    const finish = () => {
+      if (disposed || finished || !robot || pending > 0) return;
+      finished = true;
       const parts = new Map<string, Part[]>();
       const meshes: Mesh[] = [];
       robot.traverse((o) => {
@@ -184,15 +201,52 @@ export function RobotViewer({
       // Stand the robot on the grid: lowest point at y = 0, in its zero pose.
       upright.updateMatrixWorld(true);
       upright.position.y = -new Box3().setFromObject(upright).min.y;
-      modelRef.current = { robot, parts, meshes };
+      // The ghost: same geometry (shared, not copied), one see-through material, not pickable.
+      const ghostRobot = robot.clone() as URDFRobot;
+      const ghostMaterial = new MeshStandardMaterial({
+        color: COLORS.ghost, transparent: true, opacity: 0.28, depthWrite: false,
+        emissive: COLORS.ghost, emissiveIntensity: 0.35,
+      });
+      const ghostMeshes: Model["ghostMeshes"] = [];
+      ghostRobot.traverse((o) => {
+        const mesh = o as Mesh;
+        if (!mesh.isMesh) return;
+        mesh.material = ghostMaterial;
+        const above = new Set<string>();
+        for (let a: Object3D | null = mesh; a; a = a.parent)
+          if ((a as URDFJoint).isURDFJoint) above.add(a.name);
+        ghostMeshes.push({ mesh, above });
+      });
+      for (const j of Object.values(ghostRobot.joints)) j.ignoreLimits = true;
+      ghostRobot.visible = false;
+      upright.add(ghostRobot);
+      modelRef.current = { robot, ghost: ghostRobot, ghostMeshes, parts, meshes };
       setLoaded(true);
     };
-    manager.onError = (url) => setLoadError(`Could not load ${url}`);
+    loader.loadMeshCb = (path, manager, done) => {
+      pending += 1;
+      new STLLoader(manager).load(
+        path,
+        (geometry) => {
+          done(new Mesh(geometry, new MeshStandardMaterial()));
+          pending -= 1;
+          finish();
+        },
+        undefined,
+        (err) => {
+          setLoadError(`Could not load ${path}`);
+          done(new Group(), err as Error);
+          pending -= 1;
+          finish();
+        },
+      );
+    };
     loader.load(
       MODEL_URL,
       (r) => {
         robot = r;
         upright.add(r);
+        finish();
       },
       undefined,
       (e) => setLoadError(`Could not load the robot model: ${e}`),
@@ -273,19 +327,28 @@ export function RobotViewer({
     };
   }, []);
 
-  // ---- pose: joint angles and body tilt ----
+  // ---- pose: joint angles and body tilt, then the ghost on top ----
   useEffect(() => {
     const model = modelRef.current;
     if (!model || !frame) return;
+    const showGhost = !!ghost && Object.keys(ghost).length > 0;
     for (const j of JOINTS) {
       const r = readJoint(frame, j);
-      if (r) model.robot.joints[j.urdf]?.setJointValue(r.q);
+      if (!r) continue;
+      model.robot.joints[j.urdf]?.setJointValue(r.q);
+      if (showGhost) model.ghost.joints[j.urdf]?.setJointValue(ghost[j.urdf] ?? r.q);
     }
     const [roll, pitch] = showTilt && frame.imu ? frame.imu : [0, 0];
     // ZYX is ROS's rpy convention (R = Rz·Ry·Rx), with yaw left out on purpose: heading is not
     // what this page is about, and spinning the model would fight the camera.
     model.robot.rotation.set(roll, pitch, 0, "ZYX");
-  }, [frame, showTilt, loaded]);
+    model.ghost.rotation.copy(model.robot.rotation);
+    model.ghost.visible = showGhost;
+    if (showGhost) {
+      const moving = Object.keys(ghost);
+      for (const g of model.ghostMeshes) g.mesh.visible = moving.some((j) => g.above.has(j));
+    }
+  }, [frame, showTilt, ghost, loaded]);
 
   // ---- colour: temperature, then hover and selection on top ----
   useEffect(() => {

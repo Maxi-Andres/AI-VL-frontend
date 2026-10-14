@@ -42,6 +42,10 @@ export const WS_VIEW_H264_URL = wsUrl("/ws/view-h264");
 /** The G1's joint state for the Joints page, read-only (backend -> executor -> relay). */
 export const WS_JOINTS_URL = wsUrl("/ws/joints?robot=g1");
 
+/** Moving the G1's arm joints from the Joints page. A separate socket from the read-only one
+ * above, so that watching can never move anything; closing it releases the arms. */
+export const WS_JOINT_CONTROL_URL = wsUrl("/ws/joint-control?robot=g1");
+
 /**
  * WebRTC (WHEP) endpoint for the robot camera, e.g. "http://192.168.20.99:8889/robot/whep".
  *

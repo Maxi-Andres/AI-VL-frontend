@@ -1,0 +1,181 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { WS_JOINT_CONTROL_URL } from "../config";
+import { describeEvent } from "../lib/jointControl";
+
+/**
+ * Moving the G1's arm joints from the Joints page: /ws/joint-control on the backend, which
+ * passes each op through the executor to the relay and g1_joint_sender on the robot.
+ *
+ * Every limit lives on the robot (robot-command-relay/src/joint_ctl_core.hpp): which joints,
+ * how far, how fast, the weight ramps, the dead-man. This hook only names targets and keeps
+ * the session alive:
+ *
+ *   - the socket opens on "Take control" and closes after the release; closing it for ANY
+ *     reason (tab closed, page left, network gone) makes the backend release the arms;
+ *   - a keepalive every KEEPALIVE_MS proves the page is still here — without one for ~1 s the
+ *     robot freezes the arm, and after ~5 s it hands it back;
+ *   - a dragged slider sends at most one target per TARGET_MIN_MS, always the newest.
+ */
+export type ControlPhase = "off" | "taking" | "up" | "active" | "down";
+
+export interface JointControlState {
+  phase: ControlPhase;
+  /** The arm_sdk weight the robot reports: 0 = its own controller, 1 = this page. */
+  weight: number;
+  /** URDF joint names this session may move (the relay's JOINT_CTL_ALLOW). */
+  allowed: string[];
+  /** The last thing worth telling the operator: a refusal, an error, a release reason. */
+  message: string | null;
+  messageTone: "ok" | "warn" | "error";
+}
+
+export interface JointControl extends JointControlState {
+  take: () => void;
+  release: () => void;
+  target: (urdf: string, rad: number) => void;
+}
+
+const KEEPALIVE_MS = 250;
+const TARGET_MIN_MS = 100;
+
+interface Reply {
+  op?: string;
+  status?: number;
+  ok?: boolean;
+  state?: string;
+  w?: number;
+  allowed?: string[];
+  error?: string;
+  reply?: string;
+  event?: string | null;
+}
+
+const PHASES: Record<string, ControlPhase> = {
+  idle: "up", up: "up", active: "active", down: "down", done: "down", off: "off",
+};
+
+const OFF: JointControlState = {
+  phase: "off", weight: 0, allowed: [], message: null, messageTone: "ok",
+};
+
+export function useJointControl(): JointControl {
+  const [state, setState] = useState<JointControlState>(OFF);
+  const ws = useRef<WebSocket | null>(null);
+  const phase = useRef<ControlPhase>("off");
+  const pendingTarget = useRef<{ joint: string; q: number } | null>(null);
+  const lastTargetAt = useRef(0);
+  const targetTimer = useRef<number | null>(null);
+
+  const update = useCallback((patch: Partial<JointControlState>) => {
+    if (patch.phase) phase.current = patch.phase;
+    setState((s) => ({ ...s, ...patch }));
+  }, []);
+
+  const send = (msg: object) => {
+    const s = ws.current;
+    if (s && s.readyState === WebSocket.OPEN) s.send(JSON.stringify(msg));
+  };
+
+  const close = useCallback(() => {
+    const s = ws.current;
+    ws.current = null;
+    if (targetTimer.current !== null) window.clearTimeout(targetTimer.current);
+    targetTimer.current = null;
+    pendingTarget.current = null;
+    s?.close();
+  }, []);
+
+  const onReply = useCallback((r: Reply) => {
+    const event = r.event ? describeEvent(r.event) : null;
+    if (r.op === "take" && !r.ok) {
+      update({ ...OFF, message: r.reply ?? r.error ?? "The robot refused", messageTone: "error" });
+      close();
+      return;
+    }
+    const next = r.state ? PHASES[r.state] : undefined;
+    if (next === "off" || (r.status === 409 && r.error === "no control session")) {
+      update({
+        ...OFF,
+        message: event ?? "Released.",
+        messageTone: event && event !== "Released." ? "warn" : "ok",
+      });
+      close();
+      return;
+    }
+    const patch: Partial<JointControlState> = {};
+    if (next) patch.phase = next;
+    if (typeof r.w === "number") patch.weight = r.w;
+    if (r.op === "take" && r.allowed) {
+      patch.allowed = r.allowed.map((j) => `${j}_joint`);
+      patch.message = null;
+    }
+    if (!r.ok && r.op !== "keepalive") {
+      patch.message = r.reply ?? r.error ?? "Refused";
+      patch.messageTone = "error";
+    } else if (event && next === "down") {
+      patch.message = event;
+      patch.messageTone = "warn";              // a release the operator did not ask for
+    }
+    update(patch);
+  }, [close, update]);
+
+  const take = useCallback(() => {
+    if (phase.current !== "off") return;
+    update({ ...OFF, phase: "taking" });
+    const s = new WebSocket(WS_JOINT_CONTROL_URL);
+    ws.current = s;
+    s.onopen = () => s.send(JSON.stringify({ op: "take" }));
+    s.onmessage = (ev) => {
+      try {
+        onReply(JSON.parse(String(ev.data)) as Reply);
+      } catch {
+        /* a malformed reply changes nothing */
+      }
+    };
+    s.onclose = () => {
+      if (ws.current !== s) return;           // closed on purpose
+      ws.current = null;
+      if (phase.current !== "off") {
+        update({
+          ...OFF,
+          message: "Control link lost: the robot is taking the arm back by itself.",
+          messageTone: "warn",
+        });
+      }
+    };
+  }, [onReply, update]);
+
+  const release = useCallback(() => send({ op: "release" }), []);
+
+  const flushTarget = useCallback(() => {
+    targetTimer.current = null;
+    const t = pendingTarget.current;
+    if (!t) return;
+    pendingTarget.current = null;
+    lastTargetAt.current = performance.now();
+    send({ op: "target", joint: t.joint, q: t.q });
+  }, []);
+
+  const target = useCallback((urdf: string, rad: number) => {
+    if (phase.current !== "up" && phase.current !== "active") return;
+    pendingTarget.current = { joint: urdf.replace(/_joint$/, ""), q: rad };
+    const wait = TARGET_MIN_MS - (performance.now() - lastTargetAt.current);
+    if (wait <= 0) flushTarget();
+    else if (targetTimer.current === null)
+      targetTimer.current = window.setTimeout(flushTarget, wait);
+  }, [flushTarget]);
+
+  // Keepalive while a session exists, including the hand-back ramp: its replies are also how
+  // the page learns the ramp has finished.
+  const live = state.phase === "up" || state.phase === "active" || state.phase === "down";
+  useEffect(() => {
+    if (!live) return;
+    const id = window.setInterval(() => send({ op: "keepalive" }), KEEPALIVE_MS);
+    return () => window.clearInterval(id);
+  }, [live]);
+
+  // Leaving the page closes the socket, and the backend releases the arms.
+  useEffect(() => close, [close]);
+
+  return { ...state, take, release, target };
+}

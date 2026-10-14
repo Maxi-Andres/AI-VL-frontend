@@ -2,16 +2,21 @@
  * The G1's joints as the robot reports them, mapped onto the 3D model the Joints page draws.
  *
  * Two orders meet here and this file is the only place that knows both:
- *   - the SDK's: motor_state[0..28] of rt/lowstate, and motor_state[0..6] of each Dex3 hand —
- *     what g1_joint_bridge (robot-command-relay) sends, as plain arrays;
- *   - the URDF's: joint NAMES in public/g1/g1.urdf (g1_29dof_lock_waist_with_hand_rev_1_0,
- *     the variant that matches this robot's mode_machine 6 — see scripts/build_g1_model.py).
+ *   - the SDK's: motor_state[0..28] of rt/lowstate — what g1_joint_bridge (robot-command-relay)
+ *     sends, as plain arrays;
+ *   - the URDF's: joint NAMES in public/g1/g1.urdf (the lock-waist body that matches this
+ *     robot's mode_machine 6, with Inspire hands — see scripts/build_g1_model.py).
  *
  * BODY order is the SDK's G1 29-DoF order, the same table the telemetry reader uses for its
- * Splunk fields (robot-telemetry-agent/src/g1_telemetry_reader.cpp). HAND order follows the
- * SDK's Dex3 example: its per-motor limits line up with the URDF's thumb_0..2, middle_0..1,
- * index_0..1 (middle and index have identical limits, so those two pairs are confirmed only
- * once a real hand is watched moving — step J1 of .claude/roadmap/G1-CONTROL-ARTICULAR.md).
+ * Splunk fields (robot-telemetry-agent/src/g1_telemetry_reader.cpp).
+ *
+ * HANDS: five-finger Inspire hands (seen on the robot 2026-10-14), 6 motors each; the URDF's
+ * other finger joints are `mimic` joints that follow these. No reading reaches the page yet: an
+ * Inspire hand is driven by its own service, not by the robot's firmware, and none was seen
+ * running (topic list read 2026-10-13). Until step J4 wires it
+ * (.claude/roadmap/G1-CONTROL-ARTICULAR.md) the bridge sends no hand and the fingers are drawn
+ * at rest. The robot also lists rt/dex3/* (the three-finger Dex3-1's topics) with a publisher;
+ * what publishes them is not checked yet, and they do not describe these hands.
  */
 
 export const BODY_JOINTS = [
@@ -26,8 +31,10 @@ export const BODY_JOINTS = [
   "right_wrist_roll", "right_wrist_pitch", "right_wrist_yaw",
 ] as const;
 
+/** The Inspire hand's six motors, by their URDF names (prefixed L_ / R_ in the model). */
 export const HAND_JOINTS = [
-  "thumb_0", "thumb_1", "thumb_2", "middle_0", "middle_1", "index_0", "index_1",
+  "thumb_proximal_yaw", "thumb_proximal_pitch", "index_proximal", "middle_proximal",
+  "ring_proximal", "pinky_proximal",
 ] as const;
 
 /** Waist roll and pitch exist in the SDK's order but not as motors on this robot: it is the
@@ -71,8 +78,8 @@ export const JOINTS: JointRef[] = [
   })),
   ...(["left", "right"] as const).flatMap((side) =>
     HAND_JOINTS.map((name, index) => ({
-      urdf: `${side}_hand_${name}_joint`,
-      label: name.replace("_", " "),
+      urdf: `${side === "left" ? "L" : "R"}_${name}_joint`,
+      label: name.replace(/_proximal/, "").replace(/_/g, " "),
       source: side,
       index,
       group: (side === "left" ? "Left hand" : "Right hand") as JointGroup,

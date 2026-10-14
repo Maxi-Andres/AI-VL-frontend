@@ -142,7 +142,9 @@ export const DEPLOY: Record<RobotModel, RobotDeploy> = {
               "(2026-10-01): add G1_WAIST_LOCK=1 on the first pull after that date. " +
               "Clamps 1.2 / 0.5 / 1.2 (MAX_* in relay.env). First-time step 6. " +
               "Since 2026-10-13 build.sh also builds g1_joint_bridge, the read-only joint " +
-              "state behind the Joints page; the relay starts it only while someone watches.",
+              "state behind the Joints page; the relay starts it only while someone watches. " +
+              "Since 2026-10-14 also g1_joint_sender, which moves an elbow when the page " +
+              "takes control (rt/arm_sdk, robot standing in Walk); it runs only until release.",
       },
       {
         unit: "robot-video",

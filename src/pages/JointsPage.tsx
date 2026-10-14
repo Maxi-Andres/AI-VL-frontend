@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ControlPanel } from "../components/joints/ControlPanel";
 import {
   JointInspector,
   JointTable,
@@ -7,18 +8,21 @@ import {
   TiltPanel,
 } from "../components/joints/JointPanels";
 import { RobotViewer, type JointLimits } from "../components/joints/RobotViewer";
-import { useJointSource, type JointSourceKind } from "../hooks/useJointSource";
+import { useJointControl } from "../hooks/useJointControl";
+import { STALE_AGE_MS, useJointSource, type JointSourceKind } from "../hooks/useJointSource";
+import { JOINT_BY_URDF, readJoint } from "../lib/g1Joints";
 
 /**
- * Joints — the G1 in 3D, posed live from its own joint readings. READ-ONLY.
+ * Joints — the G1 in 3D, posed live from its own joint readings, and (step J2 of
+ * .claude/roadmap/G1-CONTROL-ARTICULAR.md) one elbow moved from here.
  *
- * Step J1 of .claude/roadmap/G1-CONTROL-ARTICULAR.md: before any joint is moved from here,
- * the drawing has to be proven to BE the robot — every joint the right one, turning the right
- * way. With the robot off, "Recorded walk" replays a real walk for the same check. The legs
- * panel is the other job of this step: reading joint zeros with the robot hung, which is the
- * suspect behind it leaning back (.claude/roadmap/G1.md §6.4).
+ * Watching is read-only and always on (/ws/joints). Moving is a separate session the operator
+ * opens with "Take control" (/ws/joint-control): every limit lives on the robot, in
+ * g1_joint_sender; this page only names targets. The solid model is always the robot's own
+ * reading; the translucent ghost is where it was told to go.
  *
- * G1 only: the Go2 has no joint stream (the relay serves it on the G1 alone).
+ * With the robot off, "Recorded walk" replays a real walk — and nothing can be taken.
+ * G1 only: the Go2 has neither stream (the relay serves them on the G1 alone).
  */
 export function JointsPage() {
   // /joints#replay opens straight on the recording: the link to share when the robot is off.
@@ -26,11 +30,51 @@ export function JointsPage() {
     location.hash === "#replay" ? "replay" : "live",
   );
   const source = useJointSource(kind);
+  const control = useJointControl();
   const [selected, setSelected] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const [colorByTemp, setColorByTemp] = useState(true);
   const [showTilt, setShowTilt] = useState(true);
   const [limits, setLimits] = useState<JointLimits | null>(null);
+  const [origin, setOrigin] = useState<Record<string, number>>({});
+  const [goals, setGoals] = useState<Record<string, number>>({});
+
+  const frameRef = useRef(source.frame);
+  useEffect(() => {
+    frameRef.current = source.frame;
+  });
+
+  // The moment control is granted, every movable joint's target is where it IS — the same
+  // rule the robot applies — so the ghost starts on top of the real arm and nothing jumps.
+  const steering = control.phase === "up" || control.phase === "active";
+  const allowedKey = control.allowed.join(",");
+  useEffect(() => {
+    if (!steering) {
+      setOrigin({});
+      setGoals({});
+      return;
+    }
+    const at: Record<string, number> = {};
+    for (const urdf of allowedKey.split(",").filter(Boolean)) {
+      const ref = JOINT_BY_URDF.get(urdf);
+      const r = ref ? readJoint(frameRef.current, ref) : null;
+      if (r) at[urdf] = r.q;
+    }
+    setOrigin((o) => (Object.keys(o).length ? o : at));
+    setGoals((g) => (Object.keys(g).length ? g : at));
+  }, [steering, allowedKey]);
+
+  const onGoal = (urdf: string, rad: number) => {
+    setGoals((g) => ({ ...g, [urdf]: rad }));
+    control.target(urdf, rad);
+  };
+
+  const fresh = !!source.frame && source.frame.ageMs >= 0 && source.frame.ageMs < STALE_AGE_MS;
+  const cannotTakeWhy = kind !== "live"
+    ? "Switch the source to Live robot to move it."
+    : source.link !== "live" || !fresh
+      ? "Waiting for live joint readings from the robot."
+      : null;
 
   return (
     <main className="grid gap-3 p-3 lg:h-[calc(100dvh-49px)] lg:grid-cols-[minmax(0,1fr)_380px]">
@@ -44,10 +88,28 @@ export function JointsPage() {
           colorByTemp={colorByTemp}
           showTilt={showTilt}
           onLimits={setLimits}
+          ghost={steering ? goals : null}
         />
       </div>
       <aside className="grid min-w-0 content-start gap-3 lg:overflow-y-auto lg:pr-1">
-        <SourcePanel kind={kind} onKind={setKind} state={source} />
+        <SourcePanel
+          kind={kind}
+          onKind={setKind}
+          state={source}
+          locked={control.phase !== "off"}
+        />
+        <ControlPanel
+          control={control}
+          canTake={cannotTakeWhy === null}
+          cannotTakeWhy={cannotTakeWhy}
+          selected={selected}
+          frame={source.frame}
+          limits={limits}
+          origin={origin}
+          goals={goals}
+          onGoal={onGoal}
+          onSelect={setSelected}
+        />
         <JointInspector urdf={hovered ?? selected} frame={source.frame} limits={limits} />
         <TiltPanel frame={source.frame} showTilt={showTilt} onShowTilt={setShowTilt} />
         <LegCheckPanel frame={source.frame} />

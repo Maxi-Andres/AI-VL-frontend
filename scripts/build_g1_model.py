@@ -6,10 +6,16 @@ mesh set is ~100 MB and the variant we draw uses 31 MB of it — too heavy for a
 be opened over LTE. This keeps the VISUAL geometry only (collision meshes are for physics, the
 page never uses them) and decimates every mesh to a face budget, so the result is a few MB.
 
-WHICH VARIANT: it must match the robot's `mode_machine`, or the drawn joints are not the
-robot's joints. Ours reports mode_machine 6 (read off rt/lf/lowstate by the telemetry reader on
-2026-10-13), which g1_description's README maps to `g1_29dof_lock_waist_with_hand_rev_1_0`:
-29 DoF with waist roll and pitch FIXED, plus the two Dex3-1 hands (7 joints each).
+WHICH VARIANT: it must match the robot, or the drawn joints are not the robot's joints.
+  - The BODY follows `mode_machine`. Ours reports 6 (read off rt/lf/lowstate by the telemetry
+    reader on 2026-10-13), which g1_description's README maps to the lock-waist 29-DoF body:
+    waist roll and pitch FIXED.
+  - The HANDS are not in mode_machine. Ours are Inspire five-finger hands (seen on the robot,
+    2026-10-14), not the three-finger Dex3-1 that the lock-waist file ships with. The DFQ model
+    is the one the LuckyEngine project adapted for this robot's simulation.
+g1_description has no lock-waist file with Inspire hands, so this takes the Inspire one and
+fixes the two waist joints itself — the two bodies are otherwise identical (every other joint's
+type and origin compared equal, 2026-10-14).
 
 Run once, by hand, whenever the source package changes (needs: pip install trimesh
 fast-simplification numpy):
@@ -24,7 +30,9 @@ import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-VARIANT = "g1_29dof_lock_waist_with_hand_rev_1_0"
+VARIANT = "g1_29dof_rev_1_0_with_inspire_hand_DFQ"
+# The lock-waist body (mode_machine 6): these have no motor on this robot.
+LOCKED = ("waist_roll_joint", "waist_pitch_joint")
 # Faces kept per mesh. The torso and pelvis are the largest source meshes (~100k faces); a
 # budget this size keeps every silhouette recognisable at the size the page draws them.
 FACE_BUDGET = 2000
@@ -61,6 +69,12 @@ def main() -> int:
     for link in root.findall("link"):
         for col in link.findall("collision"):
             link.remove(col)
+    for name in LOCKED:
+        joint = root.find(f"joint[@name='{name}']")
+        if joint is None:
+            print(f"error: {name} not in {src_urdf.name}", file=sys.stderr)
+            return 1
+        joint.set("type", "fixed")
 
     if OUT.exists():
         shutil.rmtree(OUT / "meshes", ignore_errors=True)
