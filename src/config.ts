@@ -39,6 +39,9 @@ export const WS_VIEW_URL = wsUrl("/ws/view");
  */
 export const WS_VIEW_H264_URL = wsUrl("/ws/view-h264");
 
+/** The G1's joint state for the Joints page, read-only (backend -> executor -> relay). */
+export const WS_JOINTS_URL = wsUrl("/ws/joints?robot=g1");
+
 /**
  * WebRTC (WHEP) endpoint for the robot camera, e.g. "http://192.168.20.99:8889/robot/whep".
  *

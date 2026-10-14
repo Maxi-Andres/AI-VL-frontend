@@ -19,8 +19,11 @@ speak, with wake-word). The Live page picks its own video source — "My camera"
 "Robot camera", or "View only", the last being a read-only mirror of whatever the
 session is streaming (this replaced the old separate `/monitor` page).
 Routes: `/` (live), `/drive` (robot drive pad), `/robot` (on-robot config),
-`/video` (live video tuning). There is no `/about` since 2026-10-07: its only live fact, the
-backend URL, is on the Robot page. It talks **only** to the backend — it never knows the iacore service
+`/video` (live video tuning), `/joints` (the G1 in 3D, posed live from its joint state —
+read-only; `#replay` opens it on a recorded walk). The 3D model in `public/g1/` is built by
+`scripts/build_g1_model.py` from Unitree's g1_description; do not hand-edit it.
+There is no `/about` since 2026-10-07: its only live fact, the backend URL, is on the Robot
+page. It talks **only** to the backend — it never knows the iacore service
 exists.
 
 ## Toolchain
