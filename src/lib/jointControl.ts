@@ -40,11 +40,18 @@ export function targetRange(
 export const GHOST_MIN_RAD = (2 * Math.PI) / 180;
 
 /**
- * What a release event from the robot means to the operator: "releasing <why>" when the
- * hand-back ramp starts, "released <why>" when it ends. Null when there is nothing to add — an
+ * What an event from the robot means to the operator: "stall <joint>" when a joint gave up
+ * pushing (rule 8 of joint_ctl_core.hpp); "releasing <why>" when the hand-back ramp starts,
+ * "released <why>" when it ends. Null when there is nothing to add — an
  * asked-for release in progress already shows as "Handing the arms back".
  */
 export function describeEvent(event: string): string | null {
+  const stall = /^stall (\S+)/.exec(event);
+  if (stall) {
+    const joint = stall[1].replace(/_/g, " ");
+    return `${joint[0].toUpperCase()}${joint.slice(1)} pushed against something: it stopped ` +
+      "where it was.";
+  }
   const m = /^(releasing|released) (\S+)/.exec(event);
   if (!m) return null;
   const done = m[1] === "released";

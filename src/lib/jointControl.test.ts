@@ -28,5 +28,8 @@ describe("describeEvent", () => {
     expect(describeEvent("released deadman")).toMatch(/^Released: nothing arrived/);
     expect(describeEvent("releasing fsm_1")).toBe("Releasing: the robot left Walk (mode 1).");
     expect(describeEvent("state active")).toBeNull();
+    expect(describeEvent("stall left_shoulder_pitch")).toBe(
+      "Left shoulder pitch pushed against something: it stopped where it was.",
+    );
   });
 });

@@ -121,6 +121,9 @@ export function useJointControl(): JointControl {
     if (!r.ok && r.op !== "keepalive") {
       patch.message = r.reply ?? r.error ?? "Refused";
       patch.messageTone = "error";
+    } else if (event && r.event?.startsWith("stall ")) {
+      patch.message = event;
+      patch.messageTone = "warn";
     } else if (event && next === "down") {
       patch.message = event;
       patch.messageTone = "warn";              // a release the operator did not ask for
