@@ -3,6 +3,7 @@ import type { JointControl } from "../../hooks/useJointControl";
 import {
   GROUPS,
   HAND_JOINTS,
+  HAND_REST_POS,
   JOINT_BY_URDF,
   deg,
   readJoint,
@@ -140,8 +141,13 @@ export function ControlPanel({
   const inSession = control.phase !== "off" && control.phase !== "taking";
   const steering = control.phase === "up" || control.phase === "active";
   const rows = joints.filter((j) => goals[j] !== undefined && origin[j] !== undefined);
-  const setHand = (fingers: string[], closed: boolean) => {
-    for (const j of fingers) onGoal(j, closed ? fingerUpper(j) : 0);
+  // Open = 0, Close = fully closed, Relax = the posture the hands power up in.
+  const setHand = (fingers: string[], to: "open" | "relax" | "close") => {
+    for (const j of fingers) {
+      const i = JOINT_BY_URDF.get(j)?.index ?? 0;
+      const share = to === "open" ? 0 : to === "close" ? 1 : HAND_REST_POS[i] / 1000;
+      onGoal(j, share * fingerUpper(j));
+    }
   };
 
   return (
@@ -165,7 +171,7 @@ export function ControlPanel({
             Moves the arms and the waist through the robot's arm channel while its own
             controller keeps it balanced. The robot must be standing still in Walk. Keep the
             remote in hand: an arm can reach the body, and the robot backs a joint off if it
-            pushes against something.
+            pushes against something. Releasing also sends each hand back to where it was.
           </p>
           <Button
             type="button"
@@ -194,9 +200,11 @@ export function ControlPanel({
                       {hand && (
                         <span className="flex gap-1">
                           <button type="button" className={quick}
-                            onClick={() => setHand(inGroup, false)}>Open</button>
+                            onClick={() => setHand(inGroup, "open")}>Open</button>
                           <button type="button" className={quick}
-                            onClick={() => setHand(inGroup, true)}>Close</button>
+                            onClick={() => setHand(inGroup, "relax")}>Relax</button>
+                          <button type="button" className={quick}
+                            onClick={() => setHand(inGroup, "close")}>Close</button>
                         </span>
                       )}
                     </div>

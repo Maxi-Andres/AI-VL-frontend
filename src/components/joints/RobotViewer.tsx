@@ -13,6 +13,7 @@ import {
   Raycaster,
   Scene,
   Vector2,
+  Vector3,
   WebGLRenderer,
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
@@ -31,6 +32,11 @@ import { StatusText } from "../ui/StatusText";
  *
  * Every mesh belongs to the nearest MOVING joint above it (a palm, under a fixed joint, belongs
  * to the wrist yaw). That one mapping drives hover, selection highlight and temperature colour.
+ *
+ * VIEWS: the whole robot, or close on one hand — the camera then follows that hand as the arm
+ * moves. The hands are a few dozen pixels in the whole-robot view, and the robot's left hand is
+ * on the RIGHT of the screen when it faces the camera: both made a moving finger easy to miss
+ * (2026-10-15), so the buttons say "Robot's left hand", not "Left".
  *
  * THE GHOST: while the page moves a joint, a translucent copy of what hangs from that joint (the
  * forearm and hand, for an elbow) shows where it was told to go. The solid model is always the
@@ -56,6 +62,16 @@ interface Props {
 }
 
 const MODEL_URL = `${import.meta.env.BASE_URL}g1/g1.urdf`;
+
+type View = "robot" | "left" | "right";
+const VIEWS: { id: View; label: string }[] = [
+  { id: "robot", label: "Whole robot" },
+  { id: "left", label: "Robot's left hand" },
+  { id: "right", label: "Robot's right hand" },
+];
+const HOME = { camera: new Vector3(2.3, 1.2, 1.3), target: new Vector3(0, 0.75, 0) };
+/** How far the camera sits from a hand it is looking at, metres. */
+const HAND_DISTANCE = 0.45;
 
 const COLORS = {
   background: "#0e0f13",
@@ -105,6 +121,10 @@ export function RobotViewer({
   const modelRef = useRef<Model | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [view, setView] = useState<View>("robot");
+  const viewRef = useRef<View>("robot");
+  // Set by the scene effect: points the camera for a view (and follows a hand each frame).
+  const aimRef = useRef<(v: View) => void>(() => {});
   // Latest callbacks for the listeners registered once in the setup effect.
   const cb = useRef({ onHover, onSelect, onLimits });
   useEffect(() => {
@@ -125,8 +145,8 @@ export function RobotViewer({
     const grid = new GridHelper(4, 16, COLORS.gridMajor, COLORS.gridMinor);
     scene.add(grid);
 
-    const camera = new PerspectiveCamera(35, 1, 0.05, 50);
-    camera.position.set(2.3, 1.2, 1.3);
+    const camera = new PerspectiveCamera(35, 1, 0.02, 50);
+    camera.position.copy(HOME.camera);
     const renderer = new WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     host.appendChild(renderer.domElement);
@@ -134,9 +154,9 @@ export function RobotViewer({
     renderer.domElement.style.touchAction = "none";
 
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(0, 0.75, 0);
+    controls.target.copy(HOME.target);
     controls.enableDamping = true;
-    controls.minDistance = 0.4;
+    controls.minDistance = 0.15;
     controls.maxDistance = 6;
     controls.update();
 
@@ -296,9 +316,41 @@ export function RobotViewer({
     el.addEventListener("pointerup", onUp);
     el.addEventListener("pointerleave", onLeave);
 
+    // Views. A hand view puts the camera HAND_DISTANCE from the hand along the current viewing
+    // direction, then keeps the hand centred as it moves (camera and target shift together, so
+    // orbiting and zooming still work while following).
+    const handPoint = (side: "left" | "right") => {
+      const link = modelRef.current?.robot.links[`${side}_base_link`];
+      return link ? link.getWorldPosition(new Vector3()) : null;
+    };
+    aimRef.current = (v: View) => {
+      if (v === "robot") {
+        camera.position.copy(HOME.camera);
+        controls.target.copy(HOME.target);
+        controls.update();
+        return;
+      }
+      const p = handPoint(v);
+      if (!p) return;
+      const dir = camera.position.clone().sub(controls.target).normalize();
+      controls.target.copy(p);
+      camera.position.copy(p).addScaledVector(dir, HAND_DISTANCE);
+      controls.update();
+    };
+    const follow = () => {
+      const v = viewRef.current;
+      if (v === "robot") return;
+      const p = handPoint(v);
+      if (!p) return;
+      const shift = p.clone().sub(controls.target);
+      controls.target.add(shift);
+      camera.position.add(shift);
+    };
+
     let raf = 0;
     const loop = () => {
       raf = requestAnimationFrame(loop);
+      follow();
       controls.update();
       renderer.render(scene, camera);
     };
@@ -377,6 +429,27 @@ export function RobotViewer({
       {loadError && (
         <div className="absolute inset-0 grid place-items-center p-4 text-sm text-[#ff9aa6]">
           <StatusText status={{ tone: "error", text: loadError }} />
+        </div>
+      )}
+      {loaded && (
+        <div className="absolute right-2 top-2 flex gap-1 rounded-md border border-line bg-bg/80 p-0.5">
+          {VIEWS.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              aria-pressed={view === v.id}
+              onClick={() => {
+                viewRef.current = v.id;
+                setView(v.id);
+                aimRef.current(v.id);
+              }}
+              className={`cursor-pointer rounded px-2 py-1 text-xs ${
+                view === v.id ? "bg-[#2a2e3a] font-semibold text-fg" : "text-muted hover:text-fg"
+              }`}
+            >
+              {v.label}
+            </button>
+          ))}
         </div>
       )}
       <p className="pointer-events-none absolute bottom-2 left-3 m-0 text-[11px] text-muted">

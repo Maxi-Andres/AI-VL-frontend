@@ -41,6 +41,10 @@ export const HAND_JOINTS = [
   { urdf: "pinky_proximal", label: "pinky", upper: 1.4661 },
 ] as const;
 
+/** The relaxed hand: where both hands sat after power-on, read 2026-10-15 (thumbs at ~40%, the
+ * other fingers at ~5%) — what the panel's "Relax" sends, in the hand's 0..1000. */
+export const HAND_REST_POS = [400, 400, 50, 50, 50, 50] as const;
+
 /** A finger position as the hand reports it (0 open .. 1000 closed) -> its URDF angle. */
 export function fingerAngle(pos: number, upper: number): number {
   return (Math.min(1000, Math.max(0, pos)) / 1000) * upper;
