@@ -1,7 +1,14 @@
 import { IconArrowBackUp, IconHandStop, IconMinus, IconPlus } from "@tabler/icons-react";
 import type { JointControl } from "../../hooks/useJointControl";
-import { GROUPS, JOINT_BY_URDF, deg, readJoint, type JointFrame } from "../../lib/g1Joints";
-import { targetRange } from "../../lib/jointControl";
+import {
+  GROUPS,
+  HAND_JOINTS,
+  JOINT_BY_URDF,
+  deg,
+  readJoint,
+  type JointFrame,
+} from "../../lib/g1Joints";
+import { isFinger, targetRange } from "../../lib/jointControl";
 import { Button } from "../ui/Button";
 import { StatusText, type Status } from "../ui/StatusText";
 import { Section } from "./JointPanels";
@@ -9,7 +16,8 @@ import type { JointLimits } from "./RobotViewer";
 
 /**
  * "Move" — take the arms from the robot's own controller and move any joint the robot allows
- * (since J3: every arm joint and the waist yaw, over their full range). One row per joint,
+ * (since J3: every arm joint and the waist yaw, over their full range; since J4 the fingers of
+ * each BrainCo hand that is answering, shown as % closed). One row per joint,
  * grouped like the joint list; the selected joint — clicked here or on the robot — is the
  * highlighted row. Presentational: the page owns the session, the targets and the selection.
  *
@@ -36,6 +44,12 @@ function phaseStatus(c: JointControl): Status {
 
 const fmt = (rad: number) => `${deg(rad).toFixed(0)}°`;
 
+/** A finger's URDF upper limit: 0 rad = open, upper = fully closed. */
+function fingerUpper(urdf: string): number {
+  const j = JOINT_BY_URDF.get(urdf);
+  return j && j.source !== "body" ? HAND_JOINTS[j.index].upper : 1;
+}
+
 function JointRow({
   urdf, selected, steering, frame, limits, origin, goal, robotLimits, onGoal, onSelect,
 }: {
@@ -53,7 +67,15 @@ function JointRow({
   const ref = JOINT_BY_URDF.get(urdf);
   const label = ref?.label ?? urdf;
   const measured = ref ? readJoint(frame, ref)?.q ?? null : null;
-  const range = targetRange(origin, limits?.get(urdf), robotLimits);
+  const finger = isFinger(urdf);
+  // A finger uses its whole travel (the hand limits itself); an arm joint the robot's limits.
+  const range = finger ? { lower: 0, upper: fingerUpper(urdf) }
+    : targetRange(origin, limits?.get(urdf), robotLimits);
+  const show = (rad: number) =>
+    finger ? `${Math.round((rad / fingerUpper(urdf)) * 100)}%` : fmt(rad);
+  // ± steps: 5° for an arm joint, a tenth of the travel for a finger.
+  const step = finger ? fingerUpper(urdf) / 10 : NUDGE_RAD;
+  const stepText = finger ? "10%" : "5 degrees";
   const set = (rad: number) => onGoal(urdf, Math.min(range.upper, Math.max(range.lower, rad)));
   const btn = "cursor-pointer rounded bg-[#2a2e3a] p-0.5 text-fg disabled:opacity-40";
   return (
@@ -66,13 +88,13 @@ function JointRow({
           {label}
         </span>
         <span className="font-mono tabular-nums">
-          <span className="text-fg">{fmt(goal)}</span>
-          <span className="text-muted"> · now {measured !== null ? fmt(measured) : "—"}</span>
+          <span className="text-fg">{show(goal)}</span>
+          <span className="text-muted"> · now {measured !== null ? show(measured) : "—"}</span>
         </span>
       </div>
       <div className="flex items-center gap-1.5">
-        <button type="button" aria-label={`${label}: decrease by 5 degrees`}
-          disabled={!steering} onClick={() => set(goal - NUDGE_RAD)} className={btn}>
+        <button type="button" aria-label={`${label}: decrease by ${stepText}`}
+          disabled={!steering} onClick={() => set(goal - step)} className={btn}>
           <IconMinus size={12} />
         </button>
         <input
@@ -86,8 +108,8 @@ function JointRow({
           onChange={(e) => set(Number(e.target.value))}
           aria-label={`${label} target`}
         />
-        <button type="button" aria-label={`${label}: increase by 5 degrees`}
-          disabled={!steering} onClick={() => set(goal + NUDGE_RAD)} className={btn}>
+        <button type="button" aria-label={`${label}: increase by ${stepText}`}
+          disabled={!steering} onClick={() => set(goal + step)} className={btn}>
           <IconPlus size={12} />
         </button>
       </div>
@@ -96,10 +118,12 @@ function JointRow({
 }
 
 export function ControlPanel({
-  control, canTake, cannotTakeWhy, selected, frame, limits, origin, goals, onGoal, onSelect,
-  onBackToStart,
+  control, joints, canTake, cannotTakeWhy, selected, frame, limits, origin, goals, onGoal,
+  onSelect, onBackToStart,
 }: {
   control: JointControl;
+  /** The joints this session can move: the arms the robot allows plus answering fingers. */
+  joints: string[];
   canTake: boolean;
   cannotTakeWhy: string | null;
   selected: string | null;
@@ -115,7 +139,10 @@ export function ControlPanel({
 }) {
   const inSession = control.phase !== "off" && control.phase !== "taking";
   const steering = control.phase === "up" || control.phase === "active";
-  const rows = control.allowed.filter((j) => goals[j] !== undefined && origin[j] !== undefined);
+  const rows = joints.filter((j) => goals[j] !== undefined && origin[j] !== undefined);
+  const setHand = (fingers: string[], closed: boolean) => {
+    for (const j of fingers) onGoal(j, closed ? fingerUpper(j) : 0);
+  };
 
   return (
     <Section title="Move">
@@ -158,9 +185,21 @@ export function ControlPanel({
               {GROUPS.map((g) => {
                 const inGroup = rows.filter((j) => JOINT_BY_URDF.get(j)?.group === g);
                 if (!inGroup.length) return null;
+                const hand = g === "Left hand" || g === "Right hand";
+                const quick = "cursor-pointer rounded bg-[#2a2e3a] px-2 py-0.5 text-[11px] text-fg";
                 return (
                   <div key={g}>
-                    <h3 className="m-0 mb-0.5 text-xs font-semibold text-muted">{g}</h3>
+                    <div className="mb-0.5 flex items-center justify-between">
+                      <h3 className="m-0 text-xs font-semibold text-muted">{g}</h3>
+                      {hand && (
+                        <span className="flex gap-1">
+                          <button type="button" className={quick}
+                            onClick={() => setHand(inGroup, false)}>Open</button>
+                          <button type="button" className={quick}
+                            onClick={() => setHand(inGroup, true)}>Close</button>
+                        </span>
+                      )}
+                    </div>
                     <ul className="m-0 grid list-none gap-0.5 p-0">
                       {inGroup.map((j) => (
                         <JointRow

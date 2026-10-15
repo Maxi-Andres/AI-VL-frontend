@@ -10,7 +10,7 @@ import {
 import { RobotViewer, type JointLimits } from "../components/joints/RobotViewer";
 import { useJointControl } from "../hooks/useJointControl";
 import { STALE_AGE_MS, useJointSource, type JointSourceKind } from "../hooks/useJointSource";
-import { JOINT_BY_URDF, readJoint } from "../lib/g1Joints";
+import { JOINTS, JOINT_BY_URDF, readJoint } from "../lib/g1Joints";
 import { GHOST_MIN_RAD } from "../lib/jointControl";
 
 /**
@@ -55,8 +55,14 @@ export function JointsPage() {
       setGoals({});
       return;
     }
+    // The arms the relay allows, plus every finger of a hand that is answering right now (the
+    // robot takes a hand only if it answered at "take", and refuses its fingers otherwise).
     const at: Record<string, number> = {};
-    for (const urdf of allowedKey.split(",").filter(Boolean)) {
+    const candidates = [
+      ...allowedKey.split(",").filter(Boolean),
+      ...JOINTS.filter((j) => j.source !== "body").map((j) => j.urdf),
+    ];
+    for (const urdf of candidates) {
       const ref = JOINT_BY_URDF.get(urdf);
       const r = ref ? readJoint(frameRef.current, ref) : null;
       if (r) at[urdf] = r.q;
@@ -117,6 +123,7 @@ export function JointsPage() {
         />
         <ControlPanel
           control={control}
+          joints={Object.keys(origin)}
           canTake={cannotTakeWhy === null}
           cannotTakeWhy={cannotTakeWhy}
           selected={selected}

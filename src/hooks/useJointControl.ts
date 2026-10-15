@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { WS_JOINT_CONTROL_URL } from "../config";
-import { DEFAULT_LIMITS, describeEvent, type TargetLimits } from "../lib/jointControl";
+import { DEFAULT_LIMITS, controlMessage, describeEvent, type TargetLimits } from "../lib/jointControl";
 
 /**
  * Moving the G1's arm joints from the Joints page: /ws/joint-control on the backend, which
@@ -14,7 +14,11 @@ import { DEFAULT_LIMITS, describeEvent, type TargetLimits } from "../lib/jointCo
  *     reason (tab closed, page left, network gone) makes the backend release the arms;
  *   - a keepalive every KEEPALIVE_MS proves the page is still here — without one for ~1 s the
  *     robot freezes the arm, and after ~5 s it hands it back;
- *   - a dragged slider sends at most one target per TARGET_MIN_MS, always the newest.
+ *   - each joint (and each finger) sends at most one target per TARGET_MIN_MS, always its
+ *     newest; different joints never overwrite each other's pending target (until 2026-10-15
+ *     one shared slot made "everything back to where it started" send only the last joint).
+ *   - fingers travel as {op: "hand", side, finger, pos 0..1000} (controlMessage in
+ *     lib/jointControl.ts); every other joint as {op: "target", joint, q}.
  */
 export type ControlPhase = "off" | "taking" | "up" | "active" | "down";
 
@@ -67,7 +71,7 @@ export function useJointControl(): JointControl {
   const [state, setState] = useState<JointControlState>(OFF);
   const ws = useRef<WebSocket | null>(null);
   const phase = useRef<ControlPhase>("off");
-  const pendingTarget = useRef<{ joint: string; q: number } | null>(null);
+  const pendingTargets = useRef(new Map<string, number>());
   const lastTargetAt = useRef(0);
   const targetTimer = useRef<number | null>(null);
 
@@ -86,7 +90,7 @@ export function useJointControl(): JointControl {
     ws.current = null;
     if (targetTimer.current !== null) window.clearTimeout(targetTimer.current);
     targetTimer.current = null;
-    pendingTarget.current = null;
+    pendingTargets.current.clear();
     s?.close();
   }, []);
 
@@ -161,16 +165,15 @@ export function useJointControl(): JointControl {
 
   const flushTarget = useCallback(() => {
     targetTimer.current = null;
-    const t = pendingTarget.current;
-    if (!t) return;
-    pendingTarget.current = null;
+    if (!pendingTargets.current.size) return;
     lastTargetAt.current = performance.now();
-    send({ op: "target", joint: t.joint, q: t.q });
+    for (const [urdf, rad] of pendingTargets.current) send(controlMessage(urdf, rad));
+    pendingTargets.current.clear();
   }, []);
 
   const target = useCallback((urdf: string, rad: number) => {
     if (phase.current !== "up" && phase.current !== "active") return;
-    pendingTarget.current = { joint: urdf.replace(/_joint$/, ""), q: rad };
+    pendingTargets.current.set(urdf, rad);
     const wait = TARGET_MIN_MS - (performance.now() - lastTargetAt.current);
     if (wait <= 0) flushTarget();
     else if (targetTimer.current === null)

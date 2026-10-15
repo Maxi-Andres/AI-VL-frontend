@@ -3,6 +3,7 @@
  * can be tested on their own. The socket is hooks/useJointControl.ts; the panel is
  * components/joints/ControlPanel.tsx.
  */
+import { HAND_JOINTS, JOINT_BY_URDF } from "./g1Joints";
 
 /** The limits the robot applies to a target, as the relay reports them on "take". */
 export interface TargetLimits {
@@ -65,4 +66,26 @@ export function describeEvent(event: string): string | null {
   const reason = why[m[2]]
     ?? (m[2].startsWith("fsm_") ? `the robot left Walk (mode ${m[2].slice(4)})` : m[2]);
   return `${done ? "Released" : "Releasing"}: ${reason}.`;
+}
+
+/** True for a finger of a BrainCo hand (a JOINTS entry whose source is a hand). */
+export function isFinger(urdf: string): boolean {
+  const j = JOINT_BY_URDF.get(urdf);
+  return !!j && j.source !== "body";
+}
+
+/** A finger angle (radians on its URDF joint) as the hand's own 0 open .. 1000 closed. */
+export function fingerPos(urdf: string, rad: number): number {
+  const j = JOINT_BY_URDF.get(urdf);
+  if (!j || j.source === "body") throw new Error(`not a finger: ${urdf}`);
+  const upper = HAND_JOINTS[j.index].upper;
+  return Math.round(Math.min(1000, Math.max(0, (rad / upper) * 1000)));
+}
+
+/** The control-socket message that sets one joint: a finger goes in the hand's own units. */
+export function controlMessage(urdf: string, rad: number) {
+  const j = JOINT_BY_URDF.get(urdf);
+  if (j && j.source !== "body")
+    return { op: "hand", side: j.source, finger: j.index, pos: fingerPos(urdf, rad) };
+  return { op: "target", joint: urdf.replace(/_joint$/, ""), q: rad };
 }

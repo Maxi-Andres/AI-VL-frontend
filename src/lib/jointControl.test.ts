@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_LIMITS, describeEvent, targetRange } from "./jointControl";
+import {
+  DEFAULT_LIMITS,
+  controlMessage,
+  describeEvent,
+  fingerPos,
+  isFinger,
+  targetRange,
+} from "./jointControl";
 
 describe("targetRange", () => {
   // The same rule g1_joint_sender applies (robot-command-relay/src/joint_ctl_core.hpp, rule 4).
@@ -31,5 +38,28 @@ describe("describeEvent", () => {
     expect(describeEvent("stall left_shoulder_pitch")).toBe(
       "Left shoulder pitch pushed against something: it stopped where it was.",
     );
+  });
+});
+
+describe("controlMessage", () => {
+  it("sends arm joints as targets in radians", () => {
+    expect(controlMessage("left_elbow_joint", 0.5)).toEqual({
+      op: "target", joint: "left_elbow", q: 0.5,
+    });
+    expect(isFinger("left_elbow_joint")).toBe(false);
+  });
+
+  it("sends fingers in the hand's own units and order", () => {
+    // index is the hand's finger 2; its URDF joint closes over 1.4661 rad.
+    expect(isFinger("right_index_proximal_joint")).toBe(true);
+    expect(controlMessage("right_index_proximal_joint", 1.4661 / 2)).toEqual({
+      op: "hand", side: "right", finger: 2, pos: 500,
+    });
+    // thumb flex is finger 0, thumb rotation finger 1 — the pair that is easy to swap.
+    expect(controlMessage("left_thumb_proximal_joint", 1.0472)).toMatchObject({
+      finger: 0, pos: 1000,
+    });
+    expect(controlMessage("left_thumb_metacarpal_joint", 0)).toMatchObject({ finger: 1, pos: 0 });
+    expect(fingerPos("left_pinky_proximal_joint", 9)).toBe(1000);
   });
 });
