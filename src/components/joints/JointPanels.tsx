@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { JointSourceKind, JointSourceState } from "../../hooks/useJointSource";
 import {
+  FINGER_STATE,
   GROUPS,
   JOINTS,
   JOINT_BY_URDF,
@@ -166,9 +167,22 @@ export function JointInspector({ urdf, frame, limits }: {
         </p>
       ) : j.source !== "body" && !r ? (
         <p className="m-0 text-xs text-muted">
-          No reading yet: the Inspire hands are driven by their own service, which is not wired
-          to this page (step J4). The fingers are drawn at rest.
+          This hand is not answering: its board reaches PC2 over a USB-C cable on the robot's
+          back (found unplugged once), and the bridge looks for it again every 5 s.
         </p>
+      ) : r?.finger ? (
+        <dl className="m-0 grid grid-cols-2 gap-1 text-sm">
+          <dt className="text-muted">Closed</dt>
+          <dd className="m-0 text-right font-mono tabular-nums">
+            {(r.finger.pos / 10).toFixed(0)}%
+          </dd>
+          <dt className="text-muted">Motor current</dt>
+          <dd className="m-0 text-right font-mono tabular-nums">{r.finger.current}</dd>
+          <dt className="text-muted">Motor</dt>
+          <dd className={`m-0 text-right ${r.finger.state === 2 ? "font-semibold text-[#ffd08a]" : ""}`}>
+            {FINGER_STATE[r.finger.state] ?? r.finger.state}
+          </dd>
+        </dl>
       ) : (
         <>
           {lim && r && <RangeBar value={r.q} lower={lim.lower} upper={lim.upper} />}

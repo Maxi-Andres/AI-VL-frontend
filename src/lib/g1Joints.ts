@@ -2,21 +2,20 @@
  * The G1's joints as the robot reports them, mapped onto the 3D model the Joints page draws.
  *
  * Two orders meet here and this file is the only place that knows both:
- *   - the SDK's: motor_state[0..28] of rt/lowstate — what g1_joint_bridge (robot-command-relay)
- *     sends, as plain arrays;
+ *   - the robot's: motor_state[0..28] of rt/lowstate, and each hand's six fingers in BrainCo's
+ *     order — what g1_joint_bridge (robot-command-relay) sends, as plain arrays;
  *   - the URDF's: joint NAMES in public/g1/g1.urdf (the lock-waist body that matches this
- *     robot's mode_machine 6, with Inspire hands — see scripts/build_g1_model.py).
+ *     robot's mode_machine 6, with BrainCo hands — see scripts/build_g1_model.py).
  *
  * BODY order is the SDK's G1 29-DoF order, the same table the telemetry reader uses for its
  * Splunk fields (robot-telemetry-agent/src/g1_telemetry_reader.cpp).
  *
- * HANDS: five-finger Inspire hands (seen on the robot 2026-10-14), 6 motors each; the URDF's
- * other finger joints are `mimic` joints that follow these. No reading reaches the page yet: an
- * Inspire hand is driven by its own service, not by the robot's firmware, and none was seen
- * running (topic list read 2026-10-13). Until step J4 wires it
- * (.claude/roadmap/G1-CONTROL-ARTICULAR.md) the bridge sends no hand and the fingers are drawn
- * at rest. The robot also lists rt/dex3/* (the three-finger Dex3-1's topics) with a publisher;
- * what publishes them is not checked yet, and they do not describe these hands.
+ * HANDS: BrainCo Revo 2 (identified 2026-10-15 — after two wrong guesses, Dex3-1 and Inspire).
+ * The bridge reads them over Modbus and sends each finger's position as the hand reports it:
+ * 0 = fully open .. 1000 = fully closed. Each is drawn on its URDF joint as
+ * angle = position / 1000 × the joint's upper limit; the URDF's other finger joints are `mimic`
+ * joints that follow. Thumb flex and thumb rotation are the two that are easy to swap (Unitree's
+ * own teleop code appears to) — confirm them by watching a real thumb.
  */
 
 export const BODY_JOINTS = [
@@ -31,11 +30,21 @@ export const BODY_JOINTS = [
   "right_wrist_roll", "right_wrist_pitch", "right_wrist_yaw",
 ] as const;
 
-/** The Inspire hand's six motors, by their URDF names (prefixed L_ / R_ in the model). */
+/** A BrainCo hand's six motors in the hand's own order, with the URDF joint each one drives
+ * (prefixed left_ / right_ in the model) and that joint's upper limit, radians. */
 export const HAND_JOINTS = [
-  "thumb_proximal_yaw", "thumb_proximal_pitch", "index_proximal", "middle_proximal",
-  "ring_proximal", "pinky_proximal",
+  { urdf: "thumb_proximal", label: "thumb flex", upper: 1.0472 },
+  { urdf: "thumb_metacarpal", label: "thumb rotation", upper: 1.5184 },
+  { urdf: "index_proximal", label: "index", upper: 1.4661 },
+  { urdf: "middle_proximal", label: "middle", upper: 1.4661 },
+  { urdf: "ring_proximal", label: "ring", upper: 1.4661 },
+  { urdf: "pinky_proximal", label: "pinky", upper: 1.4661 },
 ] as const;
+
+/** A finger position as the hand reports it (0 open .. 1000 closed) -> its URDF angle. */
+export function fingerAngle(pos: number, upper: number): number {
+  return (Math.min(1000, Math.max(0, pos)) / 1000) * upper;
+}
 
 /** Waist roll and pitch exist in the SDK's order but not as motors on this robot: it is the
  * lock-waist variant, so they read 0 with temperature 0 and the URDF makes them fixed. */
@@ -77,9 +86,9 @@ export const JOINTS: JointRef[] = [
     group: bodyGroup(index),
   })),
   ...(["left", "right"] as const).flatMap((side) =>
-    HAND_JOINTS.map((name, index) => ({
-      urdf: `${side === "left" ? "L" : "R"}_${name}_joint`,
-      label: name.replace(/_proximal/, "").replace(/_/g, " "),
+    HAND_JOINTS.map((h, index) => ({
+      urdf: `${side}_${h.urdf}_joint`,
+      label: h.label,
       source: side,
       index,
       group: (side === "left" ? "Left hand" : "Right hand") as JointGroup,
@@ -97,12 +106,22 @@ export const GROUPS: JointGroup[] = [
 // The wire format: one line of g1_joint_bridge per message (see its header for the fields)
 // --------------------------------------------------------------------------------------------
 
+/** One hand, as the bridge sends it (in the hand's own units) plus the angles to draw. */
 export interface HandFrame {
   ageMs: number;
+  /** 0 open .. 1000 closed, per finger. */
+  pos: number[];
+  /** URDF angles, radians (fingerAngle of pos). */
   q: number[];
-  tau: number[];
-  temp: number[];
+  /** Signed motor current, the hand's own scale. */
+  current: number[];
+  /** 0 idle, 1 running, 2 stalled, 3 turbo. */
+  state: number[];
+  /** Failed reads since the last good one. */
+  errors: number;
 }
+
+export const FINGER_STATE = ["idle", "moving", "stalled", "turbo"] as const;
 
 export interface JointFrame {
   /** Robot clock, unix seconds. */
@@ -131,12 +150,15 @@ function parseHand(v: unknown): HandFrame | null {
   if (!v || typeof v !== "object") return null;
   const h = v as Record<string, unknown>;
   const n = HAND_JOINTS.length;
-  if (!isNumArray(h.q, n)) return null;
+  if (!isNumArray(h.pos, n)) return null;
+  const pos = h.pos;
   return {
     ageMs: typeof h.age_ms === "number" ? h.age_ms : -1,
-    q: h.q,
-    tau: isNumArray(h.tau, n) ? h.tau : new Array(n).fill(0),
-    temp: isNumArray(h.temp, n) ? h.temp : new Array(n).fill(0),
+    pos,
+    q: pos.map((p, i) => fingerAngle(p, HAND_JOINTS[i].upper)),
+    current: isNumArray(h.current, n) ? h.current : new Array(n).fill(0),
+    state: isNumArray(h.state, n) ? h.state : new Array(n).fill(0),
+    errors: typeof h.errors === "number" ? h.errors : 0,
   };
 }
 
@@ -176,6 +198,8 @@ export interface JointReading {
   q: number;
   tau: number | null;
   temp: number | null;
+  /** Hands only: the finger as the hand reports it. */
+  finger?: { pos: number; current: number; state: number };
 }
 
 /** One joint's reading out of a frame, or null when that part of the robot is not reporting. */
@@ -191,7 +215,12 @@ export function readJoint(frame: JointFrame | null, j: JointRef): JointReading |
   }
   const hand = frame[j.source];
   if (!hand) return null;
-  return { q: hand.q[j.index], tau: hand.tau[j.index], temp: hand.temp[j.index] };
+  return {
+    q: hand.q[j.index],
+    tau: null,
+    temp: null,
+    finger: { pos: hand.pos[j.index], current: hand.current[j.index], state: hand.state[j.index] },
+  };
 }
 
 // --------------------------------------------------------------------------------------------

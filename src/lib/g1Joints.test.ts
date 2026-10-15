@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   BODY_JOINTS,
+  HAND_JOINTS,
   JOINTS,
   LOCKED_JOINTS,
   legPairs,
@@ -32,8 +33,9 @@ const line = (over: Record<string, unknown> = {}) =>
     q: BODY_JOINTS.map((_, i) => i / 100),
     tau: BODY_JOINTS.map(() => 0.5),
     temp: BODY_JOINTS.map(() => 40),
-    left: { age_ms: 3, q: [0, -0.1, -0.2, -0.3, -0.4, -0.5], tau: [0, 0, 0, 0, 0, 0],
-            temp: [30, 30, 30, 30, 30, 30] },
+    // The left hand as read off the robot on 2026-10-15, at rest.
+    left: { age_ms: 3, pos: [399, 400, 50, 50, 49, 50], speed: [0, 0, 0, 0, 0, 0],
+            current: [13, 14, -12, -23, 27, -31], state: [0, 0, 0, 0, 0, 0], errors: 0 },
     right: null,
     ...over,
   });
@@ -63,11 +65,21 @@ describe("the joint table against the model", () => {
     expect(urdfJoints.get("waist_yaw_joint")).toBe("revolute");
   });
 
-  it("draws Inspire five-finger hands, not Dex3", () => {
-    // The robot's hands, seen 2026-10-14. Every finger's outer joint follows its inner one.
-    expect(mimicJoints.size).toBe(12);
-    expect(urdfJoints.has("L_pinky_proximal_joint")).toBe(true);
+  it("draws BrainCo hands, not Dex3 or Inspire", () => {
+    // The robot's hands, identified 2026-10-15. Every finger's outer joint follows its inner one.
+    expect(mimicJoints.size).toBe(10);
+    expect(urdfJoints.get("left_thumb_metacarpal_joint")).toBe("revolute");
+    expect(urdfJoints.has("L_pinky_proximal_joint")).toBe(false);
     expect(urdfJoints.has("left_hand_thumb_0_joint")).toBe(false);
+    // The fingertip joints are pinned (lower == upper) in Unitree's file: built as fixed.
+    expect(urdfJoints.get("left_index_tip_joint")).toBe("fixed");
+  });
+
+  it("uses each hand joint's real upper limit", () => {
+    for (const h of HAND_JOINTS) {
+      const m = new RegExp(`<joint name="left_${h.urdf}_joint"[\\s\\S]*?upper="([^"]+)"`).exec(urdf);
+      expect(Number(m?.[1]), h.urdf).toBeCloseTo(h.upper, 3);
+    }
   });
 
   it("has 29 body joints and 6 per hand, each id unique", () => {
@@ -83,7 +95,8 @@ describe("parseStreamMessage", () => {
     expect(f.modeMachine).toBe(6);
     expect(f.imu).toEqual([0.01, -0.05, 1.2]);
     expect(f.q?.[3]).toBe(0.03);
-    expect(f.left?.q[5]).toBe(-0.5);
+    expect(f.left?.pos[0]).toBe(399);
+    expect(f.left?.q[2]).toBeCloseTo(0.05 * 1.4661);
     expect(f.right).toBeNull();
   });
 
@@ -107,7 +120,7 @@ describe("parseStreamMessage", () => {
     expect(frameOf(line({ q: [1, 2, 3] })).q).toBeNull();
     // NaN does not survive JSON, but a string in the array must not either.
     expect(frameOf(line({ q: BODY_JOINTS.map(() => "x") })).q).toBeNull();
-    expect(frameOf(line({ left: { q: [1, 2] } })).left).toBeNull();
+    expect(frameOf(line({ left: { pos: [1, 2] } })).left).toBeNull();
   });
 });
 
@@ -116,9 +129,11 @@ describe("readJoint", () => {
     const f = frameOf(line());
     const elbow = JOINTS.find((j) => j.urdf === "left_elbow_joint")!;
     expect(readJoint(f, elbow)).toEqual({ q: 0.18, tau: 0.5, temp: 40 });
-    const index = JOINTS.find((j) => j.urdf === "L_index_proximal_joint")!;
-    expect(readJoint(f, index)?.q).toBe(-0.2);
-    const rightThumb = JOINTS.find((j) => j.urdf === "R_thumb_proximal_yaw_joint")!;
+    const index = JOINTS.find((j) => j.urdf === "left_index_proximal_joint")!;
+    expect(readJoint(f, index)?.finger).toEqual({ pos: 50, current: -12, state: 0 });
+    const thumbFlex = JOINTS.find((j) => j.urdf === "left_thumb_proximal_joint")!;
+    expect(readJoint(f, thumbFlex)?.q).toBeCloseTo(0.399 * 1.0472);
+    const rightThumb = JOINTS.find((j) => j.urdf === "right_thumb_proximal_joint")!;
     expect(readJoint(f, rightThumb)).toBeNull();
   });
 });
