@@ -133,9 +133,11 @@ export const DEPLOY: Record<RobotModel, RobotDeploy> = {
         repo: REPO_RELAY,
         specific: "g1_command_sender (g1::LocoClient) on the shared sender_core.hpp — " +
                   "verbs use the FSM ids measured on this robot",
-        state: "pending",
+        state: "running",
         update: [`cd ${REPO_RELAY} && git pull && ./build.sh`,
-                 "sudo systemctl restart robot-command-relay"],
+                 "sudo cp systemd/robot-command-relay.g1.service \\",
+                 "        /etc/systemd/system/robot-command-relay.service",
+                 "sudo systemctl daemon-reload && sudo systemctl restart robot-command-relay"],
         note: "No damp, no zero_torque, no SDK squat (it half-falls on this robot). Walk " +
               "follows the app's waist lock, declared as G1_WAIST_LOCK in relay.env: 1 = " +
               "locked, FSM 500; unset = free, FSM 501. The robot runs with it locked " +
@@ -144,7 +146,10 @@ export const DEPLOY: Record<RobotModel, RobotDeploy> = {
               "Since 2026-10-13 build.sh also builds g1_joint_bridge, the read-only joint " +
               "state behind the Joints page; the relay starts it only while someone watches. " +
               "Since 2026-10-14 also g1_joint_sender, which moves the arms when the page " +
-              "takes control (rt/arm_sdk, robot standing in Walk); it runs only until release.",
+              "takes control (rt/arm_sdk, robot standing in Walk); it runs only until release. " +
+              "The unit copy matters since 2026-10-15: the old one capped the relay at " +
+              "CPUQuota=25%, which froze the arm sender in bursts (trembling, then 'the " +
+              "robot's mode could not be read').",
       },
       {
         unit: "robot-video",
