@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { WS_JOINT_CONTROL_URL } from "../config";
-import { describeEvent } from "../lib/jointControl";
+import { DEFAULT_LIMITS, describeEvent, type TargetLimits } from "../lib/jointControl";
 
 /**
  * Moving the G1's arm joints from the Joints page: /ws/joint-control on the backend, which
@@ -24,6 +24,8 @@ export interface JointControlState {
   weight: number;
   /** URDF joint names this session may move (the relay's JOINT_CTL_ALLOW). */
   allowed: string[];
+  /** The limits the robot applies to targets, as the relay reported them. */
+  limits: TargetLimits;
   /** The last thing worth telling the operator: a refusal, an error, a release reason. */
   message: string | null;
   messageTone: "ok" | "warn" | "error";
@@ -45,6 +47,8 @@ interface Reply {
   state?: string;
   w?: number;
   allowed?: string[];
+  excursion?: number;
+  margin?: number;
   error?: string;
   reply?: string;
   event?: string | null;
@@ -55,7 +59,8 @@ const PHASES: Record<string, ControlPhase> = {
 };
 
 const OFF: JointControlState = {
-  phase: "off", weight: 0, allowed: [], message: null, messageTone: "ok",
+  phase: "off", weight: 0, allowed: [], limits: DEFAULT_LIMITS, message: null,
+  messageTone: "ok",
 };
 
 export function useJointControl(): JointControl {
@@ -107,6 +112,10 @@ export function useJointControl(): JointControl {
     if (typeof r.w === "number") patch.weight = r.w;
     if (r.op === "take" && r.allowed) {
       patch.allowed = r.allowed.map((j) => `${j}_joint`);
+      patch.limits = {
+        excursion: typeof r.excursion === "number" ? r.excursion : DEFAULT_LIMITS.excursion,
+        margin: typeof r.margin === "number" ? r.margin : DEFAULT_LIMITS.margin,
+      };
       patch.message = null;
     }
     if (!r.ok && r.op !== "keepalive") {

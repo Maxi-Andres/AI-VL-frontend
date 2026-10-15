@@ -20,7 +20,7 @@ talks **only** to the backend.
 
 - **React 19** + **TypeScript** (strict)
 - **Tailwind CSS v4** (via the official Vite plugin — theme lives in `src/index.css`)
-- **React Router v7** (`/` live, `/drive` drive pad, `/robot` config, `/video` video tuning, `/joints` the G1 in 3D, and moving an elbow)
+- **React Router v7** (`/` live, `/drive` drive pad, `/robot` config, `/video` video tuning, `/joints` the G1 in 3D, and moving its arms)
 - **Vite** dev server / bundler
 - **bun** as the package manager and runtime
 

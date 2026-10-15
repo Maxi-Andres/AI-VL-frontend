@@ -11,10 +11,11 @@ import { RobotViewer, type JointLimits } from "../components/joints/RobotViewer"
 import { useJointControl } from "../hooks/useJointControl";
 import { STALE_AGE_MS, useJointSource, type JointSourceKind } from "../hooks/useJointSource";
 import { JOINT_BY_URDF, readJoint } from "../lib/g1Joints";
+import { GHOST_MIN_RAD } from "../lib/jointControl";
 
 /**
- * Joints — the G1 in 3D, posed live from its own joint readings, and (step J2 of
- * .claude/roadmap/G1-CONTROL-ARTICULAR.md) one elbow moved from here.
+ * Joints — the G1 in 3D, posed live from its own joint readings, and (steps J2-J3 of
+ * .claude/roadmap/G1-CONTROL-ARTICULAR.md) its arms and waist moved from here.
  *
  * Watching is read-only and always on (/ws/joints). Moving is a separate session the operator
  * opens with "Take control" (/ws/joint-control): every limit lives on the robot, in
@@ -69,6 +70,22 @@ export function JointsPage() {
     control.target(urdf, rad);
   };
 
+  const onBackToStart = () => {
+    setGoals({ ...origin });
+    for (const [urdf, rad] of Object.entries(origin)) control.target(urdf, rad);
+  };
+
+  // The ghost shows only what has not arrived yet: a joint within a couple of degrees of its
+  // target is where it was told, and drawing the whole upper body twice hides the arm moving.
+  const ghost: Record<string, number> = {};
+  if (steering) {
+    for (const [urdf, rad] of Object.entries(goals)) {
+      const ref = JOINT_BY_URDF.get(urdf);
+      const q = ref ? readJoint(source.frame, ref)?.q : undefined;
+      if (q === undefined || Math.abs(rad - q) > GHOST_MIN_RAD) ghost[urdf] = rad;
+    }
+  }
+
   const fresh = !!source.frame && source.frame.ageMs >= 0 && source.frame.ageMs < STALE_AGE_MS;
   const cannotTakeWhy = kind !== "live"
     ? "Switch the source to Live robot to move it."
@@ -88,7 +105,7 @@ export function JointsPage() {
           colorByTemp={colorByTemp}
           showTilt={showTilt}
           onLimits={setLimits}
-          ghost={steering ? goals : null}
+          ghost={steering ? ghost : null}
         />
       </div>
       <aside className="grid min-w-0 content-start gap-3 lg:overflow-y-auto lg:pr-1">
@@ -109,6 +126,7 @@ export function JointsPage() {
           goals={goals}
           onGoal={onGoal}
           onSelect={setSelected}
+          onBackToStart={onBackToStart}
         />
         <JointInspector urdf={hovered ?? selected} frame={source.frame} limits={limits} />
         <TiltPanel frame={source.frame} showTilt={showTilt} onShowTilt={setShowTilt} />

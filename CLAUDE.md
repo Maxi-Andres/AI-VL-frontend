@@ -20,7 +20,7 @@ speak, with wake-word). The Live page picks its own video source — "My camera"
 session is streaming (this replaced the old separate `/monitor` page).
 Routes: `/` (live), `/drive` (robot drive pad), `/robot` (on-robot config),
 `/video` (live video tuning), `/joints` (the G1 in 3D, posed live from its joint state;
-`#replay` opens it on a recorded walk; "Take control" moves an elbow over a separate socket,
+`#replay` opens it on a recorded walk; "Take control" moves the arms and waist over a separate socket,
 `/ws/joint-control` — every limit is on the robot, the page only names targets). The 3D model in `public/g1/` is built by
 `scripts/build_g1_model.py` from Unitree's g1_description; do not hand-edit it.
 There is no `/about` since 2026-10-07: its only live fact, the backend URL, is on the Robot

@@ -4,20 +4,40 @@
  * components/joints/ControlPanel.tsx.
  */
 
+/** The limits the robot applies to a target, as the relay reports them on "take". */
+export interface TargetLimits {
+  /** rad from where the joint was when control was taken; 0 = no such limit (full range). */
+  excursion: number;
+  /** rad kept inside the URDF range. */
+  margin: number;
+}
+
+/** What the robot applies until the relay says otherwise (joint_ctl_core.hpp's defaults). */
+export const DEFAULT_LIMITS: TargetLimits = { excursion: 0, margin: 0.05 };
+
 /**
- * A COURTESY copy of the robot's limits for the slider: the URDF range minus MARGIN_RAD, and no
- * further than EXCURSION_RAD from where the joint was when control was taken. g1_joint_sender
+ * A COURTESY copy of the robot's limits for a slider: the URDF range minus the margin, and —
+ * when an excursion is set — no further than that from where the joint started. g1_joint_sender
  * clamps to the same numbers whatever arrives (robot-command-relay/src/joint_ctl_core.hpp,
  * rule 4), so a stale copy here can only make the slider shorter, never the arm go further.
  */
-export const EXCURSION_RAD = 0.6;
-export const MARGIN_RAD = 0.05;
-
-export function targetRange(origin: number, lim: { lower: number; upper: number } | undefined) {
-  const lower = Math.max((lim?.lower ?? -Infinity) + MARGIN_RAD, origin - EXCURSION_RAD);
-  const upper = Math.min((lim?.upper ?? Infinity) - MARGIN_RAD, origin + EXCURSION_RAD);
+export function targetRange(
+  origin: number,
+  lim: { lower: number; upper: number } | undefined,
+  limits: TargetLimits = DEFAULT_LIMITS,
+) {
+  let lower = (lim?.lower ?? -Math.PI) + limits.margin;
+  let upper = (lim?.upper ?? Math.PI) - limits.margin;
+  if (limits.excursion > 0) {
+    lower = Math.max(lower, origin - limits.excursion);
+    upper = Math.min(upper, origin + limits.excursion);
+  }
   return { lower, upper };
 }
+
+/** Degrees of target-vs-measured gap under which a joint is "there" and gets no ghost: the
+ * arm holds a few degrees short of its command under gravity at the robot's gains. */
+export const GHOST_MIN_RAD = (2 * Math.PI) / 180;
 
 /**
  * What a release event from the robot means to the operator: "releasing <why>" when the
