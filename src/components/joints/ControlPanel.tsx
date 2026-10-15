@@ -152,9 +152,10 @@ export function ControlPanel({
 
   return (
     <Section title="Move">
-      <StatusText status={phaseStatus(control)} className="text-xs text-muted" />
+      <StatusText wrap status={phaseStatus(control)} className="text-xs text-muted" />
       {control.message && (
         <StatusText
+          wrap
           status={{
             tone: control.messageTone === "error" ? "error" : control.messageTone === "warn"
               ? "warn" : "ok",

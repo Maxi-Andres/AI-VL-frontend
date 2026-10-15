@@ -31,23 +31,26 @@ interface Props {
   /** Extra classes for the wrapper (colour, truncation, spacing per screen). */
   className?: string;
   size?: number;
+  /** Wrap long text onto more lines instead of cutting it with "…". For side panels, where a
+   * one-line message wider than the panel widened the whole column (Joints page, 2026-10-15). */
+  wrap?: boolean;
 }
 
 /**
  * One-line status with a leading Tabler icon. Renders nothing when there is no
  * status, so callers can drop it straight into JSX without guarding.
  */
-export function StatusText({ status, className = "", size = 13 }: Props) {
+export function StatusText({ status, className = "", size = 13, wrap = false }: Props) {
   if (!status) return null;
   const Icon = ICONS[status.tone];
   return (
-    <span className={`inline-flex min-w-0 items-center gap-1 ${className}`}>
+    <span className={`${wrap ? "flex items-start" : "inline-flex items-center"} min-w-0 gap-1 ${className}`}>
       <Icon
         size={size}
         stroke={2}
-        className={`shrink-0 ${status.tone === "busy" ? "animate-spin" : ""}`}
+        className={`shrink-0 ${wrap ? "mt-[2px]" : ""} ${status.tone === "busy" ? "animate-spin" : ""}`}
       />
-      <span className="truncate">{status.text}</span>
+      <span className={wrap ? "min-w-0 break-words" : "truncate"}>{status.text}</span>
     </span>
   );
 }

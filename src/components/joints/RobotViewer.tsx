@@ -33,6 +33,10 @@ import { StatusText } from "../ui/StatusText";
  * Every mesh belongs to the nearest MOVING joint above it (a palm, under a fixed joint, belongs
  * to the wrist yaw). That one mapping drives hover, selection highlight and temperature colour.
  *
+ * WARM JOINTS: every joint over the "normal" temperature band is listed on the view itself with
+ * its temperature, hottest first, in the colour it is painted — so a yellow part on the model can
+ * be named without hunting through the joint table (asked for 2026-10-15). Click one to select it.
+ *
  * VIEWS: the whole robot, or close on one hand — the camera then follows that hand as the arm
  * moves. The hands are a few dozen pixels in the whole-robot view, and the robot's left hand is
  * on the RIGHT of the screen when it faces the camera: both made a moving finger easy to miss
@@ -62,6 +66,32 @@ interface Props {
 }
 
 const MODEL_URL = `${import.meta.env.BASE_URL}g1/g1.urdf`;
+
+/** Text colour per temperature band — the same hues the parts are painted in. */
+const TEMP_TEXT: Record<string, string> = {
+  warm: "text-[#f5b942]",
+  hot: "text-[#f97316]",
+  critical: "text-[#ef4444] font-semibold",
+};
+
+interface WarmJoint {
+  urdf: string;
+  name: string;
+  temp: number;
+  level: string;
+}
+
+/** Joints over the normal band, hottest first. */
+function warmJoints(frame: JointFrame | null): WarmJoint[] {
+  const out: WarmJoint[] = [];
+  for (const j of JOINTS) {
+    const t = readJoint(frame, j)?.temp ?? null;
+    const level = tempLevel(t);
+    if (t === null || level === "normal") continue;
+    out.push({ urdf: j.urdf, name: `${j.group.toLowerCase()} · ${j.label}`, temp: t, level });
+  }
+  return out.sort((a, b) => b.temp - a.temp);
+}
 
 type View = "robot" | "left" | "right";
 const VIEWS: { id: View; label: string }[] = [
@@ -418,6 +448,7 @@ export function RobotViewer({
     }
   }, [frame, selected, hovered, colorByTemp, loaded]);
 
+  const warm = warmJoints(frame);
   return (
     <div className="relative h-full min-h-[320px] w-full overflow-hidden rounded-md border border-line">
       <div ref={hostRef} className="absolute inset-0" />
@@ -429,6 +460,33 @@ export function RobotViewer({
       {loadError && (
         <div className="absolute inset-0 grid place-items-center p-4 text-sm text-[#ff9aa6]">
           <StatusText status={{ tone: "error", text: loadError }} />
+        </div>
+      )}
+      {loaded && warm.length > 0 && (
+        <div className="absolute left-2 top-2 max-h-[60%] max-w-[55%] overflow-y-auto rounded-md border border-line bg-bg/85 px-2 py-1.5">
+          <p className="m-0 mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted">
+            Warm joints
+          </p>
+          <ul className="m-0 grid list-none gap-0.5 p-0">
+            {warm.map((w) => (
+              <li key={w.urdf}>
+                <button
+                  type="button"
+                  onClick={() => onSelect(w.urdf)}
+                  onMouseEnter={() => onHover(w.urdf)}
+                  onMouseLeave={() => onHover(null)}
+                  className="flex w-full cursor-pointer items-baseline justify-between gap-3 text-left text-xs"
+                >
+                  <span className={`capitalize ${w.urdf === selected ? "text-fg" : "text-muted"}`}>
+                    {w.name}
+                  </span>
+                  <span className={`font-mono tabular-nums ${TEMP_TEXT[w.level]}`}>
+                    {w.temp.toFixed(0)} °C
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       {loaded && (

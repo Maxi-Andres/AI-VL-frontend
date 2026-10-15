@@ -114,7 +114,9 @@ export function JointsPage() {
           ghost={steering ? ghost : null}
         />
       </div>
-      <aside className="grid min-w-0 content-start gap-3 lg:overflow-y-auto lg:pr-1">
+      {/* One column no wider than the page gives it: an auto track grows to its widest child,
+          and a long message once pushed the whole panel sideways under a scrollbar. */}
+      <aside className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-3 lg:overflow-x-hidden lg:overflow-y-auto lg:pr-1">
         <SourcePanel
           kind={kind}
           onKind={setKind}

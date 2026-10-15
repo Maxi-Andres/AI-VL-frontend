@@ -95,7 +95,7 @@ export function SourcePanel({ kind, onKind, state, locked = false }: {
         {opt("live", "Live robot")}
         {opt("replay", "Recorded walk")}
       </div>
-      <StatusText status={linkStatus(state)} className={`text-xs ${tone}`} />
+      <StatusText wrap status={linkStatus(state)} className={`text-xs ${tone}`} />
       {state.note && <p className="m-0 mt-1 text-xs text-muted">{state.note}</p>}
       <p className="m-0 mt-2 text-xs text-muted">
         Watching is read-only. Moving a joint is a separate step: Take control, below.
