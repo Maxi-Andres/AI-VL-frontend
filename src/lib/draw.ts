@@ -51,6 +51,11 @@ export function drawBoxes(
   ctx.textBaseline = "top";
 
   for (const o of objects) {
+    // The VLM's JSON is parsed, not validated: an item can be a bare string or lack a
+    // bbox (seen 2026-10-16), and destructuring it would throw mid-draw.
+    if (typeof o !== "object" || o === null || !Array.isArray(o.bbox) || o.bbox.length !== 4) {
+      continue;
+    }
     const color = overrideColor ?? colorForObject(o);
     const [x1, y1, x2, y2] = o.bbox;
     const x = x1 * canvas.width;
