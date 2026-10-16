@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { IconPlayerStopFilled, IconVolume } from "@tabler/icons-react";
 import { getRobotVolume, sayOnRobot, setRobotVolume, stopRobotAudio } from "../../api/backend";
+import { serverVoiceName, useVoiceChoice, voiceLabel } from "../../lib/voiceChoice";
 import { Button } from "../ui/Button";
 import { StatusText, type Status } from "../ui/StatusText";
 
 /**
  * The robot's own speaker: type something and the robot says it, stop it, and set its volume.
  *
- * Not gated by "Arm": nothing here moves the robot. The voice is the server's default Piper
- * voice, the same one the browser plays; the robot only plays the audio it is sent.
+ * Not gated by "Arm": nothing here moves the robot. The voice is the one picked on Live (shared
+ * through lib/voiceChoice.ts); the server makes the audio and the robot only plays it. It used
+ * to send no voice, so the robot always spoke with the server's default.
  */
 export function RobotSpeaker({ robot }: { robot: string }) {
   const [text, setText] = useState("");
@@ -18,6 +20,8 @@ export function RobotSpeaker({ robot }: { robot: string }) {
   const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState(false);
   const commitTimer = useRef<number | undefined>(undefined);
+  const [voiceChoice] = useVoiceChoice();
+  const voice = serverVoiceName(voiceChoice);
 
   useEffect(() => {
     const ctl = new AbortController();
@@ -44,7 +48,7 @@ export function RobotSpeaker({ robot }: { robot: string }) {
     setBusy(true);
     setStatus({ tone: "busy", text: "Sending to the robot…" });
     try {
-      const r = await sayOnRobot(robot, t);
+      const r = await sayOnRobot(robot, t, voice);
       setStatus(
         r.ok
           ? { tone: "ok", text: `Speaking (${(r.seconds ?? 0).toFixed(1)} s)` }
@@ -55,7 +59,7 @@ export function RobotSpeaker({ robot }: { robot: string }) {
     } finally {
       setBusy(false);
     }
-  }, [robot, text]);
+  }, [robot, text, voice]);
 
   const stop = useCallback(async () => {
     const r = await stopRobotAudio(robot).catch(() => null);
@@ -124,6 +128,9 @@ export function RobotSpeaker({ robot }: { robot: string }) {
           {volume === null ? "—" : `${volume}/${volumeMax}`}
         </span>
       </label>
+      <p className="m-0 text-[11px] text-muted">
+        Voice: {voice ? voiceLabel(voice) : "the server's default"} · pick it on Live
+      </p>
       <StatusText status={status} className="text-xs text-muted" />
     </div>
   );

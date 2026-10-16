@@ -35,7 +35,7 @@ export interface VoiceControls {
   /** Manually read the current answer aloud / stop reading. */
   onSpeak: () => void;
   onStopSpeak: () => void;
-  /** Available TTS voices (from the OS/browser) and the selected one. */
+  /** Available TTS voices (the server's; the browser's only if the server has none). */
   voices: { uri: string; label: string }[];
   voiceURI: string | null;
   onVoiceChange: (uri: string) => void;
@@ -256,9 +256,10 @@ export function VlmPanel({
         </Field>
       )}
 
-      {/* Pick the text-to-speech voice (list comes from the device). */}
+      {/* Pick the text-to-speech voice: the server's Piper and Kokoro voices, shared by the
+          whole app (Drive's robot speaker uses it too). */}
       {voice.speechSupported && voice.voices.length > 0 && (
-        <Field label="Voice" hint="Voices come from your device's system settings.">
+        <Field label="Voice" hint="Made on the server; also used by the robot speaker on Drive.">
           <select
             value={voice.voiceURI ?? ""}
             onChange={(e) => voice.onVoiceChange(e.target.value)}

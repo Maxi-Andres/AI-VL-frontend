@@ -6,6 +6,8 @@ import {
   synthesizeSpeech,
 } from "../api/backend";
 import { useRobot } from "../components/layout/RobotContext";
+import { speakable } from "../lib/speakable";
+import { effectiveVoice, useVoiceChoice, voiceLabel } from "../lib/voiceChoice";
 import { SpeechQueue, type Player } from "../lib/speechQueue";
 
 /**
@@ -21,7 +23,6 @@ import { SpeechQueue, type Player } from "../lib/speechQueue";
  * Note on iOS Safari: audio playback / the first speechSynthesis call must happen
  * inside a user gesture; the voice loop is armed by a tap, which usually suffices.
  */
-const LS_VOICE_URI = "aivl.voiceURI";
 const LS_OUTPUT = "aivl.speechOutput";
 
 /** Where the voice comes out: this browser, or the selected robot's own speaker. */
@@ -39,12 +40,10 @@ export interface VoiceOption {
 export function useSpeech() {
   const [speaking, setSpeaking] = useState(false);
   const [browserVoices, setBrowserVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [piperVoices, setPiperVoices] = useState<string[]>([]);
-  const [voiceURI, setVoiceURIState] = useState<string | null>(() =>
-    typeof localStorage !== "undefined"
-      ? localStorage.getItem(LS_VOICE_URI)
-      : null,
-  );
+  // The server's voices (Piper and Kokoro); null while it is still being asked.
+  const [piperVoices, setPiperVoices] = useState<string[] | null>(null);
+  // ONE choice for the whole app (lib/voiceChoice.ts), so Drive speaks with it too.
+  const [voiceURI, setVoiceURI] = useVoiceChoice();
   const { robot } = useRobot();
   const robotRef = useRef(robot);
   robotRef.current = robot;
@@ -94,23 +93,21 @@ export function useSpeech() {
     return () => ac.abort();
   }, []);
 
+  // The selector lists the server's voices only. The browser's own (dozens of "system"
+  // voices, most of them other languages) are offered just when the server has none.
   const voices = useMemo<VoiceOption[]>(
-    () => [
-      ...piperVoices.map((n) => ({ uri: `piper:${n}`, label: `${n} · neural` })),
-      ...browserVoices.map((v) => ({
-        uri: v.voiceURI,
-        label: `${v.name} (${v.lang}) · system`,
-      })),
-    ],
+    () =>
+      piperVoices?.length
+        ? piperVoices.map((n) => ({ uri: `piper:${n}`, label: voiceLabel(n) }))
+        : browserVoices.map((v) => ({ uri: v.voiceURI, label: `${v.name} (${v.lang})` })),
     [piperVoices, browserVoices],
   );
 
   // TTS is available if either back-end can speak.
-  const supported = piperVoices.length > 0 || browserSupported;
+  const supported = (piperVoices?.length ?? 0) > 0 || browserSupported;
 
-  // Effective voice: the user's choice, else the first Piper voice by default.
-  const effectiveURI =
-    voiceURI ?? (piperVoices[0] ? `piper:${piperVoices[0]}` : null);
+  // Effective voice: the user's choice if the server has it, else the server's first.
+  const effectiveURI = effectiveVoice(voiceURI, piperVoices);
 
   const setOutput = useCallback((next: SpeechOutput) => {
     setOutputState(next);
@@ -159,12 +156,6 @@ export function useSpeech() {
     },
     [effectiveURI],
   );
-
-  const setVoiceURI = useCallback((uri: string) => {
-    setVoiceURIState(uri);
-    if (typeof localStorage !== "undefined")
-      localStorage.setItem(LS_VOICE_URI, uri);
-  }, []);
 
   const queueRef = useRef<SpeechQueue | null>(null);
 
@@ -294,8 +285,9 @@ export function useSpeech() {
   );
 
   const speak = useCallback(
-    (text: string, _lang?: string, onEnd?: () => void) => {
-      if (!text.trim()) {
+    (raw: string, _lang?: string, onEnd?: () => void) => {
+      const text = speakable(raw); // no "asterisco asterisco": see lib/speakable.ts
+      if (!text) {
         onEnd?.();
         return;
       }
