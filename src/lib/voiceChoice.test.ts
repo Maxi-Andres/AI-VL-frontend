@@ -34,6 +34,7 @@ describe("voiceChoice", () => {
   it("names voices the way people read them", () => {
     expect(voiceLabel("es_AR-daniela-high")).toBe("Daniela · es_AR · Piper");
     expect(voiceLabel("em_santa")).toBe("Santa · es · Kokoro");
+    expect(voiceLabel("supertonic-M2")).toBe("M2 · es · Supertonic");
     expect(voiceLabel("custom")).toBe("custom");
   });
 });

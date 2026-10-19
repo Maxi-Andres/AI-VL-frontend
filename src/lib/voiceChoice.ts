@@ -72,12 +72,15 @@ export function serverVoiceName(uri: string | null): string | undefined {
   return uri?.startsWith("piper:") ? uri.slice("piper:".length) : undefined;
 }
 
-/** "es_AR-daniela-high" -> "Daniela · es_AR · Piper"; "em_santa" -> "Santa · es · Kokoro". */
+/** "es_AR-daniela-high" -> "Daniela · es_AR · Piper"; "em_santa" -> "Santa · es · Kokoro";
+ * "supertonic-M2" -> "M2 · es · Supertonic". */
 export function voiceLabel(name: string): string {
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
   const piper = /^([a-z]{2}_[A-Z]{2})-([^-]+)-/.exec(name);
   if (piper) return `${cap(piper[2])} · ${piper[1]} · Piper`;
   const kokoro = /^[a-z][fm]_(.+)$/.exec(name);
   if (kokoro) return `${cap(kokoro[1])} · ${name[0] === "e" ? "es" : name[0]} · Kokoro`;
+  const supertonic = /^supertonic-(.+)$/.exec(name);
+  if (supertonic) return `${supertonic[1]} · es · Supertonic`;
   return name;
 }
