@@ -25,6 +25,15 @@ describe("speakable", () => {
     );
   });
 
+  it("drops emojis instead of reading their names", () => {
+    // Catches: "😊" spoken as "cara feliz" and "🤝" as "apretón de manos" (2026-10-19).
+    expect(speakable("Mi mejor amigo es Mateo. 😊")).toBe("Mi mejor amigo es Mateo.");
+    expect(speakable("Trabajo en Silk Technologies 🤖🤝 y mido 130 cm 👍🏽")).toBe(
+      "Trabajo en Silk Technologies y mido 130 cm",
+    );
+    expect(speakable("¡Hola! ¿Qué tal? Sí, el 1.º es ✓ correcto")).toBe("¡Hola! ¿Qué tal? Sí, el 1.º es ✓ correcto");
+  });
+
   it("leaves numbers, decimals and plain text alone", () => {
     expect(speakable("Marca 17.84 kW a las 3.")).toBe("Marca 17.84 kW a las 3.");
     expect(speakable("snake_case_name y a_b")).toBe("snake_case_name y a_b");

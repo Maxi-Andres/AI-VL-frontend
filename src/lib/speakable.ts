@@ -6,6 +6,7 @@
 // text was tried and made it worse at reading what it sees (a nameplate it read correctly
 // became "Fluke" every time), so the text is cleaned here, right before it is spoken, for
 // any model and any voice. The screen still shows the answer as the model wrote it.
+// Emojis go too: "Mi mejor amigo es Mateo. 😊" was read out as "cara feliz" (2026-10-19).
 
 /** `text` without markdown markup, ready for text-to-speech. */
 export function speakable(text: string): string {
@@ -19,6 +20,8 @@ export function speakable(text: string): string {
     .replace(/(^|[^\w*])[*_]([^*_\n]+)[*_](?=[^\w*]|$)/g, "$1$2") // *italic*, _italic_
     .replace(/\*+/g, "") // any asterisk left over (e.g. an unclosed **)
     .replace(/^\s*>\s?/gm, "") // block quotes
+    // emojis: pictographs, skin tones, flags, and the joiners/selectors that glue them together
+    .replace(/\p{Extended_Pictographic}|[\u{1F3FB}-\u{1F3FF}]|[\u{1F1E6}-\u{1F1FF}]|\uFE0F|\u200D|\u20E3/gu, "")
     .replace(/[ \t]+/g, " ")
     .trim();
 }

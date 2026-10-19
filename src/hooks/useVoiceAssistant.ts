@@ -94,6 +94,15 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
   const [robotEar, setRobotEar] = useState(() => readFlag(LS_ROBOT_EAR));
   const robotEarRef = useRef(robotEar);
   robotEarRef.current = robotEar;
+  // Switched OFF in another tab of this browser: off here too. Only off: syncing "on" would
+  // make every tab take the robot's ear from the others (one ear per robot).
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === LS_ROBOT_EAR && e.newValue === "0") setRobotEar(false);
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   const wake = useWakeWord({
     phrase,
