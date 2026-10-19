@@ -20,6 +20,9 @@ export function speakable(text: string): string {
     .replace(/(^|[^\w*])[*_]([^*_\n]+)[*_](?=[^\w*]|$)/g, "$1$2") // *italic*, _italic_
     .replace(/\*+/g, "") // any asterisk left over (e.g. an unclosed **)
     .replace(/^\s*>\s?/gm, "") // block quotes
+    // An ellipsis is a pause: a comma, or nothing before other punctuation ("eres...?").
+    .replace(/(?:\.{2,}(?!\.)|…)\s*(?=[?!.,;:]|$)/g, "")
+    .replace(/(?:\.{2,}|…)/g, ",")
     // emojis: pictographs, skin tones, flags, and the joiners/selectors that glue them together
     .replace(/\p{Extended_Pictographic}|[\u{1F3FB}-\u{1F3FF}]|[\u{1F1E6}-\u{1F1FF}]|\uFE0F|\u200D|\u20E3/gu, "")
     .replace(/[ \t]+/g, " ")

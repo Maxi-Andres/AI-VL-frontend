@@ -241,11 +241,12 @@ export function useSpeech() {
    * when the answer is complete. Sentences are spoken in order as they land, so
    * playback starts on the first sentence instead of after the whole answer.
    */
-  const createStream = useCallback(() => {
+  const createStream = useCallback((maxSentences?: number) => {
     cancel(); // stop anything already playing
     const q = new SpeechQueue(synthSentence, {
       onStart: () => setSpeaking(true),
       onDone: () => setSpeaking(false),
+      maxSentences,
     });
     queueRef.current = q;
     return {

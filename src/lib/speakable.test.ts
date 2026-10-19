@@ -34,6 +34,13 @@ describe("speakable", () => {
     expect(speakable("¡Hola! ¿Qué tal? Sí, el 1.º es ✓ correcto")).toBe("¡Hola! ¿Qué tal? Sí, el 1.º es ✓ correcto");
   });
 
+  it("turns an ellipsis into a pause instead of reading the dots", () => {
+    expect(speakable("Hola... ¿cómo estás?")).toBe("Hola, ¿cómo estás?");
+    expect(speakable("Bueno… eso")).toBe("Bueno, eso");
+    expect(speakable("¿Quién eres...?")).toBe("¿Quién eres?");
+    expect(speakable("Mmm...")).toBe("Mmm");
+  });
+
   it("leaves numbers, decimals and plain text alone", () => {
     expect(speakable("Marca 17.84 kW a las 3.")).toBe("Marca 17.84 kW a las 3.");
     expect(speakable("snake_case_name y a_b")).toBe("snake_case_name y a_b");
@@ -71,5 +78,37 @@ describe("SpeechQueue speaks clean sentences", () => {
       q.end();
     });
     expect(said).toEqual(["2."]);
+  });
+
+  it("keeps an ellipsis inside its sentence", async () => {
+    // Catches: every dot of "..." cut as the end of a sentence (2026-10-19).
+    const said: string[] = [];
+    const synth = async (t: string): Promise<Player> => {
+      said.push(t);
+      return { play: async () => {}, stop: () => {} };
+    };
+    await new Promise<void>((res) => {
+      const q = new SpeechQueue(synth, { onDone: res });
+      q.push("Hola..");
+      q.push(". ¿cómo estás? Bien.");
+      q.end();
+    });
+    expect(said).toEqual(["Hola, ¿cómo estás?", "Bien."]);
+  });
+
+  it("speaks no more than maxSentences", async () => {
+    // Catches: a voice answer that goes on for a minute; the screen still has all of it.
+    const said: string[] = [];
+    const synth = async (t: string): Promise<Player> => {
+      said.push(t);
+      return { play: async () => {}, stop: () => {} };
+    };
+    await new Promise<void>((res) => {
+      const q = new SpeechQueue(synth, { onDone: res, maxSentences: 2 });
+      q.push("Uno. Dos. Tres. ");
+      q.push("Cuatro");
+      q.end();
+    });
+    expect(said).toEqual(["Uno.", "Dos."]);
   });
 });

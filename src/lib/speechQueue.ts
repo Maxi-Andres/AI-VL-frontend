@@ -26,6 +26,8 @@ export type Synth = (text: string) => Promise<Player>;
 interface Hooks {
   onStart?: () => void;
   onDone?: () => void;
+  /** Speak at most this many sentences; the rest is dropped (it is still on screen). */
+  maxSentences?: number;
 }
 
 /** True at index i if a sentence ends there — but not on a decimal point like
@@ -38,6 +40,9 @@ function isBoundary(buf: string, i: number): boolean {
   if (c === ".") {
     const prev = buf[i - 1];
     const next = buf[i + 1]; // undefined if the '.' is the last char so far
+    // "Hola... ¿cómo estás?" — an ellipsis is a pause inside the sentence (speakable() makes it
+    // a comma), not three ends of it: each dot used to become its own "sentence".
+    if (next === "." || prev === ".") return false;
     if (prev && /\d/.test(prev) && (next === undefined || /\d/.test(next)))
       return false; // decimal (or possibly-decimal at the buffer edge) -> wait
     if (next === " " && /(^|\n)\s*\d+$/.test(buf.slice(0, i))) return false; // list item
@@ -53,6 +58,7 @@ export class SpeechQueue {
   private ended = false;
   private cancelled = false;
   private current: Player | null = null;
+  private accepted = 0;
   /** The sentence after the current one, already being synthesized. */
   private prefetched: Promise<Player | null> | null = null;
 
@@ -75,7 +81,7 @@ export class SpeechQueue {
     if (this.cancelled) return;
     this.ended = true;
     const rest = speakable(this.buffer);
-    if (rest) this.sentences.push(rest);
+    if (rest) this.accept(rest);
     this.buffer = "";
     if (this.playing) this.prefetch();
     void this.pump();
@@ -98,11 +104,18 @@ export class SpeechQueue {
     for (let i = 0; i < this.buffer.length; i++) {
       if (isBoundary(this.buffer, i)) {
         const s = speakable(this.buffer.slice(cut, i + 1));
-        if (s) this.sentences.push(s);
+        if (s) this.accept(s);
         cut = i + 1;
       }
     }
     if (cut > 0) this.buffer = this.buffer.slice(cut);
+  }
+
+  /** Queue a sentence, unless the maxSentences cap is already reached. */
+  private accept(sentence: string): void {
+    if (this.hooks.maxSentences !== undefined && this.accepted >= this.hooks.maxSentences) return;
+    this.accepted += 1;
+    this.sentences.push(sentence);
   }
 
   /** Start synthesizing the next sentence, if there is one and none is in flight. */
