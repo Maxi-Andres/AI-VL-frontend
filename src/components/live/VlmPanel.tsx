@@ -12,8 +12,14 @@ import { Field } from "../ui/Field";
 import { Select } from "../ui/Select";
 import { StatusText } from "../ui/StatusText";
 
-// Longer-side sizes (px) offered for the frame sent to the VLM; "Full" = native.
-const VLM_IMG_SIZES = ["512", "768", "1024", "Full"];
+// Longer-side sizes (px) offered for the frame sent to the VLM; "Full" = native. Nothing
+// below 1152: the VLM server upscales every image to at least 1024 tokens of 32x32 px (~1 Mpx,
+// llamacpp_image_min_tokens, and Ollama does the same), so a smaller frame costs the SAME time
+// and only loses detail. Measured 2026-10-19: 320-1152 px all ~1060-1100 tokens in 0.82 s, and
+// a nameplate read "Fluke" at 512, "Crauvin" at 768, "Chauvin Arnoux" from 1024 up; 1600 px
+// cost 1.1-1.5 s.
+export const VLM_IMG_SIZES = ["1152", "1600", "Full"];
+export const VLM_IMG_DEFAULT = 1152;
 
 /** Hands-free voice controls, produced by useVoiceAssistant. */
 export interface VoiceControls {
@@ -132,7 +138,7 @@ export function VlmPanel({
       {imageMaxSize !== undefined && onImageMaxSizeChange && (
         <Field
           label="Image quality (VLM)"
-          hint="Bigger = more detail but slower; smaller = faster answers."
+          hint="1152 costs nothing extra (the VLM never looks at less); bigger reads small print better but answers slower."
           inline
         >
           <Select

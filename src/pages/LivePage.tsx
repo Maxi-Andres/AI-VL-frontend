@@ -13,7 +13,7 @@ import { VideoStage } from "../components/live/VideoStage";
 import { RobotCameraStage } from "../components/live/RobotCameraStage";
 import { ControlsStageLayout } from "../components/live/ControlsStageLayout";
 import { YoloPanel } from "../components/live/YoloPanel";
-import { VlmPanel } from "../components/live/VlmPanel";
+import { VLM_IMG_DEFAULT, VlmPanel } from "../components/live/VlmPanel";
 import { CommandPanel } from "../components/live/CommandPanel";
 import { Button } from "../components/ui/Button";
 import { useStatus } from "../components/layout/StatusContext";
@@ -75,7 +75,7 @@ export function LivePage() {
   const [scope, setScope] = useState("");
   const [variant, setVariant] = useState("");
   // Longer-side px of the frame sent to the VLM (0 = native). Smaller = faster.
-  const [vlmMaxSize, setVlmMaxSize] = useState(768);
+  const [vlmMaxSize, setVlmMaxSize] = useState(VLM_IMG_DEFAULT);
 
   // --- Overlay + metrics ---
   const [objects, setObjects] = useState<DetectedObject[]>([]);
