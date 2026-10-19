@@ -44,10 +44,12 @@ const FILLERS = ["Eh, a ver.", "Dejame ver.", "Un momento.", "A ver."];
 // Only speak a filler if the answer hasn't started within this window, so a fast
 // reply is never preceded by (or talked over with) a filler.
 const FILLER_DELAY_MS = 2000;
-// A spoken answer stops after this many sentences; the whole answer stays on screen. The model
-// is told nothing about length: asked to be brief, it read 17.84 kW as 1784 six times in six
-// (2026-10-19), so the cap is applied here, where it is spoken.
-const SPOKEN_SENTENCES = 3;
+// A spoken answer stops after about this many words (~30 s of speech) and says where the rest is;
+// the whole answer stays on screen. The model is told nothing about length: asked to be brief,
+// it read 17.84 kW as 1784 six times in six (2026-10-19), so the cap is applied here, where it
+// is spoken. Counted in words, not sentences: a list of six objects is ~60 words and is said
+// whole.
+const SPOKEN_LIMIT = { maxWords: 90, cutNotice: "El resto lo tenés en la pantalla." };
 
 function pickFiller(): string {
   return FILLERS[Math.floor(Math.random() * FILLERS.length)];
@@ -132,7 +134,7 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
       setStatus("Thinking…");
       // Stream the answer: speak each sentence as soon as it lands, so the reply
       // starts playing while the model is still generating the rest.
-      const stream = spokenModeRef.current ? speech.createStream(SPOKEN_SENTENCES) : null;
+      const stream = spokenModeRef.current ? speech.createStream(SPOKEN_LIMIT) : null;
       let answerStarted = false;
       if (stream && fillerModeRef.current) {
         // Speak a filler only if the answer is slow to start (see FILLER_DELAY_MS):

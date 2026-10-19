@@ -26,8 +26,12 @@ export type Synth = (text: string) => Promise<Player>;
 interface Hooks {
   onStart?: () => void;
   onDone?: () => void;
-  /** Speak at most this many sentences; the rest is dropped (it is still on screen). */
-  maxSentences?: number;
+  /** Stop speaking once this many words have been spoken: the sentence that crosses it is
+   * finished, the rest dropped (it is still on screen) and `cutNotice` said instead. Words,
+   * not sentences: every item of a list is a "sentence", and a cap of 3 cut a six-item answer
+   * after its second item (2026-10-19). */
+  maxWords?: number;
+  cutNotice?: string;
 }
 
 /** True at index i if a sentence ends there — but not on a decimal point like
@@ -58,7 +62,8 @@ export class SpeechQueue {
   private ended = false;
   private cancelled = false;
   private current: Player | null = null;
-  private accepted = 0;
+  private words = 0;
+  private cut = false;
   /** The sentence after the current one, already being synthesized. */
   private prefetched: Promise<Player | null> | null = null;
 
@@ -83,6 +88,7 @@ export class SpeechQueue {
     const rest = speakable(this.buffer);
     if (rest) this.accept(rest);
     this.buffer = "";
+    if (this.cut && this.hooks.cutNotice) this.sentences.push(this.hooks.cutNotice);
     if (this.playing) this.prefetch();
     void this.pump();
   }
@@ -111,10 +117,14 @@ export class SpeechQueue {
     if (cut > 0) this.buffer = this.buffer.slice(cut);
   }
 
-  /** Queue a sentence, unless the maxSentences cap is already reached. */
+  /** Queue a sentence, unless the maxWords budget is already spent. */
   private accept(sentence: string): void {
-    if (this.hooks.maxSentences !== undefined && this.accepted >= this.hooks.maxSentences) return;
-    this.accepted += 1;
+    const max = this.hooks.maxWords;
+    if (max !== undefined && this.words >= max) {
+      this.cut = true;
+      return;
+    }
+    this.words += sentence.split(/\s+/).filter(Boolean).length;
     this.sentences.push(sentence);
   }
 

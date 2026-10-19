@@ -96,19 +96,27 @@ describe("SpeechQueue speaks clean sentences", () => {
     expect(said).toEqual(["Hola, ¿cómo estás?", "Bien."]);
   });
 
-  it("speaks no more than maxSentences", async () => {
-    // Catches: a voice answer that goes on for a minute; the screen still has all of it.
-    const said: string[] = [];
-    const synth = async (t: string): Promise<Player> => {
-      said.push(t);
-      return { play: async () => {}, stop: () => {} };
+  it("says a whole list, and cuts a long answer after the word budget with a notice", async () => {
+    // Catches: a cap counted in sentences cutting "En la mesa veo: - un monitor. - una laptop…"
+    // after its second item (2026-10-19) — every list item is a sentence.
+    const run = async (text: string) => {
+      const said: string[] = [];
+      const synth = async (t: string): Promise<Player> => {
+        said.push(t);
+        return { play: async () => {}, stop: () => {} };
+      };
+      await new Promise<void>((res) => {
+        const q = new SpeechQueue(synth, { onDone: res, maxWords: 12, cutNotice: "El resto en pantalla." });
+        q.push(text);
+        q.end();
+      });
+      return said;
     };
-    await new Promise<void>((res) => {
-      const q = new SpeechQueue(synth, { onDone: res, maxSentences: 2 });
-      q.push("Uno. Dos. Tres. ");
-      q.push("Cuatro");
-      q.end();
-    });
-    expect(said).toEqual(["Uno.", "Dos."]);
+    expect(await run("Veo:\n- Un monitor.\n- Una laptop.\n- Una botella.\n- Una silla.")).toEqual([
+      "Veo:", "Un monitor.", "Una laptop.", "Una botella.", "Una silla.",
+    ]);
+    expect(await run("Uno dos tres cuatro cinco. Seis siete ocho nueve diez once. Doce trece. Catorce.")).toEqual([
+      "Uno dos tres cuatro cinco.", "Seis siete ocho nueve diez once.", "Doce trece.", "El resto en pantalla.",
+    ]);
   });
 });
