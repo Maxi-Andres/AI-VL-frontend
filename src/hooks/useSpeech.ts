@@ -42,6 +42,7 @@ export function useSpeech() {
   const [browserVoices, setBrowserVoices] = useState<SpeechSynthesisVoice[]>([]);
   // The server's voices (Piper and Kokoro); null while it is still being asked.
   const [piperVoices, setPiperVoices] = useState<string[] | null>(null);
+  const [serverDefault, setServerDefault] = useState<string | null>(null);
   // ONE choice for the whole app (lib/voiceChoice.ts), so Drive speaks with it too.
   const [voiceURI, setVoiceURI] = useVoiceChoice();
   const { robot } = useRobot();
@@ -83,7 +84,9 @@ export function useSpeech() {
     const ac = new AbortController();
     fetchTtsVoices(ac.signal)
       .then((r) => {
-        if (!ac.signal.aborted) setPiperVoices(r.voices ?? []);
+        if (ac.signal.aborted) return;
+        setPiperVoices(r.voices ?? []);
+        setServerDefault(r.default ?? null);
       })
       // An abort must NOT fall into the empty-list branch: that would look like "the server
       // has no neural voices" and silently drop the user back to browser TTS.
@@ -106,8 +109,8 @@ export function useSpeech() {
   // TTS is available if either back-end can speak.
   const supported = (piperVoices?.length ?? 0) > 0 || browserSupported;
 
-  // Effective voice: the user's choice if the server has it, else the server's first.
-  const effectiveURI = effectiveVoice(voiceURI, piperVoices);
+  // Effective voice: the user's choice if the server has it, else the server's default.
+  const effectiveURI = effectiveVoice(voiceURI, piperVoices, serverDefault);
 
   const setOutput = useCallback((next: SpeechOutput) => {
     setOutputState(next);

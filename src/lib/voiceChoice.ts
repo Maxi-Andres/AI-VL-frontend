@@ -57,14 +57,20 @@ export function useVoiceChoice(): [string | null, (uri: string) => void] {
 
 /**
  * The voice that actually speaks: the choice when it is one of the server's voices, else the
- * server's first. A browser voice is used only when the server offers none (it is down, or
+ * server's default (its TTS_VOICE), else its first. Falling back to the first alone made the
+ * default whichever voice sorts first — Daniela — whatever the server was set to. A browser voice is used only when the server offers none (it is down, or
  * has no voice installed). `serverVoices` is null while it is still being asked.
  */
-export function effectiveVoice(choice: string | null, serverVoices: string[] | null): string | null {
+export function effectiveVoice(
+  choice: string | null,
+  serverVoices: string[] | null,
+  serverDefault?: string | null,
+): string | null {
   if (serverVoices === null) return choice;
   if (serverVoices.length === 0) return choice?.startsWith("piper:") ? null : choice;
   const name = choice?.startsWith("piper:") ? choice.slice("piper:".length) : null;
-  return `piper:${name && serverVoices.includes(name) ? name : serverVoices[0]}`;
+  if (name && serverVoices.includes(name)) return `piper:${name}`;
+  return `piper:${serverDefault && serverVoices.includes(serverDefault) ? serverDefault : serverVoices[0]}`;
 }
 
 /** The server voice name to send with a request, or undefined for the server's default. */

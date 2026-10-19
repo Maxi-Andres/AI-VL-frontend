@@ -37,7 +37,7 @@ const WAKE_ACK = "¿Sí?";
 // preceded by dead air. These are SPOKEN CONTENT (audio for the end user), not UI
 // text: they must be real pronounceable words in the TTS voice's language, since a
 // neural voice spells non-words out ("Hmm" -> "h-m-m"). The default voice is
-// Spanish (es_AR-daniela-high) and the whole voice loop is Spanish (Whisper input,
+// Spanish (Kokoro's em_alex) and the whole voice loop is Spanish (Whisper input,
 // VLM answer), so the fillers are Spanish to match. Each ends in a period so the
 // SpeechQueue flushes it immediately instead of buffering.
 const FILLERS = ["Eh, a ver.", "Dejame ver.", "Un momento.", "A ver."];

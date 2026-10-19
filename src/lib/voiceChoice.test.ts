@@ -37,4 +37,11 @@ describe("voiceChoice", () => {
     expect(voiceLabel("supertonic-M2")).toBe("M2 · es · Supertonic");
     expect(voiceLabel("custom")).toBe("custom");
   });
+
+  it("falls back to the server's default voice, not the one that sorts first", () => {
+    // Catches: the default moved to em_alex on the server and the page still speaking Daniela.
+    expect(effectiveVoice(null, SERVER, "em_santa")).toBe("piper:em_santa");
+    expect(effectiveVoice("piper:gone-voice", SERVER, "em_santa")).toBe("piper:em_santa");
+    expect(effectiveVoice(null, SERVER, "not-installed")).toBe("piper:es_AR-daniela-high");
+  });
 });
