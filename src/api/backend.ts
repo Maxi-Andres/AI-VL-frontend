@@ -87,8 +87,26 @@ export async function askVlm(
  * model generates it, and resolves with the full answer once the stream ends.
  * Lets the UI show the reply live and speak it sentence by sentence.
  */
+/** The newest frame from the robot's camera as a JPEG data URL, or null when it has none live
+ * (the backend refuses a stale one). For questions asked from a page without video. */
+export async function fetchRobotFrame(signal?: AbortSignal): Promise<string | null> {
+  try {
+    const r = await fetch(`${BACKEND_URL}/api/robot-frame`, { signal });
+    if (!r.ok) return null;
+    const blob = await r.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 export async function askVlmStream(
-  req: { image: string; model: string; prompt: string; robot?: string },
+  req: { image: string; model?: string; prompt: string; robot?: string },
   onDelta: (piece: string) => void,
   signal?: AbortSignal,
 ): Promise<string> {

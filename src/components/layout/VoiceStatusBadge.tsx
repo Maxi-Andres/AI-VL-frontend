@@ -7,7 +7,14 @@ import {
 import type { VoicePhase } from "../../types";
 
 /** Pill in the header showing what the hands-free voice assistant is doing. */
-export function VoiceStatusBadge({ phase }: { phase: VoicePhase }) {
+export function VoiceStatusBadge({
+  phase,
+  wakeWords = "“robot”",
+}: {
+  phase: VoicePhase;
+  /** What it is listening for: "“robot”" (this device), "“Bender”" (the robot's mic), or both. */
+  wakeWords?: string;
+}) {
   if (phase === "off") return null;
 
   const map: Record<
@@ -16,7 +23,7 @@ export function VoiceStatusBadge({ phase }: { phase: VoicePhase }) {
   > = {
     listening: {
       icon: <IconMicrophone size={13} stroke={2} />,
-      label: "Listening for “robot”",
+      label: `Listening for ${wakeWords || "“robot”"}`,
       cls: "bg-[#173a26] text-accent",
     },
     recording: {

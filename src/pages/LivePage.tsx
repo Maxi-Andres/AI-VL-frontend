@@ -27,7 +27,7 @@ import { useVideoTransport } from "../components/layout/VideoTransportContext";
 import { VideoTransportSwitch } from "../components/live/VideoTransportSwitch";
 import { RobotCameraSwitch } from "../components/live/RobotCameraSwitch";
 import { useRobotCameraView } from "../hooks/useRobotCameraView";
-import { useVoiceAssistant } from "../hooks/useVoiceAssistant";
+import { useVoiceAssistantContext } from "../components/layout/VoiceAssistantContext";
 import { captureFrame, encodeFrame, snapshotFrame } from "../lib/capture";
 import { startPairing } from "../lib/framePairing";
 import { StatusText, type Status } from "../components/ui/StatusText";
@@ -45,7 +45,7 @@ const BLUE = "#60a5fa";
 
 export function LivePage() {
   const { options, error: optionsError } = useOptions();
-  const { setConnected, setVoicePhase } = useStatus();
+  const { setConnected } = useStatus();
   const { videoRef, active, facing, error: cameraError, start, stop, flip } =
     useCamera();
 
@@ -482,10 +482,13 @@ export function LivePage() {
   // Hands-free voice: say "robot", speak the question, it auto-submits and (in
   // spoken mode) reads the answer aloud as it streams. Also drives the manual
   // read-aloud button.
-  const va = useVoiceAssistant({ askPromptStream });
-
-  // Surface the voice-assistant state in the header (next to the connection pill).
-  useEffect(() => setVoicePhase(va.phase), [va.phase, setVoicePhase]);
+  const { va, registerAsk } = useVoiceAssistantContext();
+  // While this page is open, questions are about ITS frame and the answer shows in its panel;
+  // elsewhere the app-wide assistant asks about the robot's camera (VoiceAssistantContext).
+  useEffect(() => {
+    registerAsk(askPromptStream);
+    return () => registerAsk(null);
+  }, [askPromptStream, registerAsk]);
 
   const handleAskPrompt = useCallback(
     (prompt: string) => {

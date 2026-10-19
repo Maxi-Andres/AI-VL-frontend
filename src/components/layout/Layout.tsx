@@ -5,11 +5,15 @@ import { StatusProvider, useStatus } from "./StatusContext";
 import { RobotProvider, useRobot } from "./RobotContext";
 import { VideoTransportProvider } from "./VideoTransportContext";
 import { PresencePills } from "./PresencePills";
+import { VoiceAssistantProvider, useVoiceAssistantContext } from "./VoiceAssistantContext";
 import { VoiceStatusBadge } from "./VoiceStatusBadge";
 
 function HeaderWithStatus() {
   const { connected, voicePhase } = useStatus();
   const { robot, setRobot, robots } = useRobot();
+  const { va } = useVoiceAssistantContext();
+  const wakeWords = [va.voiceMode && "“robot”", va.robotMic && va.robotEar && "“Bender”"]
+    .filter(Boolean).join(" or ");
   return (
     <Header>
       <div className="flex flex-wrap items-center justify-end gap-1.5">
@@ -27,7 +31,7 @@ function HeaderWithStatus() {
             ))}
           </select>
         )}
-        <VoiceStatusBadge phase={voicePhase} />
+        <VoiceStatusBadge phase={voicePhase} wakeWords={wakeWords} />
         <PresencePills />
         <StatusBadge connected={connected} />
       </div>
@@ -44,8 +48,10 @@ export function Layout() {
     <StatusProvider>
       <RobotProvider>
         <VideoTransportProvider>
-        <HeaderWithStatus />
-        <Outlet />
+          <VoiceAssistantProvider>
+            <HeaderWithStatus />
+            <Outlet />
+          </VoiceAssistantProvider>
         </VideoTransportProvider>
       </RobotProvider>
     </StatusProvider>
