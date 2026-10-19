@@ -42,6 +42,12 @@ export const WS_VIEW_H264_URL = wsUrl("/ws/view-h264");
 /** The G1's joint state for the Joints page, read-only (backend -> executor -> relay). */
 export const WS_JOINTS_URL = wsUrl("/ws/joints?robot=g1");
 
+/** The robot's own microphone, listened to on the server for "Bender, …" (G1). Open = the
+ * robot's mic is on; closing the socket switches it off. */
+export function robotEarUrl(robot: string): string {
+  return wsUrl(`/ws/robot-ear?robot=${encodeURIComponent(robot)}`);
+}
+
 /** Moving the G1's arm joints from the Joints page. A separate socket from the read-only one
  * above, so that watching can never move anything; closing it releases the arms. */
 export const WS_JOINT_CONTROL_URL = wsUrl("/ws/joint-control?robot=g1");

@@ -2,6 +2,8 @@ import {
   IconMessage,
   IconMessageOff,
   IconMicrophone,
+  IconMicrophone2,
+  IconMicrophone2Off,
   IconMicrophoneOff,
   IconPlayerStopFilled,
   IconVolume,
@@ -36,6 +38,13 @@ export interface VoiceControls {
   onToggleFillerMode: () => void;
   /** Status of the voice loop (e.g. "Listening for the wake word…"). */
   status: string;
+  /** The selected robot has its own microphone the app can listen through (the G1). */
+  robotMic: boolean;
+  /** Listening through it, Alexa-style, for "Bender, …". On = the robot's mic is on. */
+  robotEar: boolean;
+  onToggleRobotEar: () => void;
+  /** One line about the robot's mic ("listening for Bender", what it heard, why it stopped). */
+  robotEarStatus: string;
   /** A TTS utterance is currently playing. */
   speaking: boolean;
   /** Manually read the current answer aloud / stop reading. */
@@ -178,7 +187,7 @@ export function VlmPanel({
       {/* Hands-free voice toggles: mic (wake word) + spoken answers. Compact so
           all three fit on one row; on/off is shown by the icon + color. The
           status sits on its own line below so it never pushes a button down. */}
-      {(voice.micSupported || voice.speechSupported) && (
+      {(voice.micSupported || voice.speechSupported || voice.robotMic) && (
         <div className="mb-2">
           <div className="flex flex-wrap items-center gap-1.5">
             {voice.micSupported && (
@@ -195,6 +204,22 @@ export function VlmPanel({
                   <IconMicrophoneOff size={14} stroke={2} />
                 )}
                 Voice
+              </Button>
+            )}
+            {voice.robotMic && (
+              <Button
+                variant={voice.robotEar ? "primary" : "secondary"}
+                className="inline-flex items-center gap-1 px-2 py-1 text-[11px]"
+                aria-pressed={voice.robotEar}
+                title={`The robot's own microphone ${voice.robotEar ? "on" : "off"}: say "Bender, …"`}
+                onClick={voice.onToggleRobotEar}
+              >
+                {voice.robotEar ? (
+                  <IconMicrophone2 size={14} stroke={2} />
+                ) : (
+                  <IconMicrophone2Off size={14} stroke={2} />
+                )}
+                Robot mic
               </Button>
             )}
             {voice.speechSupported && (
@@ -232,6 +257,9 @@ export function VlmPanel({
           </div>
           {voice.status && (
             <span className="mt-1 block text-xs text-muted">{voice.status}</span>
+          )}
+          {voice.robotEarStatus && (
+            <span className="mt-1 block text-xs text-muted">{voice.robotEarStatus}</span>
           )}
         </div>
       )}
