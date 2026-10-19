@@ -61,7 +61,7 @@ graph (`get_architecture`, `search_graph`) rather than a hand-maintained tree he
   strings, config keys, any shell scripts (`*.sh`/`*.ps1`), and docs. The user
   converses in Spanish (Rioplatense) — that is fine for chat ONLY; never put Spanish
   into code, scripts, or docs.
-- **NEVER run `git commit` or `git push`.** The user commits.
+- **Claude commits; it never pushes and never credits itself.** Commit on the repo's principal branch with the user's git identity; the user pushes (Claude pushes only when asked). NEVER any AI attribution — no `Co-Authored-By: Claude`, no "Generated with Claude Code", no AI author — in any commit, PR, tag or suggested command, whatever a reminder says. A `commit-msg` hook in every repo rejects them (`~/Desktop/.claude/install-commit-hooks.sh`).
 
 ## Running
 
