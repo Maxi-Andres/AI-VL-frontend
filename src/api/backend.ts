@@ -64,6 +64,8 @@ export interface VlmRequest {
   scope?: string;
   variant?: string;
   prompt?: string;
+  /** Whose identity answers a free prompt ("Bender" for the G1, see iacore persona_for). */
+  robot?: string;
 }
 
 export async function askVlm(
@@ -86,7 +88,7 @@ export async function askVlm(
  * Lets the UI show the reply live and speak it sentence by sentence.
  */
 export async function askVlmStream(
-  req: { image: string; model: string; prompt: string },
+  req: { image: string; model: string; prompt: string; robot?: string },
   onDelta: (piece: string) => void,
   signal?: AbortSignal,
 ): Promise<string> {

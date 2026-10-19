@@ -453,7 +453,7 @@ export function LivePage() {
       try {
         let acc = "";
         const answer = await askVlmStream(
-          { image, model: vlmModel, prompt },
+          { image, model: vlmModel, prompt, robot: cmdRobot },
           (piece) => {
             if (tFirst === null) tFirst = performance.now();
             acc += piece;
@@ -476,7 +476,7 @@ export function LivePage() {
         setVlmBusy(false);
       }
     },
-    [getCurrentFrame, vlmModel],
+    [getCurrentFrame, vlmModel, cmdRobot],
   );
 
   // Hands-free voice: say "robot", speak the question, it auto-submits and (in
