@@ -1,5 +1,8 @@
 import { NavLink } from "react-router-dom";
 import type { ReactNode } from "react";
+// Recolored from the official transparent PNG: its wordmark is dark gray and vanishes on this
+// dark-only theme, so the gray went to --color-fg; the gradient "S" is untouched.
+import silkLogo from "../../assets/silk-logo.webp";
 
 interface Props {
   /** Optional slot on the right (e.g. the connection status badge). */
@@ -12,6 +15,7 @@ const linkClass = ({ isActive }: { isActive: boolean }) =>
 export function Header({ children }: Props) {
   return (
     <header className="flex items-center gap-3 border-b border-line px-[18px] py-3">
+      <img src={silkLogo} alt="Silk Technologies" className="h-7 w-auto" />
       <h1 className="m-0 text-base font-semibold">Max's Control Panel</h1>
       <nav className="flex gap-3">
         <NavLink to="/" className={linkClass} end>
