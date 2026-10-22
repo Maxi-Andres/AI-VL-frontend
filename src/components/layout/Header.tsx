@@ -16,7 +16,8 @@ export function Header({ children }: Props) {
   return (
     <header className="flex items-center gap-3 border-b border-line px-[18px] py-3">
       <img src={silkLogo} alt="Silk Technologies" className="h-[34px] w-auto" />
-      <h1 className="m-0 text-base font-semibold">Max's Control Panel</h1>
+      {/* The product is "Silk Pilot": the Silk logo beside it supplies the first word. */}
+      <h1 className="m-0 text-base font-semibold">Pilot</h1>
       <nav className="flex gap-3">
         <NavLink to="/" className={linkClass} end>
           Live
