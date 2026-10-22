@@ -20,6 +20,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import URDFLoader, { type URDFJoint, type URDFRobot } from "urdf-loader";
 import { JOINTS, JOINT_BY_URDF, readJoint, tempLevel, type JointFrame } from "../../lib/g1Joints";
+import { liveStalls, type StallAlert } from "../../lib/jointControl";
 import { StatusText } from "../ui/StatusText";
 
 /**
@@ -42,6 +43,10 @@ import { StatusText } from "../ui/StatusText";
  * on the RIGHT of the screen when it faces the camera: both made a moving finger easy to miss
  * (2026-10-15), so the buttons say "Robot's left hand", not "Left".
  *
+ * TOP-LEFT CORNER: what the operator should notice about single joints — those that stopped
+ * against something (rule 8 of joint_ctl_core.hpp; each listed for 30 s after its last stall,
+ * with how many times) and, under them, those running warm. Clicking one selects it.
+ *
  * THE GHOST: while the page moves a joint, a translucent copy of what hangs from that joint (the
  * forearm and hand, for an elbow) shows where it was told to go. The solid model is always the
  * robot's own reading, so the gap between the two is the move still to come.
@@ -63,6 +68,8 @@ interface Props {
   onLimits?: (limits: JointLimits) => void;
   /** Targets by URDF joint name, drawn as the ghost; null or empty hides it. */
   ghost?: Record<string, number> | null;
+  /** Joints that stopped against something, newest first (useJointControl's `stalls`). */
+  stalls?: StallAlert[];
 }
 
 const MODEL_URL = `${import.meta.env.BASE_URL}g1/g1.urdf`;
@@ -81,6 +88,12 @@ interface WarmJoint {
   level: string;
 }
 
+/** "left arm · elbow": how both corner lists name a joint. */
+function jointName(urdf: string): string {
+  const j = JOINT_BY_URDF.get(urdf);
+  return j ? `${j.group.toLowerCase()} · ${j.label}` : urdf.replace(/_joint$/, "").replace(/_/g, " ");
+}
+
 /** Joints over the normal band, hottest first. */
 function warmJoints(frame: JointFrame | null): WarmJoint[] {
   const out: WarmJoint[] = [];
@@ -88,7 +101,7 @@ function warmJoints(frame: JointFrame | null): WarmJoint[] {
     const t = readJoint(frame, j)?.temp ?? null;
     const level = tempLevel(t);
     if (t === null || level === "normal") continue;
-    out.push({ urdf: j.urdf, name: `${j.group.toLowerCase()} · ${j.label}`, temp: t, level });
+    out.push({ urdf: j.urdf, name: jointName(j.urdf), temp: t, level });
   }
   return out.sort((a, b) => b.temp - a.temp);
 }
@@ -145,7 +158,7 @@ function owningJoint(obj: Object3D | null): string | null {
 }
 
 export function RobotViewer({
-  frame, selected, hovered, onHover, onSelect, colorByTemp, showTilt, onLimits, ghost,
+  frame, selected, hovered, onHover, onSelect, colorByTemp, showTilt, onLimits, ghost, stalls,
 }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const modelRef = useRef<Model | null>(null);
@@ -449,6 +462,9 @@ export function RobotViewer({
   }, [frame, selected, hovered, colorByTemp, loaded]);
 
   const warm = warmJoints(frame);
+  // Re-rendered with every joint frame (~30 Hz live), so "s ago" and the expiry keep up.
+  const now = Date.now();
+  const stopped = liveStalls(stalls ?? [], now);
   return (
     <div className="relative h-full min-h-[320px] w-full overflow-hidden rounded-md border border-line">
       <div ref={hostRef} className="absolute inset-0" />
@@ -462,31 +478,63 @@ export function RobotViewer({
           <StatusText status={{ tone: "error", text: loadError }} />
         </div>
       )}
-      {loaded && warm.length > 0 && (
-        <div className="absolute left-2 top-2 max-h-[60%] max-w-[55%] overflow-y-auto rounded-md border border-line bg-bg/85 px-2 py-1.5">
-          <p className="m-0 mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted">
-            Warm joints
-          </p>
-          <ul className="m-0 grid list-none gap-0.5 p-0">
-            {warm.map((w) => (
-              <li key={w.urdf}>
-                <button
-                  type="button"
-                  onClick={() => onSelect(w.urdf)}
-                  onMouseEnter={() => onHover(w.urdf)}
-                  onMouseLeave={() => onHover(null)}
-                  className="flex w-full cursor-pointer items-baseline justify-between gap-3 text-left text-xs"
-                >
-                  <span className={`capitalize ${w.urdf === selected ? "text-fg" : "text-muted"}`}>
-                    {w.name}
-                  </span>
-                  <span className={`font-mono tabular-nums ${TEMP_TEXT[w.level]}`}>
-                    {w.temp.toFixed(0)} °C
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
+      {loaded && (stopped.length > 0 || warm.length > 0) && (
+        <div className="absolute left-2 top-2 flex max-h-[60%] max-w-[55%] flex-col gap-1.5">
+          {stopped.length > 0 && (
+            <div className="min-h-0 overflow-y-auto rounded-md border border-[#f97316]/50 bg-bg/85 px-2 py-1.5">
+              <p className="m-0 mb-1 text-[11px] font-semibold uppercase tracking-wider text-[#f97316]">
+                Stopped against something
+              </p>
+              <ul className="m-0 grid list-none gap-0.5 p-0">
+                {stopped.map((s) => (
+                  <li key={s.urdf}>
+                    <button
+                      type="button"
+                      onClick={() => onSelect(s.urdf)}
+                      onMouseEnter={() => onHover(s.urdf)}
+                      onMouseLeave={() => onHover(null)}
+                      className="flex w-full cursor-pointer items-baseline justify-between gap-3 text-left text-xs"
+                    >
+                      <span className={`capitalize ${s.urdf === selected ? "text-fg" : "text-muted"}`}>
+                        {jointName(s.urdf)}
+                      </span>
+                      <span className="font-mono tabular-nums text-[#f97316]">
+                        {s.count > 1 ? `×${s.count} · ` : ""}
+                        {Math.max(0, Math.round((now - s.at) / 1000))} s ago
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {warm.length > 0 && (
+            <div className="min-h-0 overflow-y-auto rounded-md border border-line bg-bg/85 px-2 py-1.5">
+              <p className="m-0 mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted">
+                Warm joints
+              </p>
+              <ul className="m-0 grid list-none gap-0.5 p-0">
+                {warm.map((w) => (
+                  <li key={w.urdf}>
+                    <button
+                      type="button"
+                      onClick={() => onSelect(w.urdf)}
+                      onMouseEnter={() => onHover(w.urdf)}
+                      onMouseLeave={() => onHover(null)}
+                      className="flex w-full cursor-pointer items-baseline justify-between gap-3 text-left text-xs"
+                    >
+                      <span className={`capitalize ${w.urdf === selected ? "text-fg" : "text-muted"}`}>
+                        {w.name}
+                      </span>
+                      <span className={`font-mono tabular-nums ${TEMP_TEXT[w.level]}`}>
+                        {w.temp.toFixed(0)} °C
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
       {loaded && (

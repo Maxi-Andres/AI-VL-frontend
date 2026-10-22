@@ -36,8 +36,9 @@ export function targetRange(
   return { lower, upper };
 }
 
-/** Degrees of target-vs-measured gap under which a joint is "there" and gets no ghost: the
- * arm holds a few degrees short of its command under gravity at the robot's gains. */
+/** Degrees of target-vs-measured gap under which a joint is "there" and gets no ghost. Since
+ * the gravity feedforward (2026-10-22) the arm lands on its target instead of ~8° below it; the
+ * margin stays for the last bit the kp spring still gives. */
 export const GHOST_MIN_RAD = (2 * Math.PI) / 180;
 
 /**
@@ -66,6 +67,50 @@ export function describeEvent(event: string): string | null {
   const reason = why[m[2]]
     ?? (m[2].startsWith("fsm_") ? `the robot left Walk (mode ${m[2].slice(4)})` : m[2]);
   return `${done ? "Released" : "Releasing"}: ${reason}.`;
+}
+
+/** A joint that gave up pushing (rule 8 of joint_ctl_core.hpp), as the viewer lists it. */
+export interface StallAlert {
+  urdf: string;
+  /** Stalls of this joint in the session so far. */
+  count: number;
+  /** When the last one arrived, ms (Date.now()). */
+  at: number;
+}
+
+/** How long a stall stays listed after its last occurrence. */
+export const STALL_SHOW_MS = 30_000;
+
+/** The joint of a "stall <joint>" event, as its URDF name; null for any other event. */
+export function stallJoint(event: string | null | undefined): string | null {
+  const m = event ? /^stall (\S+)/.exec(event) : null;
+  return m ? `${m[1]}_joint` : null;
+}
+
+/**
+ * Whether a reply brings an event the page has not seen. Every reply repeats the LAST event,
+ * so the text alone cannot tell a second stall of the same joint from the first: the relay's
+ * `event_seq` counts them. A relay without it (before 2026-10-22) falls back to "the text
+ * changed", which misses only those repeats.
+ */
+export function isNewEvent(
+  seen: { seq: number; event: string | null },
+  event: string | null | undefined,
+  seq: number | undefined,
+): boolean {
+  if (!event) return false;
+  return typeof seq === "number" ? seq > seen.seq : event !== seen.event;
+}
+
+/** The list after one more stall of `urdf` at `now`: that joint first, its count up by one. */
+export function noteStall(alerts: StallAlert[], urdf: string, now: number): StallAlert[] {
+  const prev = alerts.find((a) => a.urdf === urdf);
+  return [{ urdf, count: (prev?.count ?? 0) + 1, at: now }, ...alerts.filter((a) => a.urdf !== urdf)];
+}
+
+/** The stalls still worth showing at `now`. */
+export function liveStalls(alerts: StallAlert[], now: number): StallAlert[] {
+  return alerts.filter((a) => now - a.at < STALL_SHOW_MS);
 }
 
 /** True for a finger of a BrainCo hand (a JOINTS entry whose source is a hand). */

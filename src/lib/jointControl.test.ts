@@ -3,8 +3,13 @@ import {
   DEFAULT_LIMITS,
   controlMessage,
   describeEvent,
+  STALL_SHOW_MS,
   fingerPos,
   isFinger,
+  isNewEvent,
+  liveStalls,
+  noteStall,
+  stallJoint,
   targetRange,
 } from "./jointControl";
 
@@ -61,5 +66,38 @@ describe("controlMessage", () => {
     });
     expect(controlMessage("left_thumb_metacarpal_joint", 0)).toMatchObject({ finger: 1, pos: 0 });
     expect(fingerPos("left_pinky_proximal_joint", 9)).toBe(1000);
+  });
+});
+
+describe("stall alerts (the viewer's top-left list)", () => {
+  it("names the joint of a stall event, and nothing else", () => {
+    expect(stallJoint("stall left_elbow")).toBe("left_elbow_joint");
+    expect(stallJoint("releasing deadman")).toBeNull();
+    expect(stallJoint(null)).toBeNull();
+  });
+
+  it("counts a second stall of the same joint, which repeats the same text", () => {
+    // Every reply repeats the LAST event: only the relay's count tells them apart.
+    const seen = { seq: 2, event: "stall left_elbow" };
+    expect(isNewEvent(seen, "stall left_elbow", 2)).toBe(false);   // a keepalive's echo
+    expect(isNewEvent(seen, "stall left_elbow", 3)).toBe(true);    // the arm stalled again
+  });
+
+  it("falls back to a change of text with a relay that does not count", () => {
+    expect(isNewEvent({ seq: 0, event: "state active" }, "stall left_elbow", undefined)).toBe(true);
+    expect(isNewEvent({ seq: 0, event: "stall left_elbow" }, "stall left_elbow", undefined)).toBe(false);
+    expect(isNewEvent({ seq: 0, event: null }, null, 4)).toBe(false);
+  });
+
+  it("puts the latest stall first, adds up repeats, and forgets them after a while", () => {
+    let a = noteStall([], "left_elbow_joint", 1000);
+    a = noteStall(a, "right_elbow_joint", 2000);
+    a = noteStall(a, "left_elbow_joint", 3000);
+    expect(a.map((s) => [s.urdf, s.count, s.at])).toEqual([
+      ["left_elbow_joint", 2, 3000],
+      ["right_elbow_joint", 1, 2000],
+    ]);
+    expect(liveStalls(a, 2000 + STALL_SHOW_MS - 1)).toHaveLength(2);
+    expect(liveStalls(a, 2000 + STALL_SHOW_MS).map((s) => s.urdf)).toEqual(["left_elbow_joint"]);
   });
 });

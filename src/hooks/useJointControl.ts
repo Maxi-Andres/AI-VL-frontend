@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { WS_JOINT_CONTROL_URL } from "../config";
-import { DEFAULT_LIMITS, controlMessage, describeEvent, type TargetLimits } from "../lib/jointControl";
+import {
+  DEFAULT_LIMITS,
+  controlMessage,
+  describeEvent,
+  isNewEvent,
+  noteStall,
+  stallJoint,
+  type StallAlert,
+  type TargetLimits,
+} from "../lib/jointControl";
 
 /**
  * Moving the G1's arm joints from the Joints page: /ws/joint-control on the backend, which
@@ -19,6 +28,9 @@ import { DEFAULT_LIMITS, controlMessage, describeEvent, type TargetLimits } from
  *     one shared slot made "everything back to where it started" send only the last joint).
  *   - fingers travel as {op: "hand", side, finger, pos 0..1000} (controlMessage in
  *     lib/jointControl.ts); every other joint as {op: "target", joint, q}.
+ *   - a joint that stalls (gives up pushing into something) goes to `stalls`, which the viewer
+ *     lists in its top-left corner beside the warm joints — not to `message`: dragging a
+ *     slider against an obstacle stalls it again and again, and the list counts them.
  */
 export type ControlPhase = "off" | "taking" | "up" | "active" | "down";
 
@@ -33,6 +45,9 @@ export interface JointControlState {
   /** The last thing worth telling the operator: a refusal, an error, a release reason. */
   message: string | null;
   messageTone: "ok" | "warn" | "error";
+  /** Joints that stalled in the latest session, newest first; kept after the release so the
+   * viewer can let them expire on their own (lib/jointControl.ts, STALL_SHOW_MS). */
+  stalls: StallAlert[];
 }
 
 export interface JointControl extends JointControlState {
@@ -56,24 +71,27 @@ interface Reply {
   error?: string;
   reply?: string;
   event?: string | null;
+  event_seq?: number;
 }
 
 const PHASES: Record<string, ControlPhase> = {
   idle: "up", up: "up", active: "active", down: "down", done: "down", off: "off",
 };
 
-const OFF: JointControlState = {
+// Everything a session resets — but not `stalls`, which outlive it until they expire.
+const OFF: Omit<JointControlState, "stalls"> = {
   phase: "off", weight: 0, allowed: [], limits: DEFAULT_LIMITS, message: null,
   messageTone: "ok",
 };
 
 export function useJointControl(): JointControl {
-  const [state, setState] = useState<JointControlState>(OFF);
+  const [state, setState] = useState<JointControlState>({ ...OFF, stalls: [] });
   const ws = useRef<WebSocket | null>(null);
   const phase = useRef<ControlPhase>("off");
   const pendingTargets = useRef(new Map<string, number>());
   const lastTargetAt = useRef(0);
   const targetTimer = useRef<number | null>(null);
+  const seenEvent = useRef<{ seq: number; event: string | null }>({ seq: 0, event: null });
 
   const update = useCallback((patch: Partial<JointControlState>) => {
     if (patch.phase) phase.current = patch.phase;
@@ -95,6 +113,14 @@ export function useJointControl(): JointControl {
   }, []);
 
   const onReply = useCallback((r: Reply) => {
+    const fresh = isNewEvent(seenEvent.current, r.event, r.event_seq);
+    seenEvent.current = {
+      seq: typeof r.event_seq === "number" ? Math.max(seenEvent.current.seq, r.event_seq)
+        : seenEvent.current.seq,
+      event: r.event ?? null,
+    };
+    const stalled = fresh ? stallJoint(r.event) : null;
+    if (stalled) setState((s) => ({ ...s, stalls: noteStall(s.stalls, stalled, Date.now()) }));
     const event = r.event ? describeEvent(r.event) : null;
     if (r.op === "take" && !r.ok) {
       update({ ...OFF, message: r.reply ?? r.error ?? "The robot refused", messageTone: "error" });
@@ -125,10 +151,7 @@ export function useJointControl(): JointControl {
     if (!r.ok && r.op !== "keepalive") {
       patch.message = r.reply ?? r.error ?? "Refused";
       patch.messageTone = "error";
-    } else if (event && r.event?.startsWith("stall ")) {
-      patch.message = event;
-      patch.messageTone = "warn";
-    } else if (event && next === "down") {
+    } else if (event && next === "down" && !r.event?.startsWith("stall ")) {
       patch.message = event;
       patch.messageTone = "warn";              // a release the operator did not ask for
     }
@@ -137,7 +160,8 @@ export function useJointControl(): JointControl {
 
   const take = useCallback(() => {
     if (phase.current !== "off") return;
-    update({ ...OFF, phase: "taking" });
+    seenEvent.current = { seq: 0, event: null };      // the relay counts from 0 per session
+    update({ ...OFF, phase: "taking", stalls: [] });
     const s = new WebSocket(WS_JOINT_CONTROL_URL);
     ws.current = s;
     s.onopen = () => s.send(JSON.stringify({ op: "take" }));

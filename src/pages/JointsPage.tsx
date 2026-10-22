@@ -112,6 +112,7 @@ export function JointsPage() {
           showTilt={showTilt}
           onLimits={setLimits}
           ghost={steering ? ghost : null}
+          stalls={control.stalls}
         />
       </div>
       {/* One column no wider than the page gives it: an auto track grows to its widest child,
