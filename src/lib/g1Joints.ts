@@ -15,7 +15,8 @@
  * 0 = fully open .. 1000 = fully closed. Each is drawn on its URDF joint as
  * angle = position / 1000 × the joint's upper limit; the URDF's other finger joints are `mimic`
  * joints that follow. Thumb flex and thumb rotation are the two that are easy to swap (Unitree's
- * own teleop code appears to) — confirm them by watching a real thumb.
+ * own teleop code appears to): BrainCo's order — motor 0 flexes, motor 1 rotates — was confirmed
+ * on both real thumbs on 2026-10-22 by moving only "thumb flex" and watching it bend.
  */
 
 export const BODY_JOINTS = [
