@@ -86,7 +86,7 @@ export function SettingsPage() {
 
   return (
     <main className="grid lg:h-[calc(100dvh-57px)] lg:grid-cols-[264px_minmax(0,1fr)] lg:overflow-hidden">
-      <nav className="border-b border-line bg-panel p-4 lg:overflow-y-auto lg:border-r lg:border-b-0">
+      <nav className="min-w-0 border-b border-line bg-panel p-4 lg:overflow-x-hidden lg:overflow-y-auto lg:border-r lg:border-b-0">
         <h4 className="m-0 mb-2 px-2 text-[11px] font-extrabold tracking-wider text-dim uppercase">Configuring</h4>
         <div className="mb-4 grid min-w-0 gap-1">
           {robots.map((r) => {
@@ -99,8 +99,9 @@ export function SettingsPage() {
                   <Icon size={17} />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-bold">{names[r.id] ?? r.label}</span>
-                  {names[r.id] && <span className="block truncate text-[11.5px] text-muted">{r.label}</span>}
+                  {/* Two lines, not an ellipsis: "Unitree Go2 (quadruped robot dog)" must read whole. */}
+                  <span className="line-clamp-2 text-[13px] leading-snug font-bold">{names[r.id] ?? r.label}</span>
+                  {names[r.id] && <span className="line-clamp-2 text-[11.5px] leading-snug text-muted">{r.label}</span>}
                 </span>
               </button>
             );
