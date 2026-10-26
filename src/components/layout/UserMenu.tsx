@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { IconChevronDown, IconLogout } from "@tabler/icons-react";
 import { useAuth, useMe } from "../../auth/AuthContext";
 import { initials } from "../../lib/password";
+import { ROLE_LABEL } from "../../auth/roles";
 
-const ROLE_LABEL = { owner: "Owner", admin: "Admin", operator: "Operator", viewer: "Viewer" };
 
 /** The signed-in person, top right: who you are, in which company, with what role. */
 export function UserMenu() {

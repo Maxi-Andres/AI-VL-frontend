@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import type { ButtonHTMLAttributes, FormEvent, InputHTMLAttributes, ReactNode } from "react";
 import {
   IconAlertCircle,
@@ -20,6 +20,8 @@ import {
   IconUsers,
 } from "@tabler/icons-react";
 import { AuthError } from "../api/auth";
+import { lookupInvitation, lookupPasswordReset, type InvitationInfo, type ResetInfo } from "../api/team";
+import { ROLES } from "./roles";
 import { PASSWORD_MIN, passwordStrength } from "../lib/password";
 import silkLogoOnDark from "../assets/silk-logo.webp";
 import silkLogoOnLight from "../assets/silk-logo-light-bg.webp";
@@ -182,8 +184,7 @@ export function SignInScreen({ orgName, expired }: { orgName: string | null; exp
   return (
     <Shell panel={<BrandPanel title={<>Operate every robot<br />from <Gradient>one place.</Gradient></>}>
       <p className="mt-4 max-w-[440px] text-[15px] text-white/65">
-        Live video, voice and AI-assisted control for quadrupeds and humanoids — over LTE,
-        Starlink or your own network.
+        Live video, AI perception and safe teleoperation for robots — on your own server.
       </p>
     </BrandPanel>}>
       <h1 className="text-[26px] font-extrabold tracking-[-0.025em]">
@@ -206,7 +207,7 @@ export function SignInScreen({ orgName, expired }: { orgName: string | null; exp
           required value={password} onChange={(e) => setPassword(e.target.value)}
           aside={<button type="button" onClick={() => setForgot((v) => !v)}
             className="cursor-pointer text-[12.5px] font-bold text-accent hover:underline">Forgot?</button>}
-          hint={forgot && <>Ask an admin of {orgName ?? "your workspace"} to reset it for you.</>} />
+          hint={forgot && <>Ask an admin of {orgName ?? "your workspace"} for a password reset link.</>} />
         <label className="mt-1 mb-6 flex cursor-pointer items-center gap-2.5 text-[13px] text-muted select-none">
           <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)}
             className="size-4 accent-[#0f1623]" />
@@ -399,6 +400,239 @@ function StrengthMeter({ score, label }: { score: number; label: string }) {
       </div>
       <span className="w-40 text-right">{label}</span>
     </div>
+  );
+}
+
+// --------------------------------------------------------------------------- //
+// Joining through an invitation
+// --------------------------------------------------------------------------- //
+function tokenFromHash(): string {
+  return new URLSearchParams(location.hash.replace(/^#/, "")).get("token") ?? "";
+}
+
+export function InviteScreen() {
+  const { status, acceptInvitation, signOut } = useAuth();
+  const [token] = useState(tokenFromHash);
+  const [info, setInfo] = useState<InvitationInfo | null>(null);
+  const [lookupError, setLookupError] = useState<string | null>(token ? null : "This invitation link is incomplete.");
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [remember, setRemember] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [tries, setTries] = useState(0);
+
+  useEffect(() => {
+    if (!token) return;
+    let live = true;
+    lookupInvitation(token)
+      .then((i) => live && setInfo(i))
+      .catch((e) => live && setLookupError(messageOf(e)));
+    return () => {
+      live = false;
+    };
+  }, [token]);
+
+  const strength = passwordStrength(password, info?.email ?? "");
+  const ok = name.trim() && strength.score > 0 && password === confirm;
+  const role = ROLES.find((r) => r.role === info?.role);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await acceptInvitation(token, name.trim(), password, remember);
+    } catch (err) {
+      setError(messageOf(err));
+      setTries((n) => n + 1);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const panel = (
+    <BrandPanel title={<>Welcome to<br /><Gradient>{info?.org_name ?? "Silk Pilot"}.</Gradient></>}>
+      <p className="mt-4 max-w-[440px] text-[15px] text-white/65">
+        Create your account to join your team on Silk Pilot.
+      </p>
+    </BrandPanel>
+  );
+
+  if (status.kind === "signed-in") {
+    return (
+      <Shell panel={panel}>
+        <h1 className="text-[24px] font-extrabold tracking-[-0.025em]">You are already signed in</h1>
+        <p className="mt-1.5 mb-6 text-muted">
+          This browser is signed in as <b className="text-fg">{status.me.user.email}</b>. To accept
+          this invitation as someone else, sign out first.
+        </p>
+        <PrimaryButton onClick={() => void signOut()}>Sign out and continue</PrimaryButton>
+        <a href="/" className="mt-4 block text-center text-[13px] font-bold text-accent hover:underline">
+          Stay signed in and go to the app
+        </a>
+      </Shell>
+    );
+  }
+
+  if (lookupError) {
+    return (
+      <Shell panel={panel}>
+        <span className="mb-5 grid size-12 place-items-center rounded-xl bg-[#fdecec] text-danger">
+          <IconAlertCircle size={24} />
+        </span>
+        <h1 className="text-[24px] font-extrabold tracking-[-0.025em]">This link does not work</h1>
+        <p className="mt-1.5 mb-6 text-muted">{lookupError}</p>
+        <a href="/" className="flex h-12 w-full items-center justify-center rounded-xl border border-[#d9dde5] text-[14px] font-bold">
+          Go to sign in
+        </a>
+      </Shell>
+    );
+  }
+
+  if (!info) {
+    return (
+      <Shell panel={panel}>
+        <div className="flex items-center gap-3 text-muted"><IconLoader2 size={18} className="animate-spin" />Checking your invitation…</div>
+      </Shell>
+    );
+  }
+
+  return (
+    <Shell panel={panel}>
+      <h1 className="text-[24px] font-extrabold tracking-[-0.025em]">Join {info.org_name}</h1>
+      <p className="mt-1.5 mb-5 text-muted">
+        {info.invited_by ? <>{info.invited_by} invited you</> : "You were invited"} as{" "}
+        <b className="text-fg">{role?.label ?? info.role}</b>.
+      </p>
+      {role && (
+        <div className="mb-6 rounded-xl bg-bg px-3.5 py-3 text-[13px] text-muted">{role.summary}</div>
+      )}
+      {error && <ErrorNote text={error} shakeKey={tries} />}
+      <form onSubmit={submit} noValidate>
+        <Field label="Work email" icon={<IconMail size={18} />} value={info.email} readOnly
+          className="text-muted" autoComplete="username" />
+        <Field label="Full name" icon={<IconUser size={18} />} autoFocus required autoComplete="name"
+          maxLength={120} value={name} onChange={(e) => setName(e.target.value)} />
+        <PasswordField label="Password" icon={<IconLock size={18} />} autoComplete="new-password" required
+          value={password} onChange={(e) => setPassword(e.target.value)}
+          hint={<StrengthMeter score={strength.score} label={password ? strength.label : `At least ${PASSWORD_MIN} characters`} />} />
+        <PasswordField label="Confirm password" icon={<IconLock size={18} />} autoComplete="new-password" required
+          value={confirm} onChange={(e) => setConfirm(e.target.value)}
+          hint={confirm && confirm !== password ? <span className="text-danger">The passwords do not match</span> : null} />
+        <label className="mt-1 mb-6 flex cursor-pointer items-center gap-2.5 text-[13px] text-muted select-none">
+          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)}
+            className="size-4 accent-[#0f1623]" />
+          Keep me signed in on this device for 30 days
+        </label>
+        <PrimaryButton type="submit" busy={busy} disabled={!ok}>
+          {busy ? "Creating your account…" : "Create account and join"}
+        </PrimaryButton>
+      </form>
+    </Shell>
+  );
+}
+
+// --------------------------------------------------------------------------- //
+// Setting a new password through a reset link
+// --------------------------------------------------------------------------- //
+export function ResetPasswordScreen() {
+  const { completePasswordReset } = useAuth();
+  const [token] = useState(tokenFromHash);
+  const [info, setInfo] = useState<ResetInfo | null>(null);
+  const [lookupError, setLookupError] = useState<string | null>(token ? null : "This reset link is incomplete.");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [remember, setRemember] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [tries, setTries] = useState(0);
+
+  useEffect(() => {
+    if (!token) return;
+    let live = true;
+    lookupPasswordReset(token)
+      .then((i) => live && setInfo(i))
+      .catch((e) => live && setLookupError(messageOf(e)));
+    return () => {
+      live = false;
+    };
+  }, [token]);
+
+  const strength = passwordStrength(password, info?.email ?? "");
+  const ok = strength.score > 0 && password === confirm;
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await completePasswordReset(token, password, remember);
+    } catch (err) {
+      setError(messageOf(err));
+      setTries((n) => n + 1);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const panel = (
+    <BrandPanel title={<>Back in,<br /><Gradient>in a moment.</Gradient></>}>
+      <p className="mt-4 max-w-[440px] text-[15px] text-white/65">
+        Choose a new password. Every other device signed in to your account is signed out.
+      </p>
+    </BrandPanel>
+  );
+
+  if (lookupError) {
+    return (
+      <Shell panel={panel}>
+        <span className="mb-5 grid size-12 place-items-center rounded-xl bg-[#fdecec] text-danger">
+          <IconAlertCircle size={24} />
+        </span>
+        <h1 className="text-[24px] font-extrabold tracking-[-0.025em]">This link does not work</h1>
+        <p className="mt-1.5 mb-6 text-muted">{lookupError}</p>
+        <a href="/" className="flex h-12 w-full items-center justify-center rounded-xl border border-[#d9dde5] text-[14px] font-bold">
+          Go to sign in
+        </a>
+      </Shell>
+    );
+  }
+
+  if (!info) {
+    return (
+      <Shell panel={panel}>
+        <div className="flex items-center gap-3 text-muted"><IconLoader2 size={18} className="animate-spin" />Checking your link…</div>
+      </Shell>
+    );
+  }
+
+  return (
+    <Shell panel={panel}>
+      <h1 className="text-[24px] font-extrabold tracking-[-0.025em]">Set a new password</h1>
+      <p className="mt-1.5 mb-6 text-muted">
+        For <b className="text-fg">{info.email}</b> at {info.org_name}.
+      </p>
+      {error && <ErrorNote text={error} shakeKey={tries} />}
+      <form onSubmit={submit} noValidate>
+        <input type="email" value={info.email} autoComplete="username" readOnly hidden />
+        <PasswordField label="New password" icon={<IconLock size={18} />} autoComplete="new-password" autoFocus required
+          value={password} onChange={(e) => setPassword(e.target.value)}
+          hint={<StrengthMeter score={strength.score} label={password ? strength.label : `At least ${PASSWORD_MIN} characters`} />} />
+        <PasswordField label="Confirm password" icon={<IconLock size={18} />} autoComplete="new-password" required
+          value={confirm} onChange={(e) => setConfirm(e.target.value)}
+          hint={confirm && confirm !== password ? <span className="text-danger">The passwords do not match</span> : null} />
+        <label className="mt-1 mb-6 flex cursor-pointer items-center gap-2.5 text-[13px] text-muted select-none">
+          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)}
+            className="size-4 accent-[#0f1623]" />
+          Keep me signed in on this device for 30 days
+        </label>
+        <PrimaryButton type="submit" busy={busy} disabled={!ok}>
+          {busy ? "Saving…" : "Save and sign in"}
+        </PrimaryButton>
+      </form>
+    </Shell>
   );
 }
 

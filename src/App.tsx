@@ -2,11 +2,13 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./auth/AuthContext";
 import { AuthGate } from "./auth/AuthGate";
+import { RequirePermission } from "./auth/RequirePermission";
 import { Layout } from "./components/layout/Layout";
 import { LivePage } from "./pages/LivePage";
 import { ControlPage } from "./pages/ControlPage";
 import { RobotConfigPage } from "./pages/RobotConfigPage";
 import { VideoTuningPage } from "./pages/VideoTuningPage";
+import { TeamPage } from "./pages/TeamPage";
 
 // Lazy: three.js and the URDF loader are most of this page's weight, and no other page uses
 // them — the drive pad must not pay for a 3D engine it never draws.
@@ -32,9 +34,10 @@ function AppRoutes() {
       <Routes>
         <Route element={<Layout />}>
           <Route index element={<LivePage />} />
-          <Route path="drive" element={<ControlPage />} />
-          <Route path="robot" element={<RobotConfigPage />} />
-          <Route path="video" element={<VideoTuningPage />} />
+          <Route path="drive" element={<RequirePermission perm="operate"><ControlPage /></RequirePermission>} />
+          <Route path="robot" element={<RequirePermission perm="configure"><RobotConfigPage /></RequirePermission>} />
+          <Route path="video" element={<RequirePermission perm="configure"><VideoTuningPage /></RequirePermission>} />
+          <Route path="team" element={<RequirePermission perm="manage_users"><TeamPage /></RequirePermission>} />
           <Route
             path="joints"
             element={

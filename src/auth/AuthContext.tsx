@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { getAuthState, getMe, setUp, signIn, signOut } from "../api/auth";
+import { acceptInvitation, completePasswordReset } from "../api/team";
 import type { Me, SetupInput } from "../api/auth";
 import { onSignedOut } from "./signedOut";
 
@@ -27,6 +28,8 @@ interface AuthApi {
   status: AuthStatus;
   signIn: (email: string, password: string, remember: boolean) => Promise<void>;
   setUp: (input: SetupInput) => Promise<void>;
+  acceptInvitation: (token: string, name: string, password: string, remember: boolean) => Promise<void>;
+  completePasswordReset: (token: string, password: string, remember: boolean) => Promise<void>;
   signOut: () => Promise<void>;
   retry: () => void;
 }
@@ -80,6 +83,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus({ kind: "signed-in", me });
   }, []);
 
+  const doAccept = useCallback(
+    async (token: string, name: string, password: string, remember: boolean) => {
+      const me = await acceptInvitation(token, name, password, remember);
+      // Leave /invite#token=… behind: the link is spent, and the app opens on Live.
+      history.replaceState(null, "", "/");
+      setStatus({ kind: "signed-in", me });
+    },
+    [],
+  );
+
+  const doReset = useCallback(async (token: string, password: string, remember: boolean) => {
+    const me = await completePasswordReset(token, password, remember);
+    history.replaceState(null, "", "/");
+    setStatus({ kind: "signed-in", me });
+  }, []);
+
   const doSignOut = useCallback(async () => {
     const orgName = status.kind === "signed-in" ? status.me.org.name : null;
     try {
@@ -95,8 +114,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const api = useMemo(
-    () => ({ status, signIn: doSignIn, setUp: doSetUp, signOut: doSignOut, retry }),
-    [status, doSignIn, doSetUp, doSignOut, retry],
+    () => ({
+      status, signIn: doSignIn, setUp: doSetUp, acceptInvitation: doAccept,
+      completePasswordReset: doReset, signOut: doSignOut, retry,
+    }),
+    [status, doSignIn, doSetUp, doAccept, doReset, doSignOut, retry],
   );
   return <AuthContext.Provider value={api}>{children}</AuthContext.Provider>;
 }

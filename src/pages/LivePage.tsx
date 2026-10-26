@@ -31,6 +31,7 @@ import { useVoiceAssistantContext } from "../components/layout/VoiceAssistantCon
 import { captureFrame, encodeFrame, snapshotFrame } from "../lib/capture";
 import { startPairing } from "../lib/framePairing";
 import { StatusText, type Status } from "../components/ui/StatusText";
+import { useCan } from "../auth/permissions";
 import type {
   CommandResponse,
   ConfigState,
@@ -55,7 +56,13 @@ export function LivePage() {
   //   "robot" -> the robot camera; we start the bridge and VIEW /ws/view.
   //   "view"  -> a read-only MIRROR of whatever the session is showing (/ws/view),
   //              without producing or starting the robot camera.
-  const [source, setSource] = useState<"own" | "robot" | "view">("own");
+  // What this role may do here: a viewer only mirrors the session (no camera of its own, no
+  // YOLO/VLM/command panels — those spend GPU or reach the robot), an operator may also start
+  // the robot camera. The backend refuses the rest anyway; this keeps it off the screen.
+  const can = useCan();
+  const mayAnalyze = can("analyze");
+  const mayOperate = can("operate");
+  const [source, setSource] = useState<"own" | "robot" | "view">(mayAnalyze ? "own" : "view");
   const [robotCamStatus, setRobotCamStatus] = useState<Status | null>(null);
   const viewing = source !== "own"; // true when we're a /ws/view consumer
   // Master YOLO on/off (shared session flag). Default OFF so no GPU is used until
@@ -657,7 +664,7 @@ export function LivePage() {
         <p className="mt-0 mb-2.5 text-xs text-[#ff9aa6]">{cameraError}</p>
       )}
       <ControlsStageLayout
-        columns={[
+        columns={!mayAnalyze ? [] : [
           {
             key: "yolo",
             title: "YOLO",
@@ -801,12 +808,16 @@ export function LivePage() {
 
         {/* Camera source picker (this one page replaces Live + Monitor). */}
         <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
-          <Button variant={source === "own" ? "primary" : "secondary"} onClick={useOwnCamera}>
-            My camera
-          </Button>
-          <Button variant={source === "robot" ? "primary" : "secondary"} onClick={useRobotCam}>
-            Robot camera
-          </Button>
+          {mayAnalyze && (
+            <Button variant={source === "own" ? "primary" : "secondary"} onClick={useOwnCamera}>
+              My camera
+            </Button>
+          )}
+          {mayOperate && (
+            <Button variant={source === "robot" ? "primary" : "secondary"} onClick={useRobotCam}>
+              Robot camera
+            </Button>
+          )}
           <Button variant={source === "view" ? "primary" : "secondary"} onClick={useMirror}>
             View only
           </Button>

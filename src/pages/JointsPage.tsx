@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ControlPanel } from "../components/joints/ControlPanel";
+import { useCan } from "../auth/permissions";
 import {
   JointInspector,
   JointTable,
@@ -93,7 +94,10 @@ export function JointsPage() {
   }
 
   const fresh = !!source.frame && source.frame.ageMs >= 0 && source.frame.ageMs < STALE_AGE_MS;
-  const cannotTakeWhy = kind !== "live"
+  const can = useCan();
+  const cannotTakeWhy = !can("operate")
+    ? "Your role can watch the robot, not move it."
+    : kind !== "live"
     ? "Switch the source to Live robot to move it."
     : source.link !== "live" || !fresh
       ? "Waiting for live joint readings from the robot."
