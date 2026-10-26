@@ -18,10 +18,12 @@ const PIN = L.divIcon({
 
 const WORLD: L.LatLngExpression = [-34.6, -58.4]; // first view with no pin yet
 
-export function SiteMap({ lat, lon, onPick, className = "" }: {
+export function SiteMap({ lat, lon, onPick, focus = 0, className = "" }: {
   lat: number | null;
   lon: number | null;
   onPick?: (lat: number, lon: number) => void;
+  /** Bump to fly to the pin at street level (an address search moved it far away). */
+  focus?: number;
   className?: string;
 }) {
   const box = useRef<HTMLDivElement>(null);
@@ -75,6 +77,12 @@ export function SiteMap({ lat, lon, onPick, className = "" }: {
       m.setView([lat, lon], m.getZoom());
     }
   }, [lat, lon]);
+
+  useEffect(() => {
+    if (focus && lat !== null && lon !== null) map.current?.flyTo([lat, lon], 17, { duration: 0.8 });
+    // Only a new `focus` flies; the pin moving by a click must not drag the view.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus]);
 
   return <div ref={box} className={`z-0 ${onPick ? "cursor-crosshair" : ""} ${className}`} />;
 }

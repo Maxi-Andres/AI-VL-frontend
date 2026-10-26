@@ -90,3 +90,10 @@ export const MAP_TILES = {
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   maxZoom: 19,
 };
+
+/**
+ * Address search for placing a site (OpenStreetMap's Nominatim). Free and keyless; its usage
+ * policy allows this light use — a search when someone edits a site, never automatic or in a
+ * loop. A deploy with heavier needs points this at its own geocoder.
+ */
+export const GEOCODER_URL = "https://nominatim.openstreetmap.org/search";

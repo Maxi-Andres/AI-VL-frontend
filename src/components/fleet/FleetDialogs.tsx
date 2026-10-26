@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ButtonHTMLAttributes, FormEvent, ReactNode } from "react";
-import { IconBone, IconPhotoUp, IconRobot, IconTrash, IconX } from "@tabler/icons-react";
+import { IconBone, IconLoader2, IconMapPin, IconPhotoUp, IconRobot, IconSearch, IconTrash, IconX } from "@tabler/icons-react";
+import { searchAddress, type Place } from "../../lib/geocode";
 import { deletePlan, deleteRobot, deleteSite, saveRobot, saveSite, uploadPlan } from "../../api/fleet";
 import type { Fleet, FleetRobot, Site } from "../../api/fleet";
 import { SiteMap } from "./SiteMap";
@@ -56,6 +57,32 @@ export function SiteDialog({ site, robotsHere, onClose }: { site: Site | null; r
   const [name, setName] = useState(site?.name ?? "");
   const [timezone, setTimezone] = useState(site?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC");
   const [address, setAddress] = useState(site?.address ?? "");
+  // Address search: the matches, whether one is being looked up, and a counter that tells the
+  // map to fly to the pin a search placed.
+  const [places, setPlaces] = useState<Place[] | null>(null);
+  const [finding, setFinding] = useState(false);
+  const [findError, setFindError] = useState<string | null>(null);
+  const [focus, setFocus] = useState(0);
+  const place = (p: Place) => {
+    setLat(p.lat);
+    setLon(p.lon);
+    setFocus((n) => n + 1);
+    setPlaces(null);
+  };
+  async function find() {
+    setFinding(true);
+    setFindError(null);
+    try {
+      const found = await searchAddress(address);
+      if (found.length === 1) place(found[0]);
+      else if (found.length) setPlaces(found);
+      else setFindError("No place found for that address. Try adding the city, or click the map.");
+    } catch (e) {
+      setFindError(errorText(e));
+    } finally {
+      setFinding(false);
+    }
+  }
   const [lat, setLat] = useState<number | null>(site?.lat ?? null);
   const [lon, setLon] = useState<number | null>(site?.lon ?? null);
   const [plan, setPlan] = useState<File | null>(null);
@@ -109,8 +136,37 @@ export function SiteDialog({ site, robotsHere, onClose }: { site: Site | null; r
           </div>
           <div>
             <Label htmlFor="site-address">Address</Label>
-            <input id="site-address" maxLength={255} value={address} placeholder="Street, city"
-              onChange={(e) => setAddress(e.target.value)} className={inputCls} />
+            <div className="flex gap-2">
+              <input id="site-address" maxLength={255} value={address} placeholder="Street, city"
+                onChange={(e) => setAddress(e.target.value)}
+                // Enter searches the map instead of submitting the dialog.
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void find();
+                  }
+                }}
+                className={inputCls} />
+              <button type="button" onClick={() => void find()} disabled={!address.trim() || finding}
+                title="Find this address on the map"
+                className="grid w-10 shrink-0 cursor-pointer place-items-center rounded-lg border border-line text-muted transition hover:border-accent hover:text-fg disabled:cursor-default disabled:opacity-40">
+                {finding ? <IconLoader2 size={16} className="animate-spin" /> : <IconSearch size={16} />}
+              </button>
+            </div>
+            {findError && <p className="m-0 mt-1.5 text-xs text-warn-fg">{findError}</p>}
+            {places && (
+              <ul className="m-0 mt-1.5 max-h-44 list-none overflow-y-auto rounded-lg border border-line bg-panel p-1 shadow-lift">
+                {places.map((p) => (
+                  <li key={`${p.lat},${p.lon}`}>
+                    <button type="button" onClick={() => place(p)}
+                      className="flex w-full cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-left text-xs text-fg hover:bg-subtle">
+                      <IconMapPin size={14} className="mt-0.5 shrink-0 text-accent" />
+                      <span className="line-clamp-2">{p.label}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
           <div>
             <Label htmlFor="site-tz">Time zone</Label>
@@ -145,8 +201,8 @@ export function SiteDialog({ site, robotsHere, onClose }: { site: Site | null; r
           </div>
         </div>
         <div className="flex flex-col">
-          <Label>Location — click the map to place the site</Label>
-          <SiteMap lat={lat} lon={lon} onPick={(a, b) => { setLat(a); setLon(b); }}
+          <Label>Location — search the address, or click the map</Label>
+          <SiteMap lat={lat} lon={lon} focus={focus} onPick={(a, b) => { setLat(a); setLon(b); }}
             className="min-h-[260px] flex-1 overflow-hidden rounded-lg border border-line" />
           <div className="mt-1.5 flex items-center text-xs text-muted">
             {lat !== null && lon !== null ? `${lat.toFixed(5)}, ${lon.toFixed(5)}` : "No location"}
