@@ -27,15 +27,16 @@ const TEMP_TEXT = {
   critical: "text-[#ef4444] font-semibold",
 };
 
+/** One block of a tab in the side panel; consecutive blocks are split by a rule. */
 export function Section({ title, children, aside }: {
   title: string;
   children: ReactNode;
   aside?: ReactNode;
 }) {
   return (
-    <section className="rounded-md border border-line bg-panel p-3">
-      <div className="mb-2 flex items-baseline justify-between gap-2">
-        <h2 className="m-0 text-xs font-semibold uppercase tracking-wider text-muted">{title}</h2>
+    <section className="border-b border-line pb-4 last:border-0 last:pb-0">
+      <div className="mb-2.5 flex items-baseline justify-between gap-2">
+        <h2 className="m-0 text-[13.5px] font-extrabold text-fg">{title}</h2>
         {aside}
       </div>
       {children}
@@ -67,7 +68,8 @@ function linkStatus(s: JointSourceState): Status {
   }
 }
 
-export function SourcePanel({ kind, onKind, state, locked = false }: {
+/** Live robot or the recorded walk, and how the stream is doing — the bar above the viewer. */
+export function SourceBar({ kind, onKind, state, locked = false }: {
   kind: JointSourceKind;
   onKind: (k: JointSourceKind) => void;
   state: JointSourceState;
@@ -80,27 +82,25 @@ export function SourcePanel({ kind, onKind, state, locked = false }: {
       onClick={() => onKind(k)}
       aria-pressed={kind === k}
       disabled={locked && kind !== k}
-      className={`flex-1 cursor-pointer rounded px-2 py-1 text-xs disabled:cursor-default disabled:opacity-40 ${
-        kind === k ? "bg-subtle font-semibold text-fg" : "text-muted hover:text-fg"
+      title={locked && kind !== k ? "Release the arms first: while you hold them you watch the live robot." : undefined}
+      className={`cursor-pointer rounded-lg px-3 py-1.5 text-[12.5px] font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+        kind === k ? "bg-panel text-fg shadow-card" : "text-muted hover:text-fg"
       }`}
     >
       {label}
     </button>
   );
   const tone = state.link === "error" ? "text-bad-fg" : state.link === "stale"
-    ? "text-warn-fg" : "text-muted";
+    ? "text-warn-fg" : state.link === "live" || state.link === "replay" ? "text-good-fg" : "text-muted";
   return (
-    <Section title="Source">
-      <div className="mb-2 flex gap-1 rounded-md border border-line bg-bg p-0.5">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+      <div className="flex rounded-xl bg-subtle p-1">
         {opt("live", "Live robot")}
         {opt("replay", "Recorded walk")}
       </div>
-      <StatusText wrap status={linkStatus(state)} className={`text-xs ${tone}`} />
-      {state.note && <p className="m-0 mt-1 text-xs text-muted">{state.note}</p>}
-      <p className="m-0 mt-2 text-xs text-muted">
-        Watching is read-only. Moving a joint is a separate step: Take control, below.
-      </p>
-    </Section>
+      <StatusText status={linkStatus(state)} className={`min-w-0 text-[12.5px] font-semibold ${tone}`} />
+      {state.note && <span className="min-w-0 text-xs text-muted">{state.note}</span>}
+    </div>
   );
 }
 
@@ -114,7 +114,7 @@ function RangeBar({ value, lower, upper }: { value: number; lower: number; upper
   const out = value < lower || value > upper;
   return (
     <div>
-      <div className="relative h-2 rounded-full bg-bg">
+      <div className="relative h-2 rounded-full bg-subtle">
         {zero > 0 && zero < 100 && (
           <span className="absolute top-[-2px] h-3 w-px bg-line" style={{ left: `${zero}%` }} />
         )}

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
+import { IconActivityHeartbeat, IconHandFinger, IconList, IconTarget } from "@tabler/icons-react";
 import { ControlPanel } from "../components/joints/ControlPanel";
 import { useCan } from "../auth/permissions";
 import {
   JointInspector,
   JointTable,
   LegCheckPanel,
-  SourcePanel,
+  SourceBar,
   TiltPanel,
 } from "../components/joints/JointPanels";
 import { RobotViewer, type JointLimits } from "../components/joints/RobotViewer";
@@ -34,6 +35,8 @@ export function JointsPage() {
   const source = useJointSource(kind);
   const control = useJointControl();
   const [selected, setSelected] = useState<string | null>(null);
+  // Presentation only: the side panel's tab.
+  const [tab, setTab] = useState<"control" | "joint" | "health" | "all">("control");
   const [hovered, setHovered] = useState<string | null>(null);
   const [colorByTemp, setColorByTemp] = useState(true);
   const [showTilt, setShowTilt] = useState(true);
@@ -103,57 +106,87 @@ export function JointsPage() {
       ? "Waiting for live joint readings from the robot."
       : null;
 
+  // Clicking a part of the robot opens its details — except while steering, when the Control
+  // tab already highlights that joint's row and must stay in front of the operator.
+  const pick = (urdf: string | null) => {
+    setSelected(urdf);
+    if (urdf && !steering) setTab("joint");
+  };
+
+  const TABS = [
+    ["control", "Control", IconHandFinger],
+    ["joint", "Joint", IconTarget],
+    ["health", "Health", IconActivityHeartbeat],
+    ["all", "All joints", IconList],
+  ] as const;
+
   return (
-    <main className="grid gap-3 p-3 lg:h-[calc(100dvh-49px)] lg:grid-cols-[minmax(0,1fr)_380px]">
-      <div className="h-[60vh] min-w-0 lg:h-full">
-        <RobotViewer
-          frame={source.frame}
-          selected={selected}
-          hovered={hovered}
-          onHover={setHovered}
-          onSelect={setSelected}
-          colorByTemp={colorByTemp}
-          showTilt={showTilt}
-          onLimits={setLimits}
-          ghost={steering ? ghost : null}
-          stalls={control.stalls}
-        />
+    <main className="grid gap-4 p-4 lg:h-[calc(100dvh-57px)] lg:grid-cols-[minmax(0,1fr)_400px] lg:overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-col gap-3">
+        <SourceBar kind={kind} onKind={setKind} state={source} locked={control.phase !== "off"} />
+        <div className="h-[60vh] min-h-0 lg:h-auto lg:flex-1">
+          <RobotViewer
+            frame={source.frame}
+            selected={selected}
+            hovered={hovered}
+            onHover={setHovered}
+            onSelect={pick}
+            colorByTemp={colorByTemp}
+            showTilt={showTilt}
+            onLimits={setLimits}
+            ghost={steering ? ghost : null}
+            stalls={control.stalls}
+          />
+        </div>
       </div>
       {/* One column no wider than the page gives it: an auto track grows to its widest child,
           and a long message once pushed the whole panel sideways under a scrollbar. */}
-      <aside className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-3 lg:overflow-x-hidden lg:overflow-y-auto lg:pr-1">
-        <SourcePanel
-          kind={kind}
-          onKind={setKind}
-          state={source}
-          locked={control.phase !== "off"}
-        />
-        <ControlPanel
-          control={control}
-          joints={Object.keys(origin)}
-          canTake={cannotTakeWhy === null}
-          cannotTakeWhy={cannotTakeWhy}
-          selected={selected}
-          frame={source.frame}
-          limits={limits}
-          origin={origin}
-          goals={goals}
-          onGoal={onGoal}
-          onSelect={setSelected}
-          onBackToStart={onBackToStart}
-        />
-        <JointInspector urdf={hovered ?? selected} frame={source.frame} limits={limits} />
-        <TiltPanel frame={source.frame} showTilt={showTilt} onShowTilt={setShowTilt} />
-        <LegCheckPanel frame={source.frame} />
-        <JointTable
-          frame={source.frame}
-          selected={selected}
-          hovered={hovered}
-          onSelect={setSelected}
-          onHover={setHovered}
-          colorByTemp={colorByTemp}
-          onColorByTemp={setColorByTemp}
-        />
+      <aside className="flex min-h-[480px] min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-card">
+        <div className="m-3 mb-0 grid grid-cols-4 gap-0.5 rounded-xl bg-subtle p-1">
+          {TABS.map(([id, label, Icon]) => (
+            <button key={id} type="button" onClick={() => setTab(id)} aria-pressed={tab === id}
+              className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-lg py-1.5 text-[12px] font-bold whitespace-nowrap transition ${
+                tab === id ? "bg-panel text-fg shadow-card" : "text-muted hover:text-fg"}`}>
+              <Icon size={15} className="shrink-0" />{label}
+            </button>
+          ))}
+        </div>
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] content-start gap-4 overflow-x-hidden overflow-y-auto p-4">
+          {tab === "control" && (
+            <ControlPanel
+              control={control}
+              joints={Object.keys(origin)}
+              canTake={cannotTakeWhy === null}
+              cannotTakeWhy={cannotTakeWhy}
+              selected={selected}
+              frame={source.frame}
+              limits={limits}
+              origin={origin}
+              goals={goals}
+              onGoal={onGoal}
+              onSelect={setSelected}
+              onBackToStart={onBackToStart}
+            />
+          )}
+          {tab === "joint" && <JointInspector urdf={hovered ?? selected} frame={source.frame} limits={limits} />}
+          {tab === "health" && (
+            <>
+              <TiltPanel frame={source.frame} showTilt={showTilt} onShowTilt={setShowTilt} />
+              <LegCheckPanel frame={source.frame} />
+            </>
+          )}
+          {tab === "all" && (
+            <JointTable
+              frame={source.frame}
+              selected={selected}
+              hovered={hovered}
+              onSelect={setSelected}
+              onHover={setHovered}
+              colorByTemp={colorByTemp}
+              onColorByTemp={setColorByTemp}
+            />
+          )}
+        </div>
       </aside>
     </main>
   );
