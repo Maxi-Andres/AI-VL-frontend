@@ -19,8 +19,8 @@ speak, with wake-word). The Live page picks its own video source — "My camera"
 "Robot camera", or "View only", the last being a read-only mirror of whatever the
 session is streaming (this replaced the old separate `/monitor` page).
 Routes: `/` (Fleet, the home: sites and robots with each robot's live state; admins build it
-there), `/team` (members, invitations, roles — admins), `/live` (live), `/drive` (robot drive pad), `/robot` (on-robot config),
-`/video` (live video tuning), `/joints` (the G1 in 3D, posed live from its joint state;
+there), `/team` (members, invitations, roles — admins), `/live` (live), `/drive` (robot drive pad), `/settings` (on-robot config and
+live video tuning in one page with a section menu; `/robot` and `/video` redirect there), `/joints` (the G1 in 3D, posed live from its joint state;
 `#replay` opens it on a recorded walk; "Take control" moves the arms, waist and fingers over a separate socket,
 `/ws/joint-control` — every limit is on the robot, the page only names targets). The 3D model in `public/g1/` is built by
 `scripts/build_g1_model.py` from Unitree's g1_description; do not hand-edit it.

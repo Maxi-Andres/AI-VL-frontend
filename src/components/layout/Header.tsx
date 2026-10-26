@@ -2,12 +2,11 @@ import { NavLink } from "react-router-dom";
 import type { ReactNode } from "react";
 import {
   IconBroadcast,
-  IconCpu,
   IconLayoutGrid,
   IconMan,
+  IconSettings,
   IconSteeringWheel,
   IconUsers,
-  IconVideo,
 } from "@tabler/icons-react";
 import { useCan, type Permission } from "../../auth/permissions";
 import { useMe } from "../../auth/AuthContext";
@@ -26,9 +25,8 @@ const TABS: { to: string; label: string; icon: typeof IconBroadcast; perm?: Perm
   { to: "/live", label: "Live", icon: IconBroadcast },
   { to: "/drive", label: "Drive", icon: IconSteeringWheel, perm: "operate" },
   { to: "/joints", label: "Joints", icon: IconMan },
-  { to: "/robot", label: "Robot", icon: IconCpu, perm: "configure" },
-  { to: "/video", label: "Video", icon: IconVideo, perm: "configure" },
   { to: "/team", label: "Team", icon: IconUsers, perm: "manage_users" },
+  { to: "/settings", label: "Settings", icon: IconSettings, perm: "configure" },
 ];
 
 const tabClass = ({ isActive }: { isActive: boolean }) =>

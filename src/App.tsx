@@ -6,8 +6,7 @@ import { RequirePermission } from "./auth/RequirePermission";
 import { Layout } from "./components/layout/Layout";
 import { LivePage } from "./pages/LivePage";
 import { ControlPage } from "./pages/ControlPage";
-import { RobotConfigPage } from "./pages/RobotConfigPage";
-import { VideoTuningPage } from "./pages/VideoTuningPage";
+import { SettingsPage } from "./pages/SettingsPage";
 import { TeamPage } from "./pages/TeamPage";
 import { FleetPage } from "./pages/FleetPage";
 
@@ -38,8 +37,10 @@ function AppRoutes() {
           <Route index element={<FleetPage />} />
           <Route path="live" element={<LivePage />} />
           <Route path="drive" element={<RequirePermission perm="operate"><ControlPage /></RequirePermission>} />
-          <Route path="robot" element={<RequirePermission perm="configure"><RobotConfigPage /></RequirePermission>} />
-          <Route path="video" element={<RequirePermission perm="configure"><VideoTuningPage /></RequirePermission>} />
+          <Route path="settings" element={<RequirePermission perm="configure"><SettingsPage /></RequirePermission>} />
+          {/* The two pages Settings replaced: old links and bookmarks still land. */}
+          <Route path="robot" element={<Navigate to="/settings" replace />} />
+          <Route path="video" element={<Navigate to="/settings#video" replace />} />
           <Route path="fleet" element={<Navigate to="/" replace />} />
           <Route path="team" element={<RequirePermission perm="manage_users"><TeamPage /></RequirePermission>} />
           <Route

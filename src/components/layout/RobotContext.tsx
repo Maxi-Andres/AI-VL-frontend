@@ -65,7 +65,7 @@ export function RobotProvider({ children }: { children: ReactNode }) {
   // bridge reads each robot's own video over the network (GO2_STREAM_URL / G1_STREAM_URL), so
   // following the robot is right on any network. It used to skip the switch while the camera
   // was on "stream" or "test", which is how the drive view ended up on one robot's camera
-  // while commanding the other. The test pattern is opted into on the Robot page.
+  // while commanding the other. The test pattern is opted into in Settings (Camera stream).
   const setRobot = useCallback((v: string) => {
     pickedRef.current = true;
     setRobotState(v);

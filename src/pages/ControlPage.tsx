@@ -647,7 +647,7 @@ export function ControlPage() {
               </button>
               {videoMenu && (
                 <div className="absolute top-11 right-0 z-20 flex w-[300px] animate-rise flex-col gap-2 rounded-xl border border-line bg-panel p-3 text-fg shadow-lift">
-                  {/* Here rather than only on the tuning page: this is the view being judged, so
+                  {/* Here rather than only in Settings: this is the view being judged, so
                       the switch has to be within reach of the person judging it. */}
                   <VideoTransportSwitch />
                   <RobotCameraSwitch />

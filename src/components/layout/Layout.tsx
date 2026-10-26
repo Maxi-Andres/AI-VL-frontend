@@ -23,7 +23,7 @@ function HeaderWithStatus() {
 }
 
 /** App shell: header (nav + robot selector + who-is-connected pills + live/voice
- * status) over the page. Settings live on the Robot page, not here: the header holds what
+ * status) over the page. Settings live on the Settings page, not here: the header holds what
  * you look at while driving, and the camera/network popovers that used to sit here wrote the
  * same values as the robot selector under other names. */
 export function Layout() {

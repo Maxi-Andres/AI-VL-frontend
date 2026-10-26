@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
-import { getRobotTransport, type RobotTransports } from "../api/backend";
-import { BACKEND_URL } from "../config";
-import { useRobot } from "../components/layout/RobotContext";
-import { CameraSettings } from "../components/robot/CameraSettings";
-import { ConnectionSettings } from "../components/robot/ConnectionSettings";
-import { StatusText } from "../components/ui/StatusText";
-import { NAMING_RULE, REPO_RELAY, REPO_VIDEO, deployFor, type RobotService } from "./robotDeploy";
+import { getRobotTransport, type RobotTransports } from "../../api/backend";
+import { BACKEND_URL } from "../../config";
+import { useRobot } from "../layout/RobotContext";
+import { CameraSettings } from "../robot/CameraSettings";
+import { ConnectionSettings } from "../robot/ConnectionSettings";
+import { StatusText } from "../ui/StatusText";
+import { NAMING_RULE, REPO_RELAY, REPO_VIDEO, deployFor, type RobotService } from "../../pages/robotDeploy";
 
 /**
- * Everything that is configured ON THE ROBOT, and how to change it.
+ * Everything that is configured ON THE ROBOT, and how to change it — the robot half of
+ * Settings (pages/SettingsPage.tsx). Each block is a `data-nav` card the page lists in its menu.
  *
- * WHY A PAGE OF ITS OWN: three services run on the robot's own computer (telemetry, video,
+ * WHY THESE LIVE IN THE APP AT ALL: three services run on the robot's own computer (telemetry, video,
  * command relay), because DDS cannot cross a subnet boundary on these robots — measured, 122
  * topics from the robot's own subnet versus 2 from another one. So the processes that touch
  * DDS have to sit next to it, and the addresses they push to live in .env files there rather
@@ -72,7 +73,7 @@ function ServiceRow({ s }: { s: RobotService }) {
   );
 }
 
-export function RobotConfigPage() {
+export function RobotSettings() {
   const { robot } = useRobot();
   const [data, setData] = useState<RobotTransports["transports"] | null>(null);
 
@@ -96,18 +97,20 @@ export function RobotConfigPage() {
   const deploy = deployFor(robot);
 
   return (
-    <main className="mx-auto max-w-3xl p-6 leading-relaxed">
-      <h2 className="mt-0 text-lg font-semibold">Robot configuration</h2>
-      <p className="text-muted">
+    <div className="grid gap-4 leading-relaxed">
+      <section data-nav="About these values" className="scroll-mt-4 rounded-2xl border border-line bg-panel p-5 shadow-card">
+      <h3 className="m-0 mb-2 text-[15px] font-extrabold text-fg">About these values</h3>
+      <p className="m-0 text-sm text-muted">
         These values are set on <strong>{robot}</strong> itself, in <code>.env</code> files on
         the robot — not in this app and not in source code. They are shown here as the
         <em> running processes</em> report them, so a file edited without restarting its
         service will still show the old value. That is deliberate: it is what is actually in
         effect.
       </p>
+      </section>
 
-      <section className="rounded-md border border-line bg-panel p-3">
-        <h3 className="mb-1 mt-0 text-base font-semibold">Which code runs on which robot</h3>
+      <section data-nav="Which code runs where" className="scroll-mt-4 rounded-2xl border border-line bg-panel p-5 shadow-card">
+        <h3 className="m-0 mb-2 text-[15px] font-extrabold text-fg">Which code runs on which robot</h3>
         <p className="mb-2 text-sm text-muted">
           The Go2 and the G1 run <strong>different code from the same three repos</strong>. The
           file name says which: read it before building or copying anything onto a robot.
@@ -127,13 +130,13 @@ export function RobotConfigPage() {
         </p>
       </section>
 
-      <section>
-        <h3 className="mb-1 text-base font-semibold">Connection — {robot}</h3>
+      <section data-nav="Connection" className="scroll-mt-4 rounded-2xl border border-line bg-panel p-5 shadow-card">
+        <h3 className="m-0 mb-2 text-[15px] font-extrabold text-fg">Connection — {robot}</h3>
         <ConnectionSettings />
       </section>
 
-      <section>
-        <h3 className="mb-1 text-base font-semibold">Camera stream</h3>
+      <section data-nav="Camera stream" className="scroll-mt-4 rounded-2xl border border-line bg-panel p-5 shadow-card">
+        <h3 className="m-0 mb-2 text-[15px] font-extrabold text-fg">Camera stream</h3>
         <CameraSettings />
       </section>
 
@@ -152,8 +155,8 @@ export function RobotConfigPage() {
         </p>
       )}
 
-      <section>
-        <h3 className="mb-1 text-base font-semibold">Video</h3>
+      <section data-nav="Robot video" className="scroll-mt-4 rounded-2xl border border-line bg-panel p-5 shadow-card">
+        <h3 className="m-0 mb-2 text-[15px] font-extrabold text-fg">Video</h3>
         {video?.running ? (
           <Facts
             rows={[
@@ -215,8 +218,8 @@ export function RobotConfigPage() {
         />
       </section>
 
-      <section>
-        <h3 className="mb-1 text-base font-semibold">Telemetry</h3>
+      <section data-nav="Telemetry" className="scroll-mt-4 rounded-2xl border border-line bg-panel p-5 shadow-card">
+        <h3 className="m-0 mb-2 text-[15px] font-extrabold text-fg">Telemetry</h3>
         {telemetry?.running ? (
           <Facts
             rows={[
@@ -251,8 +254,8 @@ export function RobotConfigPage() {
         />
       </section>
 
-      <section>
-        <h3 className="mb-1 text-base font-semibold">Safety envelope</h3>
+      <section data-nav="Safety envelope" className="scroll-mt-4 rounded-2xl border border-line bg-panel p-5 shadow-card">
+        <h3 className="m-0 mb-2 text-[15px] font-extrabold text-fg">Safety envelope</h3>
         {limits ? (
           <Facts
             rows={[
@@ -280,8 +283,8 @@ export function RobotConfigPage() {
         />
       </section>
 
-      <section>
-        <h3 className="mb-1 text-base font-semibold">
+      <section data-nav="Installed software" className="scroll-mt-4 rounded-2xl border border-line bg-panel p-5 shadow-card">
+        <h3 className="m-0 mb-2 text-[15px] font-extrabold text-fg">
           What is installed on the {deploy.label}, and how to update it
         </h3>
         <p className="mb-1 text-sm text-muted">
@@ -313,8 +316,8 @@ export function RobotConfigPage() {
       </section>
 
       {deploy.firstTime.length > 0 && (
-        <section>
-          <h3 className="mb-1 text-base font-semibold">First-time setup on the {deploy.label}</h3>
+        <section data-nav="First-time setup" className="scroll-mt-4 rounded-2xl border border-line bg-panel p-5 shadow-card">
+          <h3 className="m-0 mb-2 text-[15px] font-extrabold text-fg">First-time setup on the {deploy.label}</h3>
           <p className="mb-2 text-sm text-muted">
             Once per robot, in this order. Already-done steps are marked as such; they are kept
             here because they are what to repeat if the computer is ever reinstalled.
@@ -329,8 +332,8 @@ export function RobotConfigPage() {
         </section>
       )}
 
-      <section>
-        <h3 className="mb-1 text-base font-semibold">Services on the robot</h3>
+      <section data-nav="Services" className="scroll-mt-4 rounded-2xl border border-line bg-panel p-5 shadow-card">
+        <h3 className="m-0 mb-2 text-[15px] font-extrabold text-fg">Services on the robot</h3>
         <p className="mb-1 text-sm text-muted">
           All are enabled at boot, so powering the robot on is enough — nothing here has to be
           started by hand.
@@ -347,8 +350,8 @@ export function RobotConfigPage() {
       </section>
 
       {/* Moved here from the About page (removed 2026-10-07): the one live fact it had. */}
-      <section>
-        <h3 className="mb-1 text-base font-semibold">This app</h3>
+      <section data-nav="This app" className="scroll-mt-4 rounded-2xl border border-line bg-panel p-5 shadow-card">
+        <h3 className="m-0 mb-2 text-[15px] font-extrabold text-fg">This app</h3>
         <p className="mb-1 text-sm text-muted">
           The browser talks only to the backend, which reaches iacore and the robots for it. It
           is pointed at:
@@ -359,6 +362,6 @@ export function RobotConfigPage() {
           <code>VITE_BACKEND_URL</code> at build time.
         </p>
       </section>
-    </main>
+    </div>
   );
 }

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getRobotVideo, setRobotVideo } from "../api/backend";
-import type { RobotVideoState } from "../api/backend";
-import { useRobot } from "../components/layout/RobotContext";
-import { Button } from "../components/ui/Button";
-import { Field } from "../components/ui/Field";
-import { NumberField } from "../components/ui/NumberField";
-import { StatusText, type Status } from "../components/ui/StatusText";
+import { getRobotVideo, setRobotVideo } from "../../api/backend";
+import type { RobotVideoState } from "../../api/backend";
+import { useRobot } from "../layout/RobotContext";
+import { Button } from "../ui/Button";
+import { Field } from "../ui/Field";
+import { NumberField } from "../ui/NumberField";
+import { StatusText, type Status } from "../ui/StatusText";
 
 /** The knobs, in the order they matter for latency.
  *  `live` here is only the DEFAULT ordering hint — the robot is the authority and
@@ -179,7 +179,7 @@ const POLL_MS = 4000;
  *
  * Applying and saving are deliberately separate: you try many values and keep one.
  */
-export function VideoTuningPage() {
+export function VideoSettings() {
   const { robot } = useRobot();
   const [state, setState] = useState<RobotVideoState | null>(null);
   const [draft, setDraft] = useState<Record<string, number>>({});
@@ -295,26 +295,28 @@ export function VideoTuningPage() {
   const reachable = state?.ok !== false;
 
   return (
-    <main className="mx-auto max-w-3xl p-6 leading-relaxed">
-      <h2 className="mt-0 text-lg font-semibold">Video tuning — {robot}</h2>
-      <p className="mb-1 text-sm text-muted">
+    <div className="grid gap-4 leading-relaxed">
+      <section data-nav="Video tuning" className="scroll-mt-4 rounded-2xl border border-line bg-panel p-5 shadow-card">
+      <h3 className="m-0 mb-2 text-[15px] font-extrabold text-fg">Video tuning — {robot}</h3>
+      <p className="m-0 text-sm text-muted">
         The robot&apos;s video knobs, by stream. The right values differ on cable, LTE and
         Starlink, which is why they are here and not behind SSH. Each knob says whether it
         applies now or needs a restart of the robot&apos;s video service.
       </p>
 
       {!reachable && (
-        <p className="text-amber-500">
+        <p className="mt-3 mb-0 rounded-lg bg-warn-bg px-3 py-2 text-sm text-warn-fg">
           The robot is not answering: {state?.error ?? "unknown error"}. Check that the
-          command transport is set to <strong>relay</strong> on the Robot page.
+          command transport is set to <strong>relay</strong> under Connection.
         </p>
       )}
+      </section>
 
       {GROUPS.map(({ title, keys, note }) => {
         const knobs = KNOBS.filter((k) => keys.includes(k.key));
         return (
-          <section key={title} className="mt-5">
-            <h3 className="mb-1 text-base font-semibold">{title}</h3>
+          <section key={title} data-nav={title} className="scroll-mt-4 rounded-2xl border border-line bg-panel p-5 shadow-card">
+            <h3 className="m-0 mb-2 text-[15px] font-extrabold text-fg">{title}</h3>
             <p className="mb-3 text-xs text-muted">{note(robot)}</p>
             <div className="flex flex-col gap-4">
               {knobs.map(({ key, kind, fallback, label, unit, step, options, hint }) => {
@@ -439,20 +441,20 @@ export function VideoTuningPage() {
         );
       })}
 
-      <div className="mt-5 flex items-center gap-2.5">
-        <Button variant="primary" disabled={busy || !reachable} onClick={() => apply(false)}>
+      {/* Always in reach while scrolling the knobs, like a form's save bar. */}
+      <div className="sticky bottom-4 z-10 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl bg-fg px-4 py-3 text-bg shadow-lift">
+        <span className="min-w-0 flex-1 text-[12.5px] opacity-80">
+          <strong>Apply</strong> changes the running publisher only — a restart brings the saved
+          values back. <strong>Apply and save</strong> also writes the robot&apos;s <code>video.env</code>.
+        </span>
+        <StatusText status={status} className="text-xs" />
+        <Button variant="secondary" className="!border-transparent !bg-bg/15 !text-bg" disabled={busy || !reachable} onClick={() => apply(false)}>
           Apply
         </Button>
-        <Button variant="secondary" disabled={busy || !reachable} onClick={() => apply(true)}>
+        <Button variant="primary" disabled={busy || !reachable} onClick={() => apply(true)}>
           Apply and save
         </Button>
-        <StatusText status={status} />
       </div>
-      <p className="mt-2 text-xs text-muted">
-        <strong>Apply</strong> changes the running publisher only — a restart of the robot's
-        video service brings the saved values back. <strong>Apply and save</strong> also
-        writes the robot's <code>video.env</code>.
-      </p>
-    </main>
+    </div>
   );
 }

@@ -12,7 +12,7 @@ import { useRobot } from "../layout/RobotContext";
  * How this machine reaches the SELECTED robot: the online-check address, the command
  * transport (DDS or the relay on the robot) and the relay URL — all per robot. Lived in a
  * header popover ("Net") until 2026-10-01, mixed with the global DDS peer list below; it moved
- * to the Robot page because none of it is something you flip while driving.
+ * to Settings because none of it is something you flip while driving.
  *
  * ADVANCED, collapsed: the DDS peer list.
  *
