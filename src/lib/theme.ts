@@ -1,9 +1,11 @@
 // The person's theme choice: light, dark, or follow the operating system. Kept per browser
 // (a control room may run dark while the same person's laptop is light), applied as
 // <html data-theme="dark"> — index.css re-points every colour token from there.
+import { useSyncExternalStore } from "react";
 export type ThemeChoice = "light" | "dark" | "system";
 
 const KEY = "pilot.theme";
+const CHANGED = "pilot:theme"; // so every picker on screen (menu, Profile) shows the same choice
 const media = () => window.matchMedia?.("(prefers-color-scheme: dark)");
 
 export function savedTheme(): ThemeChoice {
@@ -32,6 +34,15 @@ export function saveTheme(choice: ThemeChoice): void {
     /* private mode: the choice lasts this page only */
   }
   applyTheme(choice);
+  window.dispatchEvent(new Event(CHANGED));
+}
+
+/** The current choice, kept in step across every component that shows it. */
+export function useThemeChoice(): ThemeChoice {
+  return useSyncExternalStore((cb) => {
+    window.addEventListener(CHANGED, cb);
+    return () => window.removeEventListener(CHANGED, cb);
+  }, savedTheme);
 }
 
 /** Re-apply when the OS switches, for people on "system". Returns the unsubscribe. */

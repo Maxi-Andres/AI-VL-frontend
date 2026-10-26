@@ -1,27 +1,25 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { IconBone, IconCheck, IconChevronDown, IconRobot } from "@tabler/icons-react";
 import { getFleet } from "../../api/fleet";
 import { usePresence } from "../../hooks/usePresence";
 import { useRobotTransports } from "../../hooks/useRobotTransports";
-import { BatteryPill, PresencePills, robotState } from "./PresencePills";
+import { BatteryPill, robotState } from "./PresencePills";
 import { useRobot } from "./RobotContext";
-import { StatusBadge } from "./StatusBadge";
+import { DropMenu, useDropdown } from "../ui/DropMenu";
 
 const ICON: Record<string, typeof IconRobot> = { go2: IconBone, g1: IconRobot };
 const DOT = { good: "bg-good-fg", warn: "bg-warn-fg", bad: "bg-bad-fg", idle: "bg-dim" };
 
 /**
  * The robot this browser is working with, compact: its name, whether it answers, its battery.
- * Opening it shows everything the header pills used to spread across the bar — every robot,
- * the services, this browser's stream — and switches the robot.
+ * Opening it lists every robot and switches. The services are the next pill (SystemStatus).
  */
-export function RobotStatus({ connected }: { connected: boolean }) {
+export function RobotStatus() {
   const { robot, setRobot, robots } = useRobot();
   const { presence, reachable } = usePresence();
   const net = useRobotTransports();
   const [names, setNames] = useState<Record<string, string>>({});
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const { open, setOpen, ref } = useDropdown();
 
   // The company's names for its robots ("Go2 · Unit 01"), where registered in Fleet.
   useEffect(() => {
@@ -31,19 +29,6 @@ export function RobotStatus({ connected }: { connected: boolean }) {
       .catch(() => undefined);
     return () => ctl.abort();
   }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: MouseEvent | KeyboardEvent) => {
-      if (e instanceof KeyboardEvent ? e.key === "Escape" : !ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", close);
-    document.addEventListener("keydown", close);
-    return () => {
-      document.removeEventListener("mousedown", close);
-      document.removeEventListener("keydown", close);
-    };
-  }, [open]);
 
   const info = robots.find((r) => r.id === robot);
   const name = names[robot] ?? info?.short ?? info?.label ?? robot;
@@ -57,7 +42,7 @@ export function RobotStatus({ connected }: { connected: boolean }) {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         title={!reachable ? "The gateway does not answer" : state?.title}
-        className="flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-panel py-1.5 pr-2 pl-2.5 text-[13px] font-semibold shadow-card transition hover:border-dim"
+        className="flex cursor-pointer items-center gap-2 rounded-[10px] border border-line bg-panel py-[7px] pr-2.5 pl-3 text-[12.5px] font-bold transition hover:shadow-card"
       >
         <span className={`size-2 rounded-full ${DOT[tone]} ${tone === "good" ? "animate-pulse" : ""}`} />
         <Icon size={16} className="text-muted" />
@@ -69,8 +54,7 @@ export function RobotStatus({ connected }: { connected: boolean }) {
         <BatteryPill net={net} robotId={robot} />
         <IconChevronDown size={14} className="text-muted" />
       </button>
-      {open && (
-        <div className="absolute top-11 right-0 z-50 w-[340px] animate-rise rounded-xl border border-line bg-panel p-2 shadow-lift">
+      <DropMenu open={open} className="top-[46px] w-[320px]">
           <div className="px-2 pt-1 pb-1.5 text-[11px] font-bold tracking-wider text-dim uppercase">Robot</div>
           {robots.map((r) => {
             const RIcon = ICON[r.id] ?? IconRobot;
@@ -88,15 +72,7 @@ export function RobotStatus({ connected }: { connected: boolean }) {
               </button>
             );
           })}
-          <div className="mt-2 border-t border-line px-2 pt-2.5 pb-1">
-            <div className="mb-2 text-[11px] font-bold tracking-wider text-dim uppercase">System</div>
-            <div className="flex flex-wrap gap-1.5">
-              <PresencePills />
-              <StatusBadge connected={connected} />
-            </div>
-          </div>
-        </div>
-      )}
+      </DropMenu>
     </div>
   );
 }

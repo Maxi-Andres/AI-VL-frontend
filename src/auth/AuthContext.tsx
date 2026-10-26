@@ -32,6 +32,8 @@ interface AuthApi {
   completePasswordReset: (token: string, password: string, remember: boolean) => Promise<void>;
   signOut: () => Promise<void>;
   retry: () => void;
+  /** Replace who you are after changing it (a new name in Profile). */
+  setMe: (me: Me) => void;
 }
 
 const AuthContext = createContext<AuthApi | null>(null);
@@ -113,12 +115,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAttempt((n) => n + 1);
   }, []);
 
+  const setMe = useCallback((me: Me) => setStatus({ kind: "signed-in", me }), []);
+
   const api = useMemo(
     () => ({
       status, signIn: doSignIn, setUp: doSetUp, acceptInvitation: doAccept,
-      completePasswordReset: doReset, signOut: doSignOut, retry,
+      completePasswordReset: doReset, signOut: doSignOut, retry, setMe,
     }),
-    [status, doSignIn, doSetUp, doAccept, doReset, doSignOut, retry],
+    [status, doSignIn, doSetUp, doAccept, doReset, doSignOut, retry, setMe],
   );
   return <AuthContext.Provider value={api}>{children}</AuthContext.Provider>;
 }

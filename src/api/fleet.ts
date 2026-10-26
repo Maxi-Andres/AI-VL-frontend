@@ -113,6 +113,7 @@ export async function deleteRobot(id: string): Promise<void> {
 }
 
 export interface ActivityEvent {
+  id: string;
   at: string;
   action: string;
   target: string;
@@ -121,6 +122,7 @@ export interface ActivityEvent {
 }
 
 /** Notable changes in the company, newest first (admins: the log names people). */
-export async function getActivity(signal?: AbortSignal): Promise<ActivityEvent[]> {
-  return (await check(await backendFetch("/api/activity", { signal }))).json();
+export async function getActivity(signal?: AbortSignal, page?: { limit: number; offset: number }): Promise<ActivityEvent[]> {
+  const q = page ? `?limit=${page.limit}&offset=${page.offset}` : "";
+  return (await check(await backendFetch(`/api/activity${q}`, { signal }))).json();
 }

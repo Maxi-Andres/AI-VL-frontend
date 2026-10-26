@@ -10,16 +10,15 @@ import {
   IconUserPlus,
   IconX,
 } from "@tabler/icons-react";
-import type { Role } from "../api/auth";
-import { getTeam, invite, makePasswordReset, revokeInvitation, updateMember } from "../api/team";
-import type { Invitation, Member, Team } from "../api/team";
-import { useMe } from "../auth/AuthContext";
-import { ROLES, ROLE_LABEL, ROLE_RANK } from "../auth/roles";
-import { initials } from "../lib/password";
+import type { Role } from "../../api/auth";
+import { getTeam, invite, makePasswordReset, revokeInvitation, updateMember } from "../../api/team";
+import type { Invitation, Member, Team } from "../../api/team";
+import { useMe } from "../../auth/AuthContext";
+import { ROLES, ROLE_LABEL, ROLE_RANK } from "../../auth/roles";
+import { Avatar } from "../ui/Avatar";
 
-// The team: who is in the company and with what role. Only theme tokens (bg-panel, text-fg,
-// border-line, accent…), so the page reads right in today's dark theme and in the light one
-// it will move to. The backend decides what is allowed (team.py); the page only offers it.
+// Settings → Team & roles: who is in the company and with what role (admins and owners).
+// Theme tokens only. The backend decides what is allowed (team.py); this only offers it.
 
 function ago(iso: string | null): string {
   if (!iso) return "Never";
@@ -40,7 +39,7 @@ function errorText(e: unknown): string {
   return e instanceof Error ? e.message : "Something went wrong.";
 }
 
-export function TeamPage() {
+export function TeamSettings() {
   const me = useMe();
   const [team, setTeam] = useState<Team | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -56,11 +55,12 @@ export function TeamPage() {
     }
   }, []);
 
+  // Reloads when your own name changes in Profile, so your row follows.
   useEffect(() => {
     const ctl = new AbortController();
     void load(ctl.signal);
     return () => ctl.abort();
-  }, [load]);
+  }, [load, me.user.name]);
 
   const myRank = ROLE_RANK[me.role];
   const assignable = ROLES.filter((r) => ROLE_RANK[r.role] <= myRank);
@@ -69,26 +69,22 @@ export function TeamPage() {
   const act = (text: string, run: () => Promise<void>) => setConfirm({ text, run });
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-7 lg:px-8">
-      <div className="mb-6 flex flex-wrap items-end gap-4">
-        <div>
-          <h1 className="m-0 text-[26px] font-extrabold tracking-[-0.025em]">Team &amp; roles</h1>
-          <p className="m-0 mt-1 text-sm text-muted">
-            {me.org.name}
-            {team && (() => {
-              const n = team.members.filter((m) => m.active).length;
-              return ` · ${n} active member${n === 1 ? "" : "s"}`;
-            })()}
-          </p>
-        </div>
-        <button
-          onClick={() => setInviting(true)}
-          className="ml-auto flex cursor-pointer items-center gap-2 rounded-xl bg-fg px-3.5 py-2 text-[13px] font-bold text-bg shadow-card transition hover:-translate-y-px hover:shadow-lift"
-        >
-          <IconUserPlus size={17} />
+    <section id="team" data-nav="Team & roles" className="scroll-mt-4">
+      <div className="mb-1 flex items-center gap-3">
+        <h2 className="m-0 text-lg font-extrabold tracking-[-0.015em]">Team &amp; roles</h2>
+        <button onClick={() => setInviting(true)}
+          className="ml-auto flex cursor-pointer items-center gap-2 rounded-xl bg-fg px-3.5 py-2 text-[13px] font-bold text-bg transition hover:-translate-y-px hover:shadow-lift">
+          <IconUserPlus size={16} />
           Invite member
         </button>
       </div>
+      <p className="m-0 mb-3.5 text-[13px] text-muted">
+        Owners manage the workspace, admins configure it, operators drive, viewers only watch.
+        {team && (() => {
+          const n = team.members.filter((m) => m.active).length;
+          return ` ${n} active member${n === 1 ? "" : "s"} in ${me.org.name}.`;
+        })()}
+      </p>
 
       {error && (
         <div role="alert" className="mb-4 flex items-center gap-2 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-fg">
@@ -134,9 +130,7 @@ export function TeamPage() {
               <tr key={m.id} className={`border-b border-line last:border-0 ${m.active ? "" : "opacity-55"}`}>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <span className="grid size-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#2fc1b1] to-[#d8cf3c] text-[11px] font-extrabold text-[#05302b]">
-                      {initials(m.name || m.email)}
-                    </span>
+                    <Avatar id={m.id} name={m.name || m.email} size={34} />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 font-medium text-fg">
                         {m.name}
@@ -210,11 +204,11 @@ export function TeamPage() {
 
       {!!team?.invitations.length && (
         <section className="mt-6">
-          <h2 className="m-0 mb-2 text-sm font-semibold text-fg">Pending invitations</h2>
+          <h3 className="m-0 mb-2 text-sm font-bold text-fg">Pending invitations</h3>
           <div className="overflow-hidden rounded-2xl border border-line bg-panel shadow-card">
             {team.invitations.map((inv: Invitation) => (
               <div key={inv.id} className="flex items-center gap-3 border-b border-line px-4 py-3 text-sm last:border-0">
-                <IconMail size={18} className="shrink-0 text-muted" />
+                <span className="grid size-[34px] shrink-0 place-items-center rounded-full bg-subtle text-muted"><IconMail size={16} /></span>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-fg">{inv.email}</div>
                   <div className="text-xs text-muted">
@@ -233,8 +227,8 @@ export function TeamPage() {
         </section>
       )}
 
-      <section className="mt-8">
-        <h2 className="m-0 mb-3 text-sm font-semibold text-fg">What each role can do</h2>
+      <section className="mt-6">
+        <h3 className="m-0 mb-3 text-sm font-bold text-fg">What each role can do</h3>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {ROLES.map((r) => (
             <div key={r.role} className="rounded-2xl border border-line bg-panel shadow-card p-3.5">
@@ -272,7 +266,7 @@ export function TeamPage() {
           }}
         />
       )}
-    </main>
+    </section>
   );
 }
 

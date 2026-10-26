@@ -7,6 +7,7 @@ import { RobotStatus } from "./RobotStatus";
 import { VoiceAssistantProvider, useVoiceAssistantContext } from "./VoiceAssistantContext";
 import { VoiceStatusBadge } from "./VoiceStatusBadge";
 import { UserMenu } from "./UserMenu";
+import { SystemStatus } from "./SystemStatus";
 
 function HeaderWithStatus() {
   const { connected, voicePhase } = useStatus();
@@ -16,7 +17,8 @@ function HeaderWithStatus() {
   return (
     <Header>
       <VoiceStatusBadge phase={voicePhase} wakeWords={wakeWords} />
-      <RobotStatus connected={connected} />
+      <RobotStatus />
+      <SystemStatus connected={connected} />
       <UserMenu />
     </Header>
   );

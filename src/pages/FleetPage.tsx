@@ -2,13 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  IconActivity,
-  IconBrain,
   IconBuildingWarehouse,
   IconCheck,
   IconClock,
-  IconDeviceDesktop,
-  IconKey,
   IconMapPin,
   IconMapPinPlus,
   IconPencil,
@@ -32,7 +28,10 @@ import { useRobotTransports, type TransportMap } from "../hooks/useRobotTranspor
 import { robotState } from "../components/layout/PresencePills";
 import { useRobot } from "../components/layout/RobotContext";
 import { BACKEND_URL } from "../config";
-import { initials } from "../lib/password";
+import { Avatar } from "../components/ui/Avatar";
+import { ActivityRow } from "../components/fleet/ActivityFeed";
+import { TINT } from "../components/ui/tones";
+import { PILL, systemRows } from "../components/layout/systemRows";
 import { SiteMap } from "../components/fleet/SiteMap";
 import {
   ActionButton,
@@ -61,15 +60,6 @@ function siteTime(tz: string, now: Date): string {
   } catch {
     return "";
   }
-}
-
-function ago(iso: string): string {
-  const s = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (s < 60) return "just now";
-  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
-  const d = Math.floor(s / 86400);
-  return d === 1 ? "yesterday" : `${d} days ago`;
 }
 
 /** Is this robot the one the camera bridge is streaming right now? Same rule as the pills. */
@@ -136,7 +126,7 @@ export function FleetPage() {
     fleet && mayConfigure ? [
       { done: sites.length > 0, label: "Add your first site", hint: "Where your robots work: a name, its location and a floor plan.", go: () => setEditingSite("new") },
       { done: robots.length > 0, label: "Register your robots", hint: "Give each robot a name and the site it works at.", go: () => setEditingRobot({ robot: null, siteId: sites[0]?.id ?? null }) },
-      ...(team ? [{ done: team.members.length + team.invitations.length > 1, label: "Invite your team", hint: "Operators drive, viewers watch — each with their own account.", href: "/team" }] : []),
+      ...(team ? [{ done: team.members.length + team.invitations.length > 1, label: "Invite your team", hint: "Operators drive, viewers watch — each with their own account.", href: "/settings#team" }] : []),
     ] : [];
   const onboarding = steps.some((s) => !s.done);
 
@@ -167,9 +157,8 @@ export function FleetPage() {
             <div className="flex items-center gap-2 px-2 text-[13px] font-semibold text-muted">
               <div className="flex">
                 {activeMembers.slice(0, 4).map((m, i) => (
-                  <span key={m.id} title={m.name} style={{ zIndex: 10 - i }}
-                    className="-ml-2 grid size-7 place-items-center rounded-full border-2 border-panel bg-gradient-to-br from-[#d6f1ed] to-[#f4efc4] text-[10px] font-extrabold text-[#0f5a52] first:ml-0">
-                    {initials(m.name)}
+                  <span key={m.id} style={{ zIndex: 10 - i }} className="-ml-2 rounded-full border-2 border-panel first:ml-0">
+                    <Avatar id={m.id} name={m.name || m.email} size={28} />
                   </span>
                 ))}
               </div>
@@ -177,7 +166,7 @@ export function FleetPage() {
             </div>
           )}
           {mayManage && (
-            <Link to="/team" className="flex items-center gap-2 rounded-xl border border-line bg-panel px-3.5 py-2 text-[13px] font-bold transition hover:border-dim hover:bg-subtle">
+            <Link to="/settings#team" className="flex items-center gap-2 rounded-xl border border-line bg-panel px-3.5 py-2 text-[13px] font-bold transition hover:border-dim hover:bg-subtle">
               <IconUserPlus size={16} />Invite
             </Link>
           )}
@@ -333,8 +322,12 @@ export function FleetPage() {
         <SystemPanel presence={presence} wide={!activity} />
         {activity && (
           <section className="animate-rise rounded-2xl border border-line bg-panel shadow-card [animation-delay:300ms]">
-            <header className="flex items-center gap-2.5 border-b border-line px-5 py-3.5">
+            <header className="flex items-center gap-2.5 border-b border-line px-5 py-3">
               <h2 className="m-0 text-[15px] font-extrabold">Activity</h2>
+              <Link to="/settings#activity"
+                className="ml-auto rounded-[10px] border border-line px-3 py-1.5 text-[13px] font-bold transition hover:bg-subtle">
+                View all
+              </Link>
             </header>
             {activity.length ? (
               <ul className="m-0 list-none px-5 py-1">
@@ -373,12 +366,6 @@ export function FleetPage() {
   );
 }
 
-const TINT = {
-  good: "bg-good-bg text-good-fg",
-  info: "bg-info-bg text-info-fg",
-  warn: "bg-warn-bg text-warn-fg",
-  bad: "bg-bad-bg text-bad-fg",
-};
 
 function Kpi({ icon, tint, label, value, unit, fill, delay }: {
   icon: ReactNode; tint: keyof typeof TINT; label: string; value: ReactNode; unit?: string; fill?: number; delay: number;
@@ -403,50 +390,10 @@ function Kpi({ icon, tint, label, value, unit, fill, delay }: {
   );
 }
 
-type Tone = "good" | "warn" | "bad" | "idle";
-const PILL: Record<Tone, string> = {
-  good: "bg-good-bg text-good-fg",
-  warn: "bg-warn-bg text-warn-fg",
-  bad: "bg-bad-bg text-bad-fg",
-  idle: "bg-subtle text-muted",
-};
-
-/** The services behind the robots, in words a customer reads: can the AI see, can a robot be
- * moved, is video arriving, who is on the live session. All of it from /api/presence. */
+/** The services behind the robots (systemRows), as tiles. All of it from /api/presence. */
 function SystemPanel({ presence, wide }: { presence: Presence | null; wide: boolean }) {
   const p = presence;
-  const cam = p?.robot_cam;
-  const ex = p?.executor;
-  const people = p?.web.total ?? 0;
-  const rows: { icon: ReactNode; label: string; tone: Tone; state: string; detail: string }[] = p ? [
-    {
-      icon: <IconBrain size={18} />, label: "AI engine",
-      ...(p.iacore.online
-        ? { tone: "good" as const, state: "Ready", detail: "Detection, vision assistant and voice." }
-        : { tone: "bad" as const, state: "Down", detail: "Detection and the vision assistant are paused." }),
-    },
-    {
-      icon: <IconSteeringWheel size={18} />, label: "Robot control",
-      ...(!ex?.online
-        ? { tone: "bad" as const, state: "Unreachable", detail: "Drive and actions are unavailable." }
-        : ex.dry_run
-          ? { tone: "warn" as const, state: "Dry run", detail: "Commands are checked but never sent to a robot." }
-          : { tone: "good" as const, state: "Ready", detail: ex.safe_mode ? "Safe mode on: speed and actions limited." : "Commands go to the robot." }),
-    },
-    {
-      icon: <IconVideo size={18} />, label: "Robot video",
-      ...(cam?.live
-        ? { tone: "good" as const, state: "Live", detail: [cam.fps ? `${Math.round(cam.fps)} fps` : null, cam.resolution].filter(Boolean).join(" · ") || "Frames arriving." }
-        : cam?.bridge
-          ? { tone: "warn" as const, state: "No frames", detail: "The bridge is up but no picture arrives." }
-          : { tone: "idle" as const, state: "Off", detail: "No robot is streaming." }),
-    },
-    {
-      icon: <IconDeviceDesktop size={18} />, label: "Live session",
-      tone: people ? "good" : "idle", state: people ? `${people} connected` : "Idle",
-      detail: people ? `${p.web.producers} streaming · ${p.web.viewers} watching` : "No one is on Live right now.",
-    },
-  ] : [];
+  const rows = p ? systemRows(p) : [];
   const issues = rows.filter((r) => r.tone === "bad" || r.tone === "warn").length;
 
   return (
@@ -463,9 +410,9 @@ function SystemPanel({ presence, wide }: { presence: Presence | null; wide: bool
       {p ? (
         <div className={`grid gap-3 p-4 sm:grid-cols-2 ${wide ? "xl:grid-cols-4" : ""}`}>
           {rows.map((r) => (
-            <div key={r.label} className="rounded-xl border border-line bg-bg p-4">
+            <div key={r.key} className="rounded-xl border border-line bg-bg p-4">
               <div className="flex items-center gap-2.5">
-                <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${PILL[r.tone]}`}>{r.icon}</span>
+                <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${PILL[r.tone]}`}><r.icon size={18} /></span>
                 <b className="min-w-0 truncate text-[14px]">{r.label}</b>
                 <span className={`ml-auto flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11.5px] font-bold ${PILL[r.tone]}`}>
                   <span className={`size-1.5 rounded-full bg-current ${r.tone === "good" ? "animate-pulse" : ""}`} />{r.state}
@@ -597,35 +544,5 @@ function Empty({ icon, title, text, action, fill }: {
         {action && <div className="mt-4 flex justify-center"><ActionButton onClick={action.go}>{action.label}</ActionButton></div>}
       </div>
     </div>
-  );
-}
-
-// What each audited change reads as in the feed.
-const FEED: Record<string, { icon: typeof IconActivity; tint: keyof typeof TINT; text: (e: ActivityEvent) => ReactNode }> = {
-  "auth.setup": { icon: IconCheck, tint: "good", text: (e) => <><b>{e.actor}</b> set up {e.target}</> },
-  "auth.password_reset": { icon: IconKey, tint: "warn", text: (e) => <>Password reset for <b>{e.target}</b></> },
-  "team.invite": { icon: IconUserPlus, tint: "info", text: (e) => <><b>{e.actor}</b> invited {e.target}{e.detail.role ? ` as ${String(e.detail.role)}` : ""}</> },
-  "team.invitation_accepted": { icon: IconUserCheck, tint: "good", text: (e) => <><b>{e.actor}</b> joined{e.detail.role ? ` as ${String(e.detail.role)}` : ""}</> },
-  "team.member_changed": { icon: IconUsers, tint: "warn", text: (e) => <><b>{e.actor}</b> changed {e.target}'s access</> },
-  "fleet.site_created": { icon: IconMapPinPlus, tint: "info", text: (e) => <><b>{e.actor}</b> added the site {e.target}</> },
-  "fleet.site_changed": { icon: IconMapPin, tint: "info", text: (e) => <><b>{e.actor}</b> edited {e.target}</> },
-  "fleet.site_deleted": { icon: IconMapPin, tint: "bad", text: (e) => <><b>{e.actor}</b> deleted the site {e.target}</> },
-  "fleet.plan_uploaded": { icon: IconBuildingWarehouse, tint: "info", text: (e) => <><b>{e.actor}</b> uploaded {e.target}'s floor plan</> },
-  "fleet.robot_added": { icon: IconRobot, tint: "good", text: (e) => <><b>{e.actor}</b> registered {e.target}</> },
-  "fleet.robot_changed": { icon: IconRobot, tint: "info", text: (e) => <><b>{e.actor}</b> edited {e.target}</> },
-  "fleet.robot_removed": { icon: IconRobot, tint: "bad", text: (e) => <><b>{e.actor}</b> removed {e.target}</> },
-};
-
-function ActivityRow({ ev }: { ev: ActivityEvent }) {
-  const f = FEED[ev.action] ?? { icon: IconActivity, tint: "info" as const, text: (e: ActivityEvent) => <>{e.action} {e.target}</> };
-  const Icon = f.icon;
-  return (
-    <li className="flex gap-3 border-b border-line py-3 last:border-0">
-      <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${TINT[f.tint]}`}><Icon size={16} /></span>
-      <div className="min-w-0 text-[13px]">
-        <p className="m-0">{f.text(ev)}</p>
-        <span className="text-xs text-dim">{ago(ev.at)}</span>
-      </div>
-    </li>
   );
 }

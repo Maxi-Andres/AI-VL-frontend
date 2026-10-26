@@ -85,3 +85,22 @@ export function setUp(input: SetupInput): Promise<Me> {
 export async function signOut(): Promise<void> {
   await backendFetch("/api/auth/logout", { method: "POST" }, { quiet401: true });
 }
+
+/** Your own name (Settings → Profile). Returns who you are now. */
+export async function updateProfile(name: string): Promise<Me> {
+  const r = await backendFetch("/api/auth/me", {
+    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }),
+  });
+  if (!r.ok) throw await readError(r);
+  return r.json();
+}
+
+/** Your own password; every other session of yours is signed out. */
+export async function changePassword(current_password: string, new_password: string): Promise<{ signed_out: number }> {
+  const r = await backendFetch("/api/auth/password", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ current_password, new_password }),
+  });
+  if (!r.ok) throw await readError(r);
+  return r.json();
+}

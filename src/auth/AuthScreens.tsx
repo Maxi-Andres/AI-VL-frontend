@@ -388,14 +388,15 @@ function BackButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-function StrengthMeter({ score, label }: { score: number; label: string }) {
+/** Also used by Settings → Profile, so the empty track is a theme token, not a light grey. */
+export function StrengthMeter({ score, label }: { score: number; label: string }) {
   const colors = ["#d9dde5", "#d93f45", "#c97a10", "#1f9e91", "#1f9e91"];
   return (
     <div className="flex items-center gap-3">
       <div className="flex flex-1 gap-1">
         {[1, 2, 3, 4].map((i) => (
           <span key={i} className="h-1.5 flex-1 rounded-full transition-colors duration-300"
-            style={{ background: score >= i ? colors[score] : "#eef0f3" }} />
+            style={{ background: score >= i ? colors[score] : "var(--color-subtle)" }} />
         ))}
       </div>
       <span className="w-40 text-right">{label}</span>
