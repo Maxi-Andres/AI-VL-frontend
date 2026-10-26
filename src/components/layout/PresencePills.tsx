@@ -36,7 +36,7 @@ const ROBOT_ICONS: Record<string, typeof IconRobot> = {
  * The camera and the executor stay in the tooltip: they say what WORKS, which is a
  * different question from whether the robot is reachable.
  */
-function robotState(
+export function robotState(
   p: Presence,
   id: string,
   net: TransportMap | null,
@@ -99,7 +99,7 @@ function robotState(
  * stale reading drops to the idle tone and says so in the tooltip, because the last known
  * value is still worth having as long as nobody mistakes it for now.
  */
-function BatteryPill({ net, robotId }: { net: TransportMap | null; robotId: string }) {
+export function BatteryPill({ net, robotId }: { net: TransportMap | null; robotId: string }) {
   const b = net?.[robotId]?.relay?.battery;
   if (!b || typeof b.percent !== "number") return null;
 

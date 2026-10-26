@@ -22,6 +22,9 @@ export function Header({ children }: Props) {
       {/* The product is "Silk Pilot": the Silk logo beside it supplies the first word. */}
       <h1 className="m-0 text-base font-semibold">Pilot</h1>
       <nav className="flex gap-3">
+        <NavLink to="/fleet" className={linkClass}>
+          Fleet
+        </NavLink>
         <NavLink to="/" className={linkClass} end>
           Live
         </NavLink>

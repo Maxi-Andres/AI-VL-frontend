@@ -77,3 +77,16 @@ export const WHEP_URL = (
   // comparing links. A wrong guess is cheap — the switch simply falls back to MJPEG.
   `${location.protocol}//${location.hostname}:${WHEP_DEFAULT_PORT}${WHEP_DEFAULT_PATH}`
 ).replace(/\/$/, "");
+
+/**
+ * Street map for placing a site (Fleet → site → location). OpenStreetMap's own tile servers,
+ * with their attribution: fine for this light use (a map opened while editing a site), not for
+ * heavy traffic — a deploy that needs more, or satellite imagery, points this at a licensed
+ * provider. Free satellite tiles (Esri's, used in the Splunk dashboards) are not licensed for a
+ * product, so there is no satellite layer. Indoor sites use their floor plan instead.
+ */
+export const MAP_TILES = {
+  url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  maxZoom: 19,
+};
