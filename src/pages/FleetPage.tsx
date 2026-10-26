@@ -21,6 +21,7 @@ import {
 } from "@tabler/icons-react";
 import { getActivity, getFleet, planUrl } from "../api/fleet";
 import type { ActivityEvent, Fleet, FleetRobot, Site } from "../api/fleet";
+import { AuthError } from "../api/auth";
 import { getTeam } from "../api/team";
 import type { Team } from "../api/team";
 import { useMe } from "../auth/AuthContext";
@@ -94,13 +95,20 @@ export function FleetPage() {
   const [planVersion, setPlanVersion] = useState(() => Date.now());
   const [now, setNow] = useState(() => new Date());
 
+  // Each block loads on its own: a failing one (an older server without a route, a timeout)
+  // leaves the others on screen.
   const load = useCallback(async (signal?: AbortSignal) => {
+    if (mayManage) getTeam(signal).then(setTeam).catch(() => undefined);
+    if (mayConfigure) getActivity(signal).then(setActivity).catch(() => undefined);
     try {
       setFleet(await getFleet(signal));
-      if (mayManage) getTeam(signal).then(setTeam).catch(() => undefined);
-      if (mayConfigure) getActivity(signal).then(setActivity).catch(() => undefined);
     } catch (e) {
-      if (!signal?.aborted) setError(errorText(e));
+      if (signal?.aborted) return;
+      setFleet({ sites: [], robots: [], slots: [] });
+      // 404 here means the server predates Fleet: it was updated but not restarted.
+      setError(e instanceof AuthError && e.status === 404
+        ? "This server is running an older version of Pilot. Restart it to finish the update."
+        : `Could not load the fleet: ${errorText(e)}`);
     }
   }, [mayManage, mayConfigure]);
 
@@ -288,7 +296,7 @@ export function FleetPage() {
                   ) : site.lat !== null && site.lon !== null ? (
                     <SiteMap lat={site.lat} lon={site.lon} className="absolute inset-0" />
                   ) : (
-                    <Empty icon={<IconMapPin size={24} />} title="No map yet"
+                    <Empty fill icon={<IconMapPin size={24} />} title="No map yet"
                       text={mayConfigure ? "Add the floor plan or the location." : "An admin can add the floor plan."}
                       action={mayConfigure ? { label: "Edit site", go: () => setEditingSite(site) } : undefined} />
                   )}
@@ -475,11 +483,13 @@ function IconButton({ children, title, onClick }: { children: ReactNode; title: 
   );
 }
 
-function Empty({ icon, title, text, action }: {
+function Empty({ icon, title, text, action, fill }: {
   icon: ReactNode; title: string; text: string; action?: { label: string; go: () => void };
+  /** Fill a box of fixed height (the map area) instead of sizing to the content. */
+  fill?: boolean;
 }) {
   return (
-    <div className="grid h-full min-h-[200px] place-items-center p-6 text-center">
+    <div className={`grid place-items-center px-6 py-10 text-center ${fill ? "absolute inset-0" : ""}`}>
       <div>
         <span className="mx-auto mb-3 grid size-12 place-items-center rounded-2xl bg-subtle text-muted">{icon}</span>
         <div className="text-sm font-bold">{title}</div>
