@@ -233,34 +233,35 @@ export function FleetPage() {
       )}
 
       <div className="grid items-start gap-4 xl:grid-cols-[1.45fr_1fr]">
-        {/* Robots */}
-        <section className="animate-rise rounded-2xl border border-line bg-panel shadow-card [animation-delay:120ms]">
-          <header className="flex items-center gap-2.5 border-b border-line px-5 py-3.5">
-            <h2 className="m-0 text-[15px] font-extrabold">Robots</h2>
-            {robots.length > 0 && (
-              <span className="flex items-center gap-1.5 rounded-full bg-good-bg px-2.5 py-0.5 text-xs font-bold text-good-fg">
-                <span className="size-1.5 rounded-full bg-current" />{online} online
-              </span>
+        {/* Robots and the site side by side (similar heights); the site card stays in view
+            while a long robot list scrolls, and the activity spans the full width below. */}
+          {/* Robots */}
+          <section className="animate-rise rounded-2xl border border-line bg-panel shadow-card [animation-delay:120ms]">
+            <header className="flex items-center gap-2.5 border-b border-line px-5 py-3.5">
+              <h2 className="m-0 text-[15px] font-extrabold">Robots</h2>
+              {robots.length > 0 && (
+                <span className="flex items-center gap-1.5 rounded-full bg-good-bg px-2.5 py-0.5 text-xs font-bold text-good-fg">
+                  <span className="size-1.5 rounded-full bg-current" />{online} online
+                </span>
+              )}
+            </header>
+            {robots.length ? (
+              <div className="grid gap-3.5 p-4 sm:grid-cols-2 2xl:grid-cols-3">
+                {robots.map((r) => (
+                  <RobotCard key={r.id} robot={r} site={r.site_id ? siteName[r.site_id] : null}
+                    presence={presence} net={net} editable={mayConfigure}
+                    onEdit={() => setEditingRobot({ robot: r, siteId: r.site_id })} />
+                ))}
+              </div>
+            ) : (
+              <Empty icon={<IconRobot size={26} />} title="No robots yet"
+                text={mayConfigure ? "Register your Go2 or G1 to see it here, live." : `An admin of ${me.org.name} registers the robots.`}
+                action={mayConfigure ? { label: "Register a robot", go: () => setEditingRobot({ robot: null, siteId: site?.id ?? null }) } : undefined} />
             )}
-          </header>
-          {robots.length ? (
-            <div className="grid gap-3.5 p-4 sm:grid-cols-2 2xl:grid-cols-3">
-              {robots.map((r) => (
-                <RobotCard key={r.id} robot={r} site={r.site_id ? siteName[r.site_id] : null}
-                  presence={presence} net={net} editable={mayConfigure}
-                  onEdit={() => setEditingRobot({ robot: r, siteId: r.site_id })} />
-              ))}
-            </div>
-          ) : (
-            <Empty icon={<IconRobot size={26} />} title="No robots yet"
-              text={mayConfigure ? "Register your Go2 or G1 to see it here, live." : `An admin of ${me.org.name} registers the robots.`}
-              action={mayConfigure ? { label: "Register a robot", go: () => setEditingRobot({ robot: null, siteId: site?.id ?? null }) } : undefined} />
-          )}
-        </section>
+          </section>
 
-        <div className="grid gap-4">
           {/* Site */}
-          <section className="animate-rise overflow-hidden rounded-2xl border border-line bg-panel shadow-card [animation-delay:180ms]">
+          <section className="animate-rise overflow-hidden rounded-2xl border border-line bg-panel shadow-card [animation-delay:180ms] xl:sticky xl:top-[72px]">
             <header className="flex flex-wrap items-center gap-2.5 border-b border-line px-5 py-3">
               <h2 className="m-0 text-[15px] font-extrabold">{site ? site.name : "Sites"}</h2>
               {site && (
@@ -311,12 +312,12 @@ export function FleetPage() {
 
           {/* Activity */}
           {activity && (
-            <section className="animate-rise rounded-2xl border border-line bg-panel shadow-card [animation-delay:240ms]">
+            <section className="animate-rise rounded-2xl border border-line bg-panel shadow-card [animation-delay:240ms] xl:col-span-2">
               <header className="flex items-center gap-2.5 border-b border-line px-5 py-3.5">
                 <h2 className="m-0 text-[15px] font-extrabold">Activity</h2>
               </header>
               {activity.length ? (
-                <ul className="m-0 list-none px-5 py-1">
+                <ul className="m-0 grid list-none gap-x-8 px-5 py-1 lg:grid-cols-2">
                   {activity.slice(0, 6).map((ev, i) => <ActivityRow key={`${ev.at}-${i}`} ev={ev} />)}
                 </ul>
               ) : (
@@ -324,7 +325,6 @@ export function FleetPage() {
               )}
             </section>
           )}
-        </div>
       </div>
 
       {editingSite && fleet && (
@@ -520,7 +520,7 @@ function ActivityRow({ ev }: { ev: ActivityEvent }) {
   const f = FEED[ev.action] ?? { icon: IconActivity, tint: "info" as const, text: (e: ActivityEvent) => <>{e.action} {e.target}</> };
   const Icon = f.icon;
   return (
-    <li className="flex gap-3 border-b border-line py-3 last:border-0">
+    <li className="flex gap-3 border-b border-line py-3 last:border-0 lg:[&:nth-last-child(-n+2)]:border-0">
       <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${TINT[f.tint]}`}><Icon size={16} /></span>
       <div className="min-w-0 text-[13px]">
         <p className="m-0">{f.text(ev)}</p>
