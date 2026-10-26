@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Button } from "../ui/Button";
+import type { ReactNode } from "react";
+import { IconChevronDown, IconLock } from "@tabler/icons-react";
 import type { SkillInfo } from "../../api/backend";
 import type { ChoiceSendable } from "./unsendableSkills";
 import { choiceGroups } from "./choiceGroups";
@@ -20,6 +21,13 @@ interface Props {
   /** Per value of a choice skill: whether the transport can deliver it (struck out if not). */
   choiceOk: ChoiceSendable;
   onAction: (skill: string, params?: Record<string, unknown>) => void;
+  /** Only show actions whose name contains this (case-insensitive). */
+  query?: string;
+  /** Group titles folded shut. Owned by the caller so "collapse all" can reach them. */
+  collapsed: Set<string>;
+  onToggleGroup: (title: string) => void;
+  /** Glass styling for the fullscreen cockpit's drawer. */
+  glass?: boolean;
 }
 
 // Skills handled elsewhere (joysticks / e-stop) or not a real action.
@@ -36,6 +44,8 @@ const GROUPS: { title: string; skills: string[] }[] = [
   { title: "Gestures", skills: ["hello", "stretch", "scrape", "heart", "dance1", "dance2", "pose", "wave_hand", "shake_hand"] },
   { title: "Acrobatics", skills: ["front_jump", "front_pounce", "front_flip", "back_flip", "left_flip", "handstand", "walk_upright"] },
 ];
+
+export const ADVANCED_GROUP = "Advanced (raw mode)";
 
 // Fallback display names for catalog entries that carry no `label` of their own
 // (older iacore). The catalog is the source of truth — add names there, not here.
@@ -89,8 +99,11 @@ const NOT_ON_RELAY =
   "Not available over the relay yet: the executor refuses it before it reaches the robot. " +
   "It needs adding to the relay's allowlist (robot-command-relay) and the executor's map.";
 
+/** The robot's preset actions, grouped and foldable, filtered by `query`. Group headers stick
+ * to the top of the caller's scroll box, so a long G1 catalog never loses its place. */
 export function ActionPad({
   skills, dangerous, disabled, safeMode, unsendable, choiceOk, onAction,
+  query = "", collapsed, onToggleGroup, glass,
 }: Props) {
   const blockedBySafe = new Set(dangerous);
   // Which side (on/off) was last chosen per flag skill, so the pad shows the
@@ -102,6 +115,8 @@ export function ActionPad({
   };
   // Typed values for the free-value skills (raw FSM / mode ids).
   const [freeVals, setFreeVals] = useState<Record<string, string>>({});
+  const q = query.trim().toLowerCase();
+  const matches = (label: string) => !q || label.toLowerCase().includes(q);
 
   const names = Object.keys(skills).filter((n) => !EXCLUDE.has(n));
   // Skills with a choice param render as their own titled block (not in the grids).
@@ -123,88 +138,98 @@ export function ActionPad({
   if (more.length) groups.push({ title: "More", items: more });
   // Raw mode control last, clearly separated from the normal actions.
   const advanced = [...hidden].filter((n) => !choiceSet.has(n));
-  if (advanced.length) groups.push({ title: "Advanced (raw mode)", items: advanced });
+  if (advanced.length) groups.push({ title: ADVANCED_GROUP, items: advanced });
+
+  const ui = glass
+    ? {
+        card: "border-white/10 bg-white/[0.04]",
+        head: "bg-[#161b24]/95 text-white",
+        count: "bg-white/10 text-white/60",
+        btn: "border-white/10 bg-white/[0.06] text-white hover:border-[#3fd6c4]/60 hover:bg-[#3fd6c4]/15",
+        input: "border-white/15 bg-white/[0.06] text-white",
+        sub: "text-white/45",
+      }
+    : {
+        card: "border-line bg-panel",
+        head: "bg-panel text-fg",
+        count: "bg-subtle text-muted",
+        btn: "border-line bg-panel text-fg hover:border-accent hover:bg-good-bg hover:text-good-fg",
+        input: "border-line bg-bg text-fg",
+        sub: "text-dim",
+      };
+  const btn = `flex min-w-0 items-center gap-1.5 rounded-lg border px-2.5 py-2 text-left text-[12.5px] font-semibold transition active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-55 disabled:active:scale-100 ${ui.btn}`;
 
   const renderSimple = (name: string) => {
     const info = skills[name];
     const offRelay = unsendable.has(name);
     // Safe mode disables these; so does a transport that cannot deliver them.
-    const blocked = (safeMode && blockedBySafe.has(name)) || offRelay;
+    const bySafe = safeMode && blockedBySafe.has(name);
+    const blocked = bySafe || offRelay;
     const title = offRelay
       ? `${NOT_ON_RELAY}\n\n${info?.desc ?? ""}`
-      : blocked
+      : bySafe
       ? `Blocked by Safe mode: it can make the robot lose its support or change ` +
         `control mode. Turn Safe off to allow.\n\n${info?.desc ?? ""}`
       : info?.desc;
-    const strike = offRelay ? " line-through opacity-60" : "";
+    const label = pretty(name, info);
+    const lock = blocked && <IconLock size={13} className="shrink-0 opacity-70" />;
+    const text = <span className={`truncate ${offRelay ? "line-through" : ""}`}>{label}</span>;
     const free = freeParam(info);
     if (free) {
       // One free value (an FSM/mode id): type it, then send. This is how an operator
       // reaches — and discovers — the app modes Unitree does not document.
       const value = freeVals[name] ?? String(free.def ?? "");
       return (
-        <div key={name} className="col-span-2 flex items-center gap-1.5">
-          <span className={`flex-1 truncate text-xs text-fg${strike}`} title={title}>
-            {pretty(name, info)}
-          </span>
+        <div key={name} className="col-span-2 flex items-center gap-1.5" title={title}>
+          <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[12.5px] font-semibold">{lock}{text}</span>
           <input
             type={free.type.startsWith("number") ? "number" : "text"}
             value={value}
             disabled={disabled || blocked}
-            title={title}
             onChange={(e) => setFreeVals((s) => ({ ...s, [name]: e.target.value }))}
-            className="w-20 rounded-md border border-line bg-bg px-1.5 py-1 text-[11px] text-fg focus:border-accent focus:outline-none"
+            className={`w-20 rounded-lg border px-2 py-1.5 text-xs focus:border-accent focus:outline-none disabled:opacity-40 ${ui.input}`}
           />
-          <Button
-            variant="secondary" className="px-2 py-1 text-[11px]"
-            disabled={disabled || blocked || value.trim() === ""} title={title}
-            onClick={() =>
-              onAction(name, {
-                [free.key]: free.type.startsWith("number") ? Number(value) : value,
-              })
-            }
-          >
+          <button type="button" className={`${btn} justify-center px-3`}
+            disabled={disabled || blocked || value.trim() === ""}
+            onClick={() => onAction(name, { [free.key]: free.type.startsWith("number") ? Number(value) : value })}>
             Go
-          </Button>
+          </button>
         </div>
       );
     }
     const flag = info?.params?.on; // on/off toggle skill
     if (flag) {
       const sel = flagOn[name]; // true=on selected, false=off selected, undefined=none
+      const on = "border-accent bg-good-bg text-good-fg";
       return (
-        <div key={name} className="col-span-2 flex items-center gap-1.5">
-          <span className={`flex-1 truncate text-xs text-fg${strike}`} title={title}>
-            {pretty(name, info)}
-          </span>
-          <Button variant={sel === true ? "primary" : "secondary"}
-            className="px-2 py-1 text-[11px]" aria-pressed={sel === true}
-            disabled={disabled || blocked} title={title}
-            onClick={() => chooseFlag(name, true)}>On</Button>
-          <Button variant={sel === false ? "primary" : "secondary"}
-            className="px-2 py-1 text-[11px]" aria-pressed={sel === false}
-            disabled={disabled || blocked} title={title}
-            onClick={() => chooseFlag(name, false)}>Off</Button>
+        <div key={name} className="col-span-2 flex items-center gap-1.5" title={title}>
+          <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[12.5px] font-semibold">{lock}{text}</span>
+          <button type="button" aria-pressed={sel === true} disabled={disabled || blocked}
+            className={`${btn} justify-center px-3 ${sel === true ? on : ""}`} onClick={() => chooseFlag(name, true)}>On</button>
+          <button type="button" aria-pressed={sel === false} disabled={disabled || blocked}
+            className={`${btn} justify-center px-3 ${sel === false ? on : ""}`} onClick={() => chooseFlag(name, false)}>Off</button>
         </div>
       );
     }
     return (
-      <Button key={name} variant="secondary" className={`px-2 py-1.5 text-xs${strike}`}
-        disabled={disabled || blocked} title={title} onClick={() => onAction(name)}>
-        {pretty(name, info)}
-      </Button>
+      <button key={name} type="button" className={btn} disabled={disabled || blocked} title={title}
+        onClick={() => onAction(name)}>
+        {lock}{text}
+      </button>
     );
   };
 
+  const simpleGroups = groups
+    .map((g) => ({ ...g, items: g.items.filter((n) => matches(pretty(n, skills[n])) || matches(g.title)) }))
+    .filter((g) => g.items.length);
+
   return (
-    <div className="space-y-3">
-      {groups.map((g) => (
-        <div key={g.title}>
-          <h3 className="m-0 mb-1.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-muted">
-            {g.title}
-          </h3>
+    <div>
+      {simpleGroups.map((g) => (
+        <Group key={g.title} title={g.title} count={g.items.length} ui={ui}
+          shut={collapsed.has(g.title) && !q} onToggle={() => onToggleGroup(g.title)}>
           <div className="grid grid-cols-2 gap-1.5">{g.items.map(renderSimple)}</div>
-        </div>
+        </Group>
       ))}
 
       {choiceNames.map((name) => {
@@ -212,37 +237,60 @@ export function ActionPad({
         const choice = choiceParam(info)!;
         const offRelay = unsendable.has(name);
         const blocked = (safeMode && blockedBySafe.has(name)) || offRelay;
+        const title = pretty(name, info);
+        const sets = choiceGroups(choice.values, choice.groups)
+          .map((g) => ({ ...g, values: g.values.filter((v) => matches(choice.labels?.[v] ?? prettify(v)) || matches(title)) }))
+          .filter((g) => g.values.length);
+        if (!sets.length) return null;
         return (
-          <div key={name} title={offRelay ? NOT_ON_RELAY : undefined}>
-            <h3 className={`m-0 mb-1.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-muted${
-              offRelay ? " line-through opacity-60" : ""}`}>
-              {pretty(name, info)}
-            </h3>
-            {choiceGroups(choice.values, choice.groups).map((g) => (
-              <div key={g.title ?? ""} className="mb-1.5">
-                {g.title && (
-                  <h4 className="m-0 mb-1 text-[10px] font-medium text-muted">{g.title}</h4>
-                )}
+          <Group key={name} title={title} count={sets.reduce((n, g) => n + g.values.length, 0)} ui={ui}
+            shut={collapsed.has(title) && !q} onToggle={() => onToggleGroup(title)}>
+            {offRelay && <p className={`m-0 mb-2 text-[11px] ${ui.sub}`} title={NOT_ON_RELAY}>Not available over the relay yet.</p>}
+            {sets.map((g) => (
+              <div key={g.title ?? ""} className="mb-1.5 last:mb-0">
+                {g.title && <h4 className={`m-0 mt-1 mb-1.5 text-[10.5px] font-bold tracking-wider uppercase ${ui.sub}`}>{g.title}</h4>}
                 <div className="grid grid-cols-2 gap-1.5">
                   {g.values.map((v) => {
                     const off = !choiceOk(name, v);
                     return (
-                      <Button key={v} variant="secondary"
-                        className={`px-2 py-1.5 text-xs${off ? " line-through opacity-60" : ""}`}
-                        disabled={disabled || blocked || off}
-                        title={off ? NOT_ON_RELAY
-                          : g.title ? `Needs: ${g.title}.\n\n${info?.desc ?? ""}` : info?.desc}
+                      <button key={v} type="button" className={btn} disabled={disabled || blocked || off}
+                        title={off ? NOT_ON_RELAY : g.title ? `Needs: ${g.title}.\n\n${info?.desc ?? ""}` : info?.desc}
                         onClick={() => onAction(name, { [choice.key]: v })}>
-                        {choice.labels?.[v] ?? prettify(v)}
-                      </Button>
+                        {(off || blocked) && <IconLock size={13} className="shrink-0 opacity-70" />}
+                        <span className={`truncate ${off ? "line-through" : ""}`}>{choice.labels?.[v] ?? prettify(v)}</span>
+                      </button>
                     );
                   })}
                 </div>
               </div>
             ))}
-          </div>
+          </Group>
         );
       })}
     </div>
   );
+}
+
+function Group({ title, count, shut, onToggle, ui, children }: {
+  title: string; count: number; shut: boolean; onToggle: () => void;
+  ui: { card: string; head: string; count: string }; children: ReactNode;
+}) {
+  return (
+    <section className={`mb-2 rounded-xl border ${ui.card}`}>
+      <button type="button" onClick={onToggle} aria-expanded={!shut}
+        className={`sticky top-0 z-[1] flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2.5 text-left text-[12.5px] font-extrabold ${ui.head}`}>
+        {title}
+        <span className={`rounded-full px-1.5 text-[11px] font-bold ${ui.count}`}>{count}</span>
+        <IconChevronDown size={16} className={`ml-auto opacity-60 transition-transform ${shut ? "-rotate-90" : ""}`} />
+      </button>
+      {!shut && <div className="px-2.5 pb-2.5">{children}</div>}
+    </section>
+  );
+}
+
+/** Every group title the pad would draw for this catalog — for "collapse all". */
+export function actionGroupTitles(skills: Record<string, SkillInfo>): string[] {
+  const names = Object.keys(skills).filter((n) => !EXCLUDE.has(n));
+  const choice = names.filter((n) => choiceParam(skills[n])).map((n) => pretty(n, skills[n]));
+  return [...GROUPS.map((g) => g.title), "More", ADVANCED_GROUP, ...choice];
 }
