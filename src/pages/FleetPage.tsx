@@ -12,7 +12,6 @@ import {
   IconPencil,
   IconPlus,
   IconRobot,
-  IconSettings,
   IconSteeringWheel,
   IconUserCheck,
   IconUserPlus,
@@ -434,10 +433,11 @@ function RobotCard({ robot, site, presence, net, editable, onEdit }: {
         <div className="flex items-center gap-2">
           <Icon size={17} className="shrink-0 text-accent" />
           <b className="min-w-0 truncate text-[14.5px]">{robot.name}</b>
+          {/* Always visible: an edit that only shows on hover is one nobody finds. */}
           {editable && (
-            <button onClick={onEdit} aria-label={`Edit ${robot.name}`}
-              className="ml-auto cursor-pointer rounded-md p-1 text-muted opacity-0 transition group-hover:opacity-100 hover:bg-subtle hover:text-fg focus:opacity-100">
-              <IconSettings size={15} />
+            <button onClick={onEdit} title="Edit name, model, serial and site" aria-label={`Edit ${robot.name}`}
+              className="ml-auto flex shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-line px-2 py-1 text-[11.5px] font-bold text-muted transition hover:border-accent hover:bg-good-bg hover:text-good-fg">
+              <IconPencil size={13} />Edit
             </button>
           )}
         </div>
