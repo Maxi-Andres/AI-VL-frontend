@@ -11,11 +11,9 @@ import {
 } from "../api/backend";
 import { VideoStage } from "../components/live/VideoStage";
 import { RobotCameraStage } from "../components/live/RobotCameraStage";
-import { ControlsStageLayout } from "../components/live/ControlsStageLayout";
 import { YoloPanel } from "../components/live/YoloPanel";
 import { VLM_IMG_DEFAULT, VlmPanel } from "../components/live/VlmPanel";
 import { CommandPanel } from "../components/live/CommandPanel";
-import { Button } from "../components/ui/Button";
 import { useStatus } from "../components/layout/StatusContext";
 import { useRobot } from "../components/layout/RobotContext";
 import { fmtMs } from "../lib/format";
@@ -32,6 +30,19 @@ import { captureFrame, encodeFrame, snapshotFrame } from "../lib/capture";
 import { startPairing } from "../lib/framePairing";
 import { StatusText, type Status } from "../components/ui/StatusText";
 import { useCan } from "../auth/permissions";
+import { colorForObject } from "../lib/draw";
+import {
+  IconAdjustmentsHorizontal,
+  IconCameraRotate,
+  IconDeviceLaptop,
+  IconEye,
+  IconPlayerPlayFilled,
+  IconPlayerStopFilled,
+  IconScan,
+  IconSparkles,
+  IconTerminal2,
+  IconVideo,
+} from "@tabler/icons-react";
 import type {
   CommandResponse,
   ConfigState,
@@ -63,6 +74,9 @@ export function LivePage() {
   const mayAnalyze = can("analyze");
   const mayOperate = can("operate");
   const [source, setSource] = useState<"own" | "robot" | "view">(mayAnalyze ? "own" : "view");
+  // Presentation only: which side-panel tab is open, and the robot camera's settings menu.
+  const [panel, setPanel] = useState<"vlm" | "yolo" | "command">("vlm");
+  const [videoMenu, setVideoMenu] = useState(false);
   const [robotCamStatus, setRobotCamStatus] = useState<Status | null>(null);
   const viewing = source !== "own"; // true when we're a /ws/view consumer
   // Master YOLO on/off (shared session flag). Default OFF so no GPU is used until
@@ -91,7 +105,6 @@ export function LivePage() {
     undefined,
   );
   const [fps, setFps] = useState("— fps");
-  const [count, setCount] = useState("0 objects");
 
   // --- VLM request state ---
   const [vlmBusy, setVlmBusy] = useState(false);
@@ -187,7 +200,6 @@ export function LivePage() {
     } else {
       setFps(`${msg.elapsed_ms} ms`);
     }
-    setCount(`${msg.n} objects`);
   }, []);
 
   // Adopt config the server pushes (e.g. changed from the monitor) so the phone's
@@ -324,7 +336,6 @@ export function LivePage() {
     stop();
     setObjects([]);
     setFps("— fps");
-    setCount("0 objects");
     fpsEmaRef.current = 0;
     lastFrameTsRef.current = 0;
   }, [stop]);
@@ -657,70 +668,159 @@ export function LivePage() {
   }
 
   const variants = options.scopes[scope]?.variants ?? [];
+  const live = source === "own" ? active : robotViewConnected;
+  const sourceText = source === "own"
+    ? `My camera · ${facing === "environment" ? "rear" : "front"}`
+    : source === "robot"
+      ? `Robot camera${videoDetail ? ` · ${videoDetail}` : ""}`
+      : "View only · mirroring the session";
+  // Boxes on screen, counted per class, for the strip under the video.
+  const perClass = Object.values(objects.reduce<Record<string, { label: string; n: number; color: string }>>((acc, o) => {
+    const k = o.type;
+    acc[k] ??= { label: k, n: 0, color: colorForObject(o) };
+    acc[k].n += 1;
+    return acc;
+  }, {}));
+
+  const overlay = (
+    <>
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/35 via-transparent to-black/35" />
+      <div className="absolute top-3 left-3 z-10 flex max-w-[70%] flex-wrap items-center gap-2">
+        <span className="flex items-center gap-1.5 rounded-lg bg-black/55 px-2.5 py-1 text-[11.5px] font-extrabold tracking-wider text-white backdrop-blur">
+          <span className={`size-2 rounded-full ${live ? "animate-pulse bg-[#ff5a5f]" : "bg-white/40"}`} />
+          {live ? "LIVE" : source === "own" ? "CAMERA OFF" : "CONNECTING"}
+        </span>
+        <span className="truncate rounded-lg bg-black/55 px-2.5 py-1 text-[11.5px] font-semibold text-white backdrop-blur">{sourceText}</span>
+      </div>
+      <div className="absolute top-3 right-14 z-10">
+        <button type="button" disabled={!mayAnalyze} onClick={() => setYoloEnabled(!yoloEnabled)}
+          title={mayAnalyze ? "Live detection on/off — off keeps the GPU idle" : "Live detection"}
+          className={`flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-extrabold backdrop-blur transition enabled:cursor-pointer ${
+            yoloEnabled ? "bg-white/90 text-[#0f1623]" : "bg-black/55 text-white/70"}`}>
+          <span className={`size-2 rounded-full ${yoloEnabled ? "bg-[#2fc1b1] shadow-[0_0_0_3px_rgba(47,193,177,0.25)]" : "bg-white/40"}`} />
+          YOLO
+          {yoloEnabled && <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[#0f1623] px-1 text-[11px] text-white">{objects.length}</span>}
+        </button>
+      </div>
+      {source === "own" && (
+        <div className="absolute inset-x-0 bottom-4 z-10 flex justify-center">
+          <div className="flex items-center gap-1 rounded-2xl bg-white/90 p-1.5 shadow-lift backdrop-blur dark:bg-[#171922]/90">
+            <button type="button" onClick={handleStart} disabled={active}
+              className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-[#0f1623] px-3 py-2 text-[12.5px] font-bold text-white transition disabled:cursor-default disabled:opacity-40 dark:bg-white dark:text-[#0f1623]">
+              <IconPlayerPlayFilled size={14} />Start camera
+            </button>
+            <button type="button" onClick={handleStop} disabled={!active}
+              className="flex cursor-pointer items-center gap-1.5 rounded-xl px-3 py-2 text-[12.5px] font-bold text-muted transition hover:bg-subtle hover:text-fg disabled:cursor-default disabled:opacity-40">
+              <IconPlayerStopFilled size={14} />Stop
+            </button>
+            <span className="h-5 w-px bg-line" />
+            <button type="button" onClick={flip} title="Switch front/rear camera"
+              className="flex cursor-pointer items-center gap-1.5 rounded-xl px-3 py-2 text-[12.5px] font-bold text-muted transition hover:bg-subtle hover:text-fg">
+              <IconCameraRotate size={16} />{facing === "environment" ? "Rear" : "Front"}
+            </button>
+          </div>
+        </div>
+      )}
+      {source === "view" && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-4 z-10 flex justify-center">
+          <span className="flex items-center gap-2 rounded-xl bg-black/55 px-3 py-2 text-xs font-semibold text-white/80 backdrop-blur">
+            <IconEye size={15} className="text-[#5fe3d4]" />Read-only mirror of what this session is showing
+          </span>
+        </div>
+      )}
+    </>
+  );
 
   return (
-    <main className="p-4">
-      {cameraError && (
-        <p className="mt-0 mb-2.5 text-xs text-bad-fg">{cameraError}</p>
-      )}
-      <ControlsStageLayout
-        columns={!mayAnalyze ? [] : [
-          {
-            key: "yolo",
-            title: "YOLO",
-            node: (
-              <YoloPanel
-                models={options.yolo_models}
-                classOptions={classOptions}
-                model={yoloModel}
-                conf={conf}
-                imgsz={imgsz}
-                classes={classes}
-                maxFps={maxFps}
-                enabled={yoloEnabled}
-                onEnabledChange={setYoloEnabled}
-                onModelChange={handleModelChange}
-                onConfChange={setConf}
-                onImgszChange={setImgsz}
-                onClassesChange={setClasses}
-                onMaxFpsChange={setMaxFps}
-              />
-            ),
-          },
-          {
-            key: "command",
-            title: "Robot command",
-            node: (
-              <CommandPanel
-                models={options.vlm_models}
-                model={cmdModel}
-                onModelChange={setCmdModel}
-                text={cmdText}
-                onTextChange={setCmdText}
-                busy={cmdBusy}
-                status={cmdStatus}
-                result={cmdResult}
-                micSupported={cmdRecorder.supported}
-                recording={cmdRecorder.recording}
-                onInterpret={handleInterpret}
-                onRecord={handleRecordCommand}
-                onExecuteOnRobot={handleExecuteOnRobot}
-                onStop={handleStopRobot}
-                executing={executing}
-                executeStatus={executeStatus}
-                execEnabled={execEnabled}
-                onToggleExecEnabled={toggleExecEnabled}
-                autoRun={autoRun}
-                onToggleAutoRun={toggleAutoRun}
-                safeMode={safeMode}
-                onToggleSafeMode={toggleSafeMode}
-              />
-            ),
-          },
-          {
-            key: "vlm",
-            title: "VLM",
-            node: (
+    <main className={`grid gap-4 p-4 lg:h-[calc(100dvh-57px)] lg:overflow-hidden ${mayAnalyze ? "lg:grid-cols-[minmax(0,1fr)_420px]" : ""}`}>
+      <div className="flex min-h-0 min-w-0 flex-col gap-3">
+        {/* Source, and for the robot camera its picture settings */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex rounded-xl bg-subtle p-1">
+            {([
+              ["own", "My camera", IconDeviceLaptop, mayAnalyze, useOwnCamera],
+              ["robot", "Robot camera", IconVideo, mayOperate, useRobotCam],
+              ["view", "View only", IconEye, true, useMirror],
+            ] as const).filter((b) => b[3]).map(([id, label, Icon, , go]) => (
+              <button key={id} type="button" onClick={() => void go()}
+                className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-bold transition ${
+                  source === id ? "bg-panel text-fg shadow-card" : "text-muted hover:text-fg"}`}>
+                <Icon size={15} />{label}
+              </button>
+            ))}
+          </div>
+          <StatusText status={robotCamStatus} className="min-w-0 truncate text-xs text-muted" />
+          {cameraError && <span className="min-w-0 truncate text-xs text-bad-fg">{cameraError}</span>}
+          <span className="flex-1" />
+          {source === "robot" && (
+            <div className="relative">
+              <button type="button" onClick={() => setVideoMenu((v) => !v)} aria-expanded={videoMenu}
+                className="flex cursor-pointer items-center gap-2 rounded-xl border border-line bg-panel px-3 py-2 text-[12.5px] font-bold shadow-card transition hover:border-dim">
+                <IconAdjustmentsHorizontal size={16} />Camera &amp; transport
+              </button>
+              {videoMenu && (
+                <div className="absolute top-12 right-0 z-30 flex w-[320px] animate-rise flex-col gap-3 rounded-xl border border-line bg-panel p-3 shadow-lift">
+                  <VideoTransportSwitch />
+                  <RobotCameraSwitch />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {source === "own" ? (
+          <VideoStage videoRef={videoRef} objects={objects} overrideColor={overrideColor} overlay={overlay} />
+        ) : (
+          <RobotCameraStage
+            intraCanvasRef={intraCanvasRef}
+            frameUrl={robotFrameUrl}
+            getBlob={getLastFrameBlob}
+            connected={robotViewConnected}
+            objects={objects}
+            overrideColor={overrideColor}
+            overlay={overlay}
+            stream={transport === "h264" ? h264Stream : null}
+            videoElRef={videoElRef}
+            still={still}
+          />
+        )}
+
+        {/* Readings + what is on screen */}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl border border-line bg-panel px-4 py-2.5 shadow-card">
+          <Reading label="Frame rate" value={fps.replace(/ fps.*/, "")} unit={/fps/.test(fps) ? "fps" : undefined} />
+          {/ms/.test(fps) && <Reading label="YOLO inference" value={fps.replace(/.*?(\d+) ms.*/, "$1")} unit="ms" />}
+          <Reading label="Objects" value={yoloEnabled ? String(objects.length) : "—"} />
+          <Reading label="Model" value={yoloEnabled ? `${yoloModel.replace(/\.pt$/, "")} · ${imgsz}px` : "Detection off"} />
+          <span className="flex-1" />
+          <div className="flex flex-wrap gap-1.5">
+            {perClass.map((c) => (
+              <span key={c.label} className="flex items-center gap-1.5 rounded-full bg-subtle px-2.5 py-1 text-xs font-bold">
+                <span className="size-2 rounded-sm" style={{ background: c.color }} />
+                {c.label} ×{c.n}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Side panel: the AI, detection and the command interpreter, each with its own scroll. */}
+      {mayAnalyze && (
+        <aside className="flex min-h-[480px] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-card">
+          <div className="m-3 mb-0 flex gap-0.5 rounded-xl bg-subtle p-1">
+            {([
+              ["vlm", "Ask VLM", IconSparkles],
+              ["yolo", "Detection", IconScan],
+              ["command", "Command", IconTerminal2],
+            ] as const).map(([id, label, Icon]) => (
+              <button key={id} type="button" onClick={() => setPanel(id)}
+                className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg py-1.5 text-[12.5px] font-bold transition ${
+                  panel === id ? "bg-panel text-fg shadow-card" : "text-muted hover:text-fg"}`}>
+                <Icon size={15} />{label}
+              </button>
+            ))}
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            {panel === "vlm" && (
               <VlmPanel
                 models={options.vlm_models}
                 scopes={Object.keys(options.scopes)}
@@ -767,68 +867,67 @@ export function LivePage() {
                   robotSpeakerError: va.robotSpeakerError,
                 }}
               />
-            ),
-          },
-        ]}
-      >
-        {source === "own" ? (
-          <VideoStage
-            videoRef={videoRef}
-            objects={objects}
-            overrideColor={overrideColor}
-            active={active}
-            facing={facing}
-            fps={fps}
-            count={count}
-            onStart={handleStart}
-            onStop={handleStop}
-            onFlip={flip}
-          />
-        ) : (
-          <RobotCameraStage
-            intraCanvasRef={intraCanvasRef}
-            frameUrl={robotFrameUrl}
-            getBlob={getLastFrameBlob}
-            connected={robotViewConnected}
-            objects={objects}
-            overrideColor={overrideColor}
-            label={source === "robot" ? "Robot camera" : "Session mirror"}
-            detail={source === "robot" ? videoDetail : undefined}
-            stream={transport === "h264" ? h264Stream : null}
-            videoElRef={videoElRef}
-            still={still}
-          />
-        )}
-        {source === "robot" && (
-          <div className="mt-2.5 flex flex-col gap-2">
-            <VideoTransportSwitch />
-            <RobotCameraSwitch />
+            )}
+            {panel === "yolo" && (
+              <YoloPanel
+                models={options.yolo_models}
+                classOptions={classOptions}
+                model={yoloModel}
+                conf={conf}
+                imgsz={imgsz}
+                classes={classes}
+                maxFps={maxFps}
+                enabled={yoloEnabled}
+                onEnabledChange={setYoloEnabled}
+                onModelChange={handleModelChange}
+                onConfChange={setConf}
+                onImgszChange={setImgsz}
+                onClassesChange={setClasses}
+                onMaxFpsChange={setMaxFps}
+              />
+            )}
+            {panel === "command" && (
+              <CommandPanel
+                models={options.vlm_models}
+                model={cmdModel}
+                onModelChange={setCmdModel}
+                text={cmdText}
+                onTextChange={setCmdText}
+                busy={cmdBusy}
+                status={cmdStatus}
+                result={cmdResult}
+                micSupported={cmdRecorder.supported}
+                recording={cmdRecorder.recording}
+                onInterpret={handleInterpret}
+                onRecord={handleRecordCommand}
+                onExecuteOnRobot={handleExecuteOnRobot}
+                onStop={handleStopRobot}
+                executing={executing}
+                executeStatus={executeStatus}
+                execEnabled={execEnabled}
+                onToggleExecEnabled={toggleExecEnabled}
+                autoRun={autoRun}
+                onToggleAutoRun={toggleAutoRun}
+                safeMode={safeMode}
+                onToggleSafeMode={toggleSafeMode}
+              />
+            )}
           </div>
-        )}
-
-        {/* Camera source picker (this one page replaces Live + Monitor). */}
-        <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
-          {mayAnalyze && (
-            <Button variant={source === "own" ? "primary" : "secondary"} onClick={useOwnCamera}>
-              My camera
-            </Button>
-          )}
-          {mayOperate && (
-            <Button variant={source === "robot" ? "primary" : "secondary"} onClick={useRobotCam}>
-              Robot camera
-            </Button>
-          )}
-          <Button variant={source === "view" ? "primary" : "secondary"} onClick={useMirror}>
-            View only
-          </Button>
-          <StatusText status={robotCamStatus} className="text-xs text-muted" />
-          {viewing && (
-            <span className="text-xs text-muted tabular-nums">
-              {objects.length} objects
-            </span>
-          )}
-        </div>
-      </ControlsStageLayout>
+        </aside>
+      )}
     </main>
+  );
+}
+
+/** One reading in the strip under the video: a small label over a value. */
+function Reading({ label, value, unit }: { label: string; value: string; unit?: string }) {
+  return (
+    <div className="flex flex-col leading-tight">
+      <small className="text-[10.5px] font-bold tracking-wider text-dim uppercase">{label}</small>
+      <b className="text-[14.5px] font-bold">
+        {value}
+        {unit && <em className="ml-1 text-[11px] font-semibold text-muted not-italic">{unit}</em>}
+      </b>
+    </div>
   );
 }

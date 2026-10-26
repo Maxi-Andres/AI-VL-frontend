@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { FullscreenButton } from "../ui/FullscreenButton";
 import { CameraCanvas } from "./CameraCanvas";
 import { drawBoxes } from "../../lib/draw";
@@ -14,10 +15,8 @@ interface Props {
   objects: DetectedObject[];
   /** Force one color for all boxes (VLM overlay); omit for per-class colors. */
   overrideColor?: string;
-  /** Caption shown under the video (e.g. "Robot camera" / "Session mirror"). */
-  label?: string;
-  /** Appended to the caption: which transport is playing and how it is doing. */
-  detail?: string;
+  /** Drawn over the picture: the page's state chips (source, transport, detection). */
+  overlay?: ReactNode;
   /**
    * WebRTC track from a WHEP endpoint. When present it REPLACES the JPEG canvas as the
    * picture source; the overlay, the fullscreen button and the caption are unchanged, which
@@ -60,8 +59,7 @@ export function RobotCameraStage({
   connected,
   objects,
   overrideColor,
-  label = "Robot camera",
-  detail,
+  overlay,
   stream = null,
   intraCanvasRef = null,
   videoElRef,
@@ -128,10 +126,10 @@ export function RobotCameraStage({
   }, [stream, onSize, videoRef]);
 
   return (
-    <section className="min-w-0">
+    <section className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div
         ref={wrapRef}
-        className="relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-line bg-black"
+        className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-black shadow-lift lg:aspect-auto lg:min-h-[260px] lg:flex-1"
       >
         {intraCanvasRef ? (
           <canvas
@@ -154,7 +152,7 @@ export function RobotCameraStage({
             className="absolute inset-0 h-full w-full object-contain"
           />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-sm text-muted">
+          <div className="absolute inset-0 flex items-center justify-center text-sm text-white/60">
             {connected ? "Waiting for frames…" : "Connecting…"}
           </div>
         )}
@@ -165,12 +163,8 @@ export function RobotCameraStage({
           ref={canvasRef}
           className="pointer-events-none absolute inset-0 h-full w-full object-contain"
         />
+        {overlay}
         <FullscreenButton targetRef={wrapRef} />
-      </div>
-
-      <div className="mt-2.5 text-xs text-muted">
-        {label} {connected ? "· live" : "· connecting"}
-        {detail ? ` · ${detail}` : ""}
       </div>
     </section>
   );

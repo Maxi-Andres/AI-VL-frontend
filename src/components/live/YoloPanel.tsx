@@ -44,8 +44,8 @@ export function YoloPanel({
   return (
     <div>
       <div className="mb-2.5 flex items-center justify-between gap-2">
-        <h2 className="m-0 text-[13px] font-semibold uppercase tracking-[0.04em] text-muted">
-          YOLO (live)
+        <h2 className="m-0 text-[13.5px] font-extrabold text-fg">
+          Live detection (YOLO)
         </h2>
         <Button
           variant={enabled ? "primary" : "secondary"}

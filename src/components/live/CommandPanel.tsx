@@ -85,8 +85,9 @@ export function CommandPanel({
 
   return (
     <div>
-      <h2 className="m-0 mb-2.5 text-[13px] font-semibold uppercase tracking-[0.04em] text-muted">
-        Robot command (interpreter)
+      <h2 className="m-0 mb-3 flex items-center gap-2 text-[13.5px] font-extrabold text-fg">
+        One phrase, one robot skill
+        <span className="rounded-full bg-warn-bg px-2 py-0.5 text-[11px] font-bold text-warn-fg">Experimental</span>
       </h2>
 
       <Field

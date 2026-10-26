@@ -116,8 +116,8 @@ export function VlmPanel({
 }: Props) {
   return (
     <div>
-      <h2 className="m-0 mb-2.5 text-[13px] font-semibold uppercase tracking-[0.04em] text-muted">
-        VLM (on demand)
+      <h2 className="m-0 mb-3 flex items-center gap-2 text-[13.5px] font-extrabold text-fg">
+        Ask about what the camera sees
       </h2>
 
       <Field label="Model">

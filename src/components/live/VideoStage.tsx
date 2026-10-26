@@ -1,44 +1,28 @@
 import { useRef } from "react";
+import type { ReactNode } from "react";
 import { DetectionOverlay } from "./DetectionOverlay";
-import { ControlBar } from "./ControlBar";
 import { FullscreenButton } from "../ui/FullscreenButton";
 import type { DetectedObject } from "../../types";
-import type { Facing } from "../../hooks/useCamera";
 
 interface Props {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   objects: DetectedObject[];
   /** Force one box color (VLM overlay); omit for per-class YOLO colors. */
   overrideColor?: string;
-  active: boolean;
-  facing: Facing;
-  fps: string;
-  count: string;
-  onStart: () => void;
-  onStop: () => void;
-  onFlip: () => void;
+  /** Drawn over the picture: state chips, the camera's start/stop/flip. */
+  overlay?: ReactNode;
 }
 
-/** The video viewport: <video> + detection overlay + fullscreen + control bar. */
-export function VideoStage({
-  videoRef,
-  objects,
-  overrideColor,
-  active,
-  facing,
-  fps,
-  count,
-  onStart,
-  onStop,
-  onFlip,
-}: Props) {
+/** The video viewport for this device's own camera: <video> + detection overlay +
+ * fullscreen, filling the column it sits in. The controls are the page's `overlay`. */
+export function VideoStage({ videoRef, objects, overrideColor, overlay }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
 
   return (
-    <section className="min-w-0">
+    <section className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div
         ref={wrapRef}
-        className="relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-line bg-black"
+        className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-black shadow-lift lg:aspect-auto lg:min-h-[260px] lg:flex-1"
       >
         <video
           ref={videoRef}
@@ -52,17 +36,9 @@ export function VideoStage({
           overrideColor={overrideColor}
           videoRef={videoRef}
         />
+        {overlay}
         <FullscreenButton targetRef={wrapRef} />
       </div>
-      <ControlBar
-        active={active}
-        facing={facing}
-        fps={fps}
-        count={count}
-        onStart={onStart}
-        onStop={onStop}
-        onFlip={onFlip}
-      />
     </section>
   );
 }
