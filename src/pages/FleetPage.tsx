@@ -3,9 +3,11 @@ import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   IconActivity,
+  IconBrain,
   IconBuildingWarehouse,
   IconCheck,
   IconClock,
+  IconDeviceDesktop,
   IconKey,
   IconMapPin,
   IconMapPinPlus,
@@ -234,7 +236,7 @@ export function FleetPage() {
 
       <div className="grid items-start gap-4 xl:grid-cols-[1.45fr_1fr]">
         {/* Robots and the site side by side (similar heights); the site card stays in view
-            while a long robot list scrolls, and the activity spans the full width below. */}
+            while a long robot list scrolls. */}
           {/* Robots */}
           <section className="animate-rise rounded-2xl border border-line bg-panel shadow-card [animation-delay:120ms]">
             <header className="flex items-center gap-2.5 border-b border-line px-5 py-3.5">
@@ -246,12 +248,26 @@ export function FleetPage() {
               )}
             </header>
             {robots.length ? (
-              <div className="grid gap-3.5 p-4 sm:grid-cols-2 2xl:grid-cols-3">
+              // Columns follow the count, so one or two robots fill the row instead of sitting in
+              // a corner of an empty box; admins get a tile to add the next one.
+              <div className={`grid gap-3.5 p-4 sm:grid-cols-2 ${robots.length + (mayConfigure ? 1 : 0) >= 3 ? "2xl:grid-cols-3" : ""}`}>
                 {robots.map((r) => (
                   <RobotCard key={r.id} robot={r} site={r.site_id ? siteName[r.site_id] : null}
                     presence={presence} net={net} editable={mayConfigure}
                     onEdit={() => setEditingRobot({ robot: r, siteId: r.site_id })} />
                 ))}
+                {mayConfigure && (
+                  <button onClick={() => setEditingRobot({ robot: null, siteId: site?.id ?? null })}
+                    className="group grid min-h-[200px] cursor-pointer place-items-center rounded-xl border-2 border-dashed border-line p-6 text-center transition hover:border-accent hover:bg-good-bg">
+                    <span>
+                      <span className="mx-auto mb-3 grid size-11 place-items-center rounded-2xl bg-subtle text-muted transition group-hover:bg-accent group-hover:text-on-accent">
+                        <IconPlus size={22} />
+                      </span>
+                      <b className="block text-sm">Add a robot</b>
+                      <span className="mt-1 block text-[13px] text-muted">A Go2 or a G1 — it shows up here, live.</span>
+                    </span>
+                  </button>
+                )}
               </div>
             ) : (
               <Empty icon={<IconRobot size={26} />} title="No robots yet"
@@ -310,21 +326,26 @@ export function FleetPage() {
             )}
           </section>
 
-          {/* Activity */}
-          {activity && (
-            <section className="animate-rise rounded-2xl border border-line bg-panel shadow-card [animation-delay:240ms] xl:col-span-2">
-              <header className="flex items-center gap-2.5 border-b border-line px-5 py-3.5">
-                <h2 className="m-0 text-[15px] font-extrabold">Activity</h2>
-              </header>
-              {activity.length ? (
-                <ul className="m-0 grid list-none gap-x-8 px-5 py-1 lg:grid-cols-2">
-                  {activity.slice(0, 6).map((ev, i) => <ActivityRow key={`${ev.at}-${i}`} ev={ev} />)}
-                </ul>
-              ) : (
-                <p className="m-0 px-5 py-6 text-center text-sm text-muted">Nothing yet.</p>
-              )}
-            </section>
-          )}
+      </div>
+
+      {/* The system under the robots, the latest changes under the site — same proportions as
+          the row above, so the page reads as two clean columns. */}
+      <div className="mt-4 grid gap-4 xl:grid-cols-[1.45fr_1fr]">
+        <SystemPanel presence={presence} wide={!activity} />
+        {activity && (
+          <section className="animate-rise rounded-2xl border border-line bg-panel shadow-card [animation-delay:300ms]">
+            <header className="flex items-center gap-2.5 border-b border-line px-5 py-3.5">
+              <h2 className="m-0 text-[15px] font-extrabold">Activity</h2>
+            </header>
+            {activity.length ? (
+              <ul className="m-0 list-none px-5 py-1">
+                {activity.slice(0, 5).map((ev, i) => <ActivityRow key={`${ev.at}-${i}`} ev={ev} />)}
+              </ul>
+            ) : (
+              <p className="m-0 px-5 py-6 text-center text-sm text-muted">Nothing yet.</p>
+            )}
+          </section>
+        )}
       </div>
 
       {editingSite && fleet && (
@@ -379,6 +400,85 @@ function Kpi({ icon, tint, label, value, unit, fill, delay }: {
         </div>
       )}
     </div>
+  );
+}
+
+type Tone = "good" | "warn" | "bad" | "idle";
+const PILL: Record<Tone, string> = {
+  good: "bg-good-bg text-good-fg",
+  warn: "bg-warn-bg text-warn-fg",
+  bad: "bg-bad-bg text-bad-fg",
+  idle: "bg-subtle text-muted",
+};
+
+/** The services behind the robots, in words a customer reads: can the AI see, can a robot be
+ * moved, is video arriving, who is on the live session. All of it from /api/presence. */
+function SystemPanel({ presence, wide }: { presence: Presence | null; wide: boolean }) {
+  const p = presence;
+  const cam = p?.robot_cam;
+  const ex = p?.executor;
+  const people = p?.web.total ?? 0;
+  const rows: { icon: ReactNode; label: string; tone: Tone; state: string; detail: string }[] = p ? [
+    {
+      icon: <IconBrain size={18} />, label: "AI engine",
+      ...(p.iacore.online
+        ? { tone: "good" as const, state: "Ready", detail: "Detection, vision assistant and voice." }
+        : { tone: "bad" as const, state: "Down", detail: "Detection and the vision assistant are paused." }),
+    },
+    {
+      icon: <IconSteeringWheel size={18} />, label: "Robot control",
+      ...(!ex?.online
+        ? { tone: "bad" as const, state: "Unreachable", detail: "Drive and actions are unavailable." }
+        : ex.dry_run
+          ? { tone: "warn" as const, state: "Dry run", detail: "Commands are checked but never sent to a robot." }
+          : { tone: "good" as const, state: "Ready", detail: ex.safe_mode ? "Safe mode on: speed and actions limited." : "Commands go to the robot." }),
+    },
+    {
+      icon: <IconVideo size={18} />, label: "Robot video",
+      ...(cam?.live
+        ? { tone: "good" as const, state: "Live", detail: [cam.fps ? `${Math.round(cam.fps)} fps` : null, cam.resolution].filter(Boolean).join(" · ") || "Frames arriving." }
+        : cam?.bridge
+          ? { tone: "warn" as const, state: "No frames", detail: "The bridge is up but no picture arrives." }
+          : { tone: "idle" as const, state: "Off", detail: "No robot is streaming." }),
+    },
+    {
+      icon: <IconDeviceDesktop size={18} />, label: "Live session",
+      tone: people ? "good" : "idle", state: people ? `${people} connected` : "Idle",
+      detail: people ? `${p.web.producers} streaming · ${p.web.viewers} watching` : "No one is on Live right now.",
+    },
+  ] : [];
+  const issues = rows.filter((r) => r.tone === "bad" || r.tone === "warn").length;
+
+  return (
+    <section className={`animate-rise rounded-2xl border border-line bg-panel shadow-card [animation-delay:240ms] ${wide ? "xl:col-span-2" : ""}`}>
+      <header className="flex items-center gap-2.5 border-b border-line px-5 py-3.5">
+        <h2 className="m-0 text-[15px] font-extrabold">System</h2>
+        {p && (
+          <span className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold ${PILL[issues ? "warn" : "good"]}`}>
+            <span className="size-1.5 rounded-full bg-current" />
+            {issues ? `${issues} need${issues === 1 ? "s" : ""} attention` : "All systems normal"}
+          </span>
+        )}
+      </header>
+      {p ? (
+        <div className={`grid gap-3 p-4 sm:grid-cols-2 ${wide ? "xl:grid-cols-4" : ""}`}>
+          {rows.map((r) => (
+            <div key={r.label} className="rounded-xl border border-line bg-bg p-4">
+              <div className="flex items-center gap-2.5">
+                <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${PILL[r.tone]}`}>{r.icon}</span>
+                <b className="min-w-0 truncate text-[14px]">{r.label}</b>
+                <span className={`ml-auto flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11.5px] font-bold ${PILL[r.tone]}`}>
+                  <span className={`size-1.5 rounded-full bg-current ${r.tone === "good" ? "animate-pulse" : ""}`} />{r.state}
+                </span>
+              </div>
+              <p className="m-0 mt-2.5 text-[12.5px] text-muted">{r.detail}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="m-0 px-5 py-6 text-center text-sm text-muted">Checking…</p>
+      )}
+    </section>
   );
 }
 
@@ -520,7 +620,7 @@ function ActivityRow({ ev }: { ev: ActivityEvent }) {
   const f = FEED[ev.action] ?? { icon: IconActivity, tint: "info" as const, text: (e: ActivityEvent) => <>{e.action} {e.target}</> };
   const Icon = f.icon;
   return (
-    <li className="flex gap-3 border-b border-line py-3 last:border-0 lg:[&:nth-last-child(-n+2)]:border-0">
+    <li className="flex gap-3 border-b border-line py-3 last:border-0">
       <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${TINT[f.tint]}`}><Icon size={16} /></span>
       <div className="min-w-0 text-[13px]">
         <p className="m-0">{f.text(ev)}</p>
