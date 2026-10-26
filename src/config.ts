@@ -91,6 +91,11 @@ export const MAP_TILES = {
   maxZoom: 19,
 };
 
+/** Credit for the satellite layer (Esri World Imagery) — its terms ask for "Powered by Esri".
+ * The tile URL itself, with the key, comes from the server: GET /api/fleet → `satellite`. */
+export const SATELLITE_ATTRIBUTION =
+  'Powered by <a href="https://www.esri.com">Esri</a> · Esri, Maxar, Earthstar Geographics';
+
 /**
  * Address search for placing a site (OpenStreetMap's Nominatim). Free and keyless; its usage
  * policy allows this light use — a search when someone edits a site, never automatic or in a

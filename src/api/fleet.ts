@@ -27,6 +27,8 @@ export interface Fleet {
   sites: Site[];
   robots: FleetRobot[];
   slots: { slot: string; model: string; free: boolean }[];
+  /** Satellite tile URL (with this server's key), or null when it has none. */
+  satellite: string | null;
 }
 
 async function check(r: Response): Promise<Response> {

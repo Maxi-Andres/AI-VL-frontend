@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { MAP_TILES } from "../../config";
+import { MAP_TILES, SATELLITE_ATTRIBUTION } from "../../config";
 
 // A site's location on a street map. Read-only by default; with `onPick`, a click moves the
 // pin (the site editor). Leaflet is driven directly — one small component does not need a
@@ -18,14 +18,29 @@ const PIN = L.divIcon({
 
 const WORLD: L.LatLngExpression = [-34.6, -58.4]; // first view with no pin yet
 
-export function SiteMap({ lat, lon, onPick, focus = 0, className = "" }: {
+type Layer = "street" | "satellite";
+const LAYER_KEY = "pilot.mapLayer";
+function savedLayer(): Layer {
+  try {
+    return localStorage.getItem(LAYER_KEY) === "street" ? "street" : "satellite";
+  } catch {
+    return "satellite";
+  }
+}
+
+export function SiteMap({ lat, lon, onPick, focus = 0, satellite = null, className = "" }: {
   lat: number | null;
   lon: number | null;
   onPick?: (lat: number, lon: number) => void;
   /** Bump to fly to the pin at street level (an address search moved it far away). */
   focus?: number;
+  /** The satellite tile URL, when the server has a key for one (GET /api/fleet). */
+  satellite?: string | null;
+  /** Must position the box (relative, absolute…): the layer switch sits inside it. */
   className?: string;
 }) {
+  const [layer, setLayer] = useState<Layer>(savedLayer);
+  const tiles = useRef<L.TileLayer | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const pin = useRef<L.Marker | null>(null);
@@ -36,16 +51,23 @@ export function SiteMap({ lat, lon, onPick, focus = 0, className = "" }: {
   useEffect(() => {
     if (!box.current) return;
     const m = L.map(box.current, { zoomControl: !!onPick, attributionControl: true, scrollWheelZoom: !!onPick });
-    L.tileLayer(MAP_TILES.url, { attribution: MAP_TILES.attribution, maxZoom: MAP_TILES.maxZoom }).addTo(m);
+    m.attributionControl.setPrefix(false);
     m.on("click", (e: L.LeafletMouseEvent) => pickRef.current?.(e.latlng.lat, e.latlng.lng));
     map.current = m;
+    // The tile credit is a licence term (OSM, Esri), so it stays — but quiet: shown when the
+    // map opens, folded into an (i) after a few seconds or the first touch, open on hover.
+    const fold = () => box.current?.classList.add("credit-folded");
+    const timer = window.setTimeout(fold, 5000);
+    m.once("movestart click", fold);
     // Leaflet measures its box once; inside a dialog that is still animating open, or a card
     // that resizes, that size is wrong and the tiles stay grey. Re-measure on every resize.
     const ro = new ResizeObserver(() => m.invalidateSize());
     ro.observe(box.current);
     return () => {
+      window.clearTimeout(timer);
       ro.disconnect();
       m.remove();
+      tiles.current = null;
       map.current = null;
       pin.current = null;
       framed.current = false;
@@ -53,6 +75,25 @@ export function SiteMap({ lat, lon, onPick, focus = 0, className = "" }: {
     // Built once; the pin and the view follow the props below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const shown: Layer = satellite && layer === "satellite" ? "satellite" : "street";
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    tiles.current?.remove();
+    tiles.current = (shown === "satellite" && satellite
+      ? L.tileLayer(satellite, { attribution: SATELLITE_ATTRIBUTION, maxZoom: 19 })
+      : L.tileLayer(MAP_TILES.url, { attribution: MAP_TILES.attribution, maxZoom: MAP_TILES.maxZoom })).addTo(m);
+  }, [shown, satellite]);
+
+  const pick = (l: Layer) => {
+    setLayer(l);
+    try {
+      localStorage.setItem(LAYER_KEY, l);
+    } catch {
+      /* a private window: the choice lasts this page only */
+    }
+  };
 
   useEffect(() => {
     const m = map.current;
@@ -66,13 +107,13 @@ export function SiteMap({ lat, lon, onPick, focus = 0, className = "" }: {
     }
     if (pin.current) pin.current.setLatLng([lat, lon]);
     else pin.current = L.marker([lat, lon], { icon: PIN }).addTo(m);
-    // Frame the pin once: a saved site opens at street level; a first click on the world view
+    // Frame the pin once: a saved site opens close enough to see its buildings; a first click on the world view
     // zooms in a few steps. After that a click in the editor only moves the pin, so the person
     // can zoom in and nudge it without the view jumping under the cursor.
     if (!framed.current) {
       framed.current = true;
-      const shown = (m as unknown as { _loaded?: boolean })._loaded;
-      m.setView([lat, lon], shown && pickRef.current ? Math.min(m.getZoom() + 4, 16) : 15);
+      const loaded = (m as unknown as { _loaded?: boolean })._loaded;
+      m.setView([lat, lon], loaded && pickRef.current ? Math.min(m.getZoom() + 4, 16) : 17);
     } else if (!pickRef.current) {
       m.setView([lat, lon], m.getZoom());
     }
@@ -84,5 +125,19 @@ export function SiteMap({ lat, lon, onPick, focus = 0, className = "" }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus]);
 
-  return <div ref={box} className={`z-0 ${onPick ? "cursor-crosshair" : ""} ${className}`} />;
+  return (
+    <div className={`z-0 ${className}`}>
+      <div ref={box} className={`pilot-map absolute inset-0 ${onPick ? "cursor-crosshair" : ""}`} />
+      {satellite && (
+        <div className="absolute top-2.5 right-2.5 z-[1000] flex rounded-lg bg-panel/90 p-0.5 shadow-card backdrop-blur">
+          {(["satellite", "street"] as const).map((l) => (
+            <button key={l} type="button" onClick={() => pick(l)} aria-pressed={shown === l}
+              className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-bold ${shown === l ? "bg-fg text-bg" : "text-muted hover:text-fg"}`}>
+              {l === "satellite" ? "Satellite" : "Map"}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }

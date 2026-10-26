@@ -53,7 +53,9 @@ const ZONES: string[] = (() => {
   }
 })();
 
-export function SiteDialog({ site, robotsHere, onClose }: { site: Site | null; robotsHere: number; onClose: (changed: boolean) => void }) {
+export function SiteDialog({ site, robotsHere, satellite, onClose }: {
+  site: Site | null; robotsHere: number; satellite: string | null; onClose: (changed: boolean) => void;
+}) {
   const [name, setName] = useState(site?.name ?? "");
   const [timezone, setTimezone] = useState(site?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC");
   const [address, setAddress] = useState(site?.address ?? "");
@@ -202,8 +204,8 @@ export function SiteDialog({ site, robotsHere, onClose }: { site: Site | null; r
         </div>
         <div className="flex flex-col">
           <Label>Location — search the address, or click the map</Label>
-          <SiteMap lat={lat} lon={lon} focus={focus} onPick={(a, b) => { setLat(a); setLon(b); }}
-            className="min-h-[260px] flex-1 overflow-hidden rounded-lg border border-line" />
+          <SiteMap lat={lat} lon={lon} focus={focus} satellite={satellite} onPick={(a, b) => { setLat(a); setLon(b); }}
+            className="relative min-h-[260px] flex-1 overflow-hidden rounded-lg border border-line" />
           <div className="mt-1.5 flex items-center text-xs text-muted">
             {lat !== null && lon !== null ? `${lat.toFixed(5)}, ${lon.toFixed(5)}` : "No location"}
             {lat !== null && (

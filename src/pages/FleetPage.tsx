@@ -105,7 +105,7 @@ export function FleetPage() {
       setFleet(await getFleet(signal));
     } catch (e) {
       if (signal?.aborted) return;
-      setFleet({ sites: [], robots: [], slots: [] });
+      setFleet({ sites: [], robots: [], slots: [], satellite: null });
       // 404 here means the server predates Fleet: it was updated but not restarted.
       setError(e instanceof AuthError && e.status === 404
         ? "This server is running an older version of Pilot. Restart it to finish the update."
@@ -160,13 +160,15 @@ export function FleetPage() {
               : " "}
           </p>
         </div>
-        <div className="ml-auto flex flex-wrap items-center gap-2.5">
+        {/* The people and the two things to do next, grouped in one card (the mockup). Adding a
+            robot is not here: the tile in the robot grid does that, once is enough. */}
+        <div className="ml-auto flex animate-rise flex-wrap items-center gap-2 rounded-2xl border border-line bg-panel p-1.5 shadow-card">
           {activeMembers.length > 1 && (
-            <div className="mr-1 flex items-center gap-2 text-[13px] font-semibold text-muted">
+            <div className="flex items-center gap-2 px-2 text-[13px] font-semibold text-muted">
               <div className="flex">
                 {activeMembers.slice(0, 4).map((m, i) => (
                   <span key={m.id} title={m.name} style={{ zIndex: 10 - i }}
-                    className="-ml-2 grid size-7 place-items-center rounded-full border-2 border-bg bg-gradient-to-br from-[#d6f1ed] to-[#f4efc4] text-[10px] font-extrabold text-[#0f5a52] first:ml-0">
+                    className="-ml-2 grid size-7 place-items-center rounded-full border-2 border-panel bg-gradient-to-br from-[#d6f1ed] to-[#f4efc4] text-[10px] font-extrabold text-[#0f5a52] first:ml-0">
                     {initials(m.name)}
                   </span>
                 ))}
@@ -175,16 +177,13 @@ export function FleetPage() {
             </div>
           )}
           {mayManage && (
-            <Link to="/team" className="flex items-center gap-2 rounded-xl border border-line bg-panel px-3.5 py-2 text-[13px] font-bold shadow-card transition hover:-translate-y-px hover:shadow-lift">
+            <Link to="/team" className="flex items-center gap-2 rounded-xl border border-line bg-panel px-3.5 py-2 text-[13px] font-bold transition hover:border-dim hover:bg-subtle">
               <IconUserPlus size={16} />Invite
             </Link>
           )}
-          {mayConfigure && (
-            <button onClick={() => setEditingRobot({ robot: null, siteId: site?.id ?? null })}
-              className="flex cursor-pointer items-center gap-2 rounded-xl bg-fg px-3.5 py-2 text-[13px] font-bold text-bg shadow-card transition hover:-translate-y-px hover:shadow-lift">
-              <IconPlus size={16} />Add robot
-            </button>
-          )}
+          <Link to="/live" className="flex items-center gap-2 rounded-xl bg-fg px-3.5 py-2 text-[13px] font-bold text-bg transition hover:-translate-y-px hover:shadow-lift">
+            <IconVideo size={16} />Go live
+          </Link>
         </div>
       </div>
 
@@ -310,7 +309,7 @@ export function FleetPage() {
                   {site.has_plan ? (
                     <img src={planUrl(site, planVersion)} alt={`Floor plan of ${site.name}`} className="absolute inset-0 size-full object-contain p-3" />
                   ) : site.lat !== null && site.lon !== null ? (
-                    <SiteMap lat={site.lat} lon={site.lon} className="absolute inset-0" />
+                    <SiteMap lat={site.lat} lon={site.lon} satellite={fleet?.satellite} className="absolute inset-0" />
                   ) : (
                     <Empty fill icon={<IconMapPin size={24} />} title="No map yet"
                       text={mayConfigure ? "Add the floor plan or the location." : "An admin can add the floor plan."}
@@ -352,6 +351,7 @@ export function FleetPage() {
         <SiteDialog
           site={editingSite === "new" ? null : editingSite}
           robotsHere={editingSite === "new" ? 0 : robots.filter((r) => r.site_id === editingSite.id).length}
+          satellite={fleet.satellite ?? null}
           onClose={async (did) => {
             setEditingSite(null);
             await changed(did);

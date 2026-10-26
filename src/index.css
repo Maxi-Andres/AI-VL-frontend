@@ -111,3 +111,33 @@ body {
   -webkit-font-smoothing: antialiased;
   transition: background-color 0.25s ease, color 0.25s ease;
 }
+
+/* Map tile credit (SiteMap): a licence term, so never removed — kept small and quiet, then
+   folded into an (i) that opens on hover. */
+.pilot-map .leaflet-control-attribution {
+  margin: 0 6px 6px 0;
+  padding: 2px 8px;
+  border-radius: 9px;
+  background: rgb(12 18 22 / 0.55);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  font: 600 10px/1.5 var(--font-sans);
+}
+.pilot-map .leaflet-control-attribution a {
+  color: inherit;
+}
+.pilot-map.credit-folded .leaflet-control-attribution:not(:hover) {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  overflow: hidden;
+  font-size: 0;
+}
+.pilot-map.credit-folded .leaflet-control-attribution:not(:hover)::before {
+  content: "i";
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  font: italic 700 11px/1 var(--font-sans);
+}
