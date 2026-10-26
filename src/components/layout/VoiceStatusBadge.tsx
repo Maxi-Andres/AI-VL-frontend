@@ -24,27 +24,27 @@ export function VoiceStatusBadge({
     listening: {
       icon: <IconMicrophone size={13} stroke={2} />,
       label: `Listening for ${wakeWords || "“robot”"}`,
-      cls: "bg-[#173a26] text-accent",
+      cls: "bg-good-bg text-good-fg",
     },
     recording: {
       icon: <IconMicrophoneFilled size={13} />,
       label: "Recording…",
-      cls: "bg-[#3a2330] text-[#ff9aa6]",
+      cls: "bg-bad-bg text-bad-fg",
     },
     transcribing: {
       icon: <IconLoader2 size={13} className="animate-spin" />,
       label: "Transcribing…",
-      cls: "bg-[#2a2e3a] text-fg",
+      cls: "bg-subtle text-fg",
     },
     thinking: {
       icon: <IconLoader2 size={13} className="animate-spin" />,
       label: "Thinking…",
-      cls: "bg-[#2a2e3a] text-fg",
+      cls: "bg-subtle text-fg",
     },
     speaking: {
       icon: <IconVolume size={13} stroke={2} />,
       label: "Speaking…",
-      cls: "bg-[#1e2f45] text-[#8fc2ff]",
+      cls: "bg-info-bg text-info-fg",
     },
   };
 

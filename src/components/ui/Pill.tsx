@@ -5,10 +5,10 @@ import type { ReactNode } from "react";
 export type PillTone = "good" | "warn" | "bad" | "idle";
 
 const TONES: Record<PillTone, string> = {
-  good: "bg-[#173a26] text-accent",
-  warn: "bg-[#3a3320] text-[#ffd08a]",
-  bad: "bg-[#3a2330] text-[#ff9aa6]",
-  idle: "bg-[#2a2e3a] text-muted",
+  good: "bg-good-bg text-good-fg",
+  warn: "bg-warn-bg text-warn-fg",
+  bad: "bg-bad-bg text-bad-fg",
+  idle: "bg-subtle text-muted",
 };
 
 interface Props {

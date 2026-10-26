@@ -1,42 +1,23 @@
 import { Outlet } from "react-router-dom";
 import { Header } from "./Header";
-import { StatusBadge } from "./StatusBadge";
 import { StatusProvider, useStatus } from "./StatusContext";
-import { RobotProvider, useRobot } from "./RobotContext";
+import { RobotProvider } from "./RobotContext";
 import { VideoTransportProvider } from "./VideoTransportContext";
-import { PresencePills } from "./PresencePills";
+import { RobotStatus } from "./RobotStatus";
 import { VoiceAssistantProvider, useVoiceAssistantContext } from "./VoiceAssistantContext";
 import { VoiceStatusBadge } from "./VoiceStatusBadge";
 import { UserMenu } from "./UserMenu";
 
 function HeaderWithStatus() {
   const { connected, voicePhase } = useStatus();
-  const { robot, setRobot, robots } = useRobot();
   const { va } = useVoiceAssistantContext();
   const wakeWords = [va.voiceMode && "“robot”", va.robotMic && va.robotEar && "“Bender”"]
     .filter(Boolean).join(" or ");
   return (
     <Header>
-      <div className="flex flex-wrap items-center justify-end gap-1.5">
-        {robots.length > 1 && (
-          <select
-            value={robot}
-            onChange={(e) => setRobot(e.target.value)}
-            title="Robot the interpreter and Drive target"
-            className="rounded-md border border-line bg-bg px-1.5 py-1 text-xs text-fg focus:border-accent focus:outline-none"
-          >
-            {robots.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.label}
-              </option>
-            ))}
-          </select>
-        )}
-        <VoiceStatusBadge phase={voicePhase} wakeWords={wakeWords} />
-        <PresencePills />
-        <StatusBadge connected={connected} />
-        <UserMenu />
-      </div>
+      <VoiceStatusBadge phase={voicePhase} wakeWords={wakeWords} />
+      <RobotStatus connected={connected} />
+      <UserMenu />
     </Header>
   );
 }

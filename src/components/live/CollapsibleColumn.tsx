@@ -42,7 +42,7 @@ export function CollapsibleColumn({ title, collapsed, onToggle, children }: Prop
           title={`Collapse ${title}`}
           aria-expanded
           aria-label={`Collapse ${title}`}
-          className="rounded p-1 text-muted transition duration-100 hover:bg-white/5 hover:text-fg active:scale-90"
+          className="rounded p-1 text-muted transition duration-100 hover:bg-subtle hover:text-fg active:scale-90"
         >
           <IconChevronLeft size={16} stroke={2} />
         </button>

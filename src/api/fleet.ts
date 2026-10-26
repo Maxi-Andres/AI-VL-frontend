@@ -109,3 +109,16 @@ export async function saveRobot(id: string | null, input: RobotInput): Promise<F
 export async function deleteRobot(id: string): Promise<void> {
   await check(await backendFetch(`/api/robots/${encodeURIComponent(id)}`, { method: "DELETE" }));
 }
+
+export interface ActivityEvent {
+  at: string;
+  action: string;
+  target: string;
+  actor: string;
+  detail: Record<string, unknown>;
+}
+
+/** Notable changes in the company, newest first (admins: the log names people). */
+export async function getActivity(signal?: AbortSignal): Promise<ActivityEvent[]> {
+  return (await check(await backendFetch("/api/activity", { signal }))).json();
+}

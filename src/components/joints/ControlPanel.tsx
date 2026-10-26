@@ -78,10 +78,10 @@ function JointRow({
   const step = finger ? fingerUpper(urdf) / 10 : NUDGE_RAD;
   const stepText = finger ? "10%" : "5 degrees";
   const set = (rad: number) => onGoal(urdf, Math.min(range.upper, Math.max(range.lower, rad)));
-  const btn = "cursor-pointer rounded bg-[#2a2e3a] p-0.5 text-fg disabled:opacity-40";
+  const btn = "cursor-pointer rounded bg-subtle p-0.5 text-fg disabled:opacity-40";
   return (
     <li
-      className={`rounded px-1.5 py-1 ${selected ? "bg-[#1d2a40]" : ""}`}
+      className={`rounded px-1.5 py-1 ${selected ? "bg-info-bg" : ""}`}
       onPointerDown={() => onSelect(urdf)}
     >
       <div className="flex items-baseline justify-between gap-2 text-xs">
@@ -161,8 +161,8 @@ export function ControlPanel({
               ? "warn" : "ok",
             text: control.message,
           }}
-          className={`mt-1 text-xs ${control.messageTone === "error" ? "text-[#ff9aa6]"
-            : control.messageTone === "warn" ? "text-[#ffd08a]" : "text-muted"}`}
+          className={`mt-1 text-xs ${control.messageTone === "error" ? "text-bad-fg"
+            : control.messageTone === "warn" ? "text-warn-fg" : "text-muted"}`}
         />
       )}
 
@@ -193,7 +193,7 @@ export function ControlPanel({
                 const inGroup = rows.filter((j) => JOINT_BY_URDF.get(j)?.group === g);
                 if (!inGroup.length) return null;
                 const hand = g === "Left hand" || g === "Right hand";
-                const quick = "cursor-pointer rounded bg-[#2a2e3a] px-2 py-0.5 text-[11px] text-fg";
+                const quick = "cursor-pointer rounded bg-subtle px-2 py-0.5 text-[11px] text-fg";
                 return (
                   <div key={g}>
                     <div className="mb-0.5 flex items-center justify-between">

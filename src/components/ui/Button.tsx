@@ -3,9 +3,9 @@ import type { ButtonHTMLAttributes } from "react";
 type Variant = "primary" | "secondary" | "accent";
 
 const variants: Record<Variant, string> = {
-  primary: "bg-accent text-[#05210f] hover:brightness-110",
-  secondary: "bg-[#2a2e3a] text-fg hover:brightness-125",
-  accent: "bg-accent2 text-[#04162e] hover:brightness-110",
+  primary: "bg-accent text-on-accent hover:brightness-110",
+  secondary: "bg-subtle text-fg hover:brightness-125",
+  accent: "bg-accent2 text-on-accent2 hover:brightness-110",
 };
 
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {

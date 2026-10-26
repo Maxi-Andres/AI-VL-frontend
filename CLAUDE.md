@@ -18,8 +18,8 @@ the current frame. It also has a **voice-assistant** flow (record → transcribe
 speak, with wake-word). The Live page picks its own video source — "My camera",
 "Robot camera", or "View only", the last being a read-only mirror of whatever the
 session is streaming (this replaced the old separate `/monitor` page).
-Routes: `/fleet` (sites and robots, with each robot's live state; admins build it there),
-`/team` (members, invitations, roles — admins), `/` (live), `/drive` (robot drive pad), `/robot` (on-robot config),
+Routes: `/` (Fleet, the home: sites and robots with each robot's live state; admins build it
+there), `/team` (members, invitations, roles — admins), `/live` (live), `/drive` (robot drive pad), `/robot` (on-robot config),
 `/video` (live video tuning), `/joints` (the G1 in 3D, posed live from its joint state;
 `#replay` opens it on a recorded walk; "Take control" moves the arms, waist and fingers over a separate socket,
 `/ws/joint-control` — every limit is on the robot, the page only names targets). The 3D model in `public/g1/` is built by
@@ -52,9 +52,11 @@ The frontend knows exactly one URL: the backend's, resolved in **`src/config.ts`
   before that it shows sign-in or the first-run setup. The session is an httpOnly cookie —
   the frontend never sees a token. **Every backend call goes through `backendFetch`**
   (`src/api/backend.ts`): it sends the cookie and turns a 401 into "back to sign-in".
-- **The light redesign** (`.theme-light` in `src/index.css`) is applied per subtree while the
-  app moves to it screen by screen; sign-in and setup are the first. Font: Manrope, bundled
-  (`@fontsource-variable/manrope`) — installs may have no internet.
+- **Themes**: light by default, dark with `<html data-theme="dark">` (the user menu: Light /
+  Dark / System, `src/lib/theme.ts`). Every colour is a token in `src/index.css` (`bg-panel`,
+  `text-muted`, `bg-good-bg`/`text-good-fg`, `bg-subtle`, `shadow-card`…) — **never a raw hex
+  for UI chrome**, or it breaks one of the two themes. `.theme-light` forces light (sign-in,
+  setup). Font: Manrope, bundled (`@fontsource-variable/manrope`) — installs may have no internet.
 - **Container/presentational**: `LivePage` (and `MonitorPage`) own control state and
   wire the hooks; `components/live/*` and `components/ui/*` stay presentational.
 - **Detection socket discipline**: `useDetectionSocket` pumps frames over

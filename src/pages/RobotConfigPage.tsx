@@ -28,7 +28,7 @@ import { NAMING_RULE, REPO_RELAY, REPO_VIDEO, deployFor, type RobotService } fro
 
 function Steps({ lines }: { lines: string[] }) {
   return (
-    <pre className="overflow-x-auto rounded-md border border-line bg-[#0a0b0f] p-2 font-mono text-xs text-fg">
+    <pre className="overflow-x-auto rounded-md border border-line bg-sunken p-2 font-mono text-xs text-fg">
       {lines.join("\n")}
     </pre>
   );

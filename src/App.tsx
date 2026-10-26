@@ -34,11 +34,13 @@ function AppRoutes() {
     <BrowserRouter>
       <Routes>
         <Route element={<Layout />}>
-          <Route index element={<LivePage />} />
+          {/* Fleet is home: where the company's robots are and how they are doing. */}
+          <Route index element={<FleetPage />} />
+          <Route path="live" element={<LivePage />} />
           <Route path="drive" element={<RequirePermission perm="operate"><ControlPage /></RequirePermission>} />
           <Route path="robot" element={<RequirePermission perm="configure"><RobotConfigPage /></RequirePermission>} />
           <Route path="video" element={<RequirePermission perm="configure"><VideoTuningPage /></RequirePermission>} />
-          <Route path="fleet" element={<FleetPage />} />
+          <Route path="fleet" element={<Navigate to="/" replace />} />
           <Route path="team" element={<RequirePermission perm="manage_users"><TeamPage /></RequirePermission>} />
           <Route
             path="joints"

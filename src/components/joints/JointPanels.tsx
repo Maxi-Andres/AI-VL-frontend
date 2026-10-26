@@ -22,7 +22,7 @@ const fmtDeg = (rad: number) => `${deg(rad).toFixed(1)}°`;
 
 const TEMP_TEXT = {
   normal: "text-fg",
-  warm: "text-[#f5b942]",
+  warm: "text-warn-fg",
   hot: "text-[#f97316]",
   critical: "text-[#ef4444] font-semibold",
 };
@@ -81,14 +81,14 @@ export function SourcePanel({ kind, onKind, state, locked = false }: {
       aria-pressed={kind === k}
       disabled={locked && kind !== k}
       className={`flex-1 cursor-pointer rounded px-2 py-1 text-xs disabled:cursor-default disabled:opacity-40 ${
-        kind === k ? "bg-[#2a2e3a] font-semibold text-fg" : "text-muted hover:text-fg"
+        kind === k ? "bg-subtle font-semibold text-fg" : "text-muted hover:text-fg"
       }`}
     >
       {label}
     </button>
   );
-  const tone = state.link === "error" ? "text-[#ff9aa6]" : state.link === "stale"
-    ? "text-[#ffd08a]" : "text-muted";
+  const tone = state.link === "error" ? "text-bad-fg" : state.link === "stale"
+    ? "text-warn-fg" : "text-muted";
   return (
     <Section title="Source">
       <div className="mb-2 flex gap-1 rounded-md border border-line bg-bg p-0.5">
@@ -179,7 +179,7 @@ export function JointInspector({ urdf, frame, limits }: {
           <dt className="text-muted">Motor current</dt>
           <dd className="m-0 text-right font-mono tabular-nums">{r.finger.current}</dd>
           <dt className="text-muted">Motor</dt>
-          <dd className={`m-0 text-right ${r.finger.state === 2 ? "font-semibold text-[#ffd08a]" : ""}`}>
+          <dd className={`m-0 text-right ${r.finger.state === 2 ? "font-semibold text-warn-fg" : ""}`}>
             {FINGER_STATE[r.finger.state] ?? r.finger.state}
           </dd>
         </dl>
@@ -265,7 +265,7 @@ export function LegCheckPanel({ frame }: { frame: JointFrame | null }) {
                   <td className="font-sans capitalize">{p.joint}</td>
                   <td className="text-right">{p.left.toFixed(1)}°</td>
                   <td className="text-right">{p.right.toFixed(1)}°</td>
-                  <td className={`text-right ${warn ? "font-semibold text-[#ffd08a]" : "text-muted"}`}>
+                  <td className={`text-right ${warn ? "font-semibold text-warn-fg" : "text-muted"}`}>
                     {p.diff.toFixed(1)}°
                   </td>
                 </tr>
@@ -322,7 +322,7 @@ export function JointTable({ frame, selected, hovered, onSelect, onHover, colorB
                       onMouseEnter={() => onHover(j.urdf)}
                       onMouseLeave={() => onHover(null)}
                       className={`flex w-full cursor-pointer items-baseline justify-between gap-2 rounded px-1.5 py-0.5 text-left text-sm ${
-                        active ? "bg-[#1d2a40]" : j.urdf === hovered ? "bg-[#1f222c]" : ""
+                        active ? "bg-info-bg" : j.urdf === hovered ? "bg-subtle" : ""
                       }`}
                     >
                       <span className="capitalize text-fg">{j.label}</span>

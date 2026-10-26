@@ -644,7 +644,7 @@ export function LivePage() {
 
   if (optionsError) {
     return (
-      <main className="p-4 text-[#ff9aa6]">
+      <main className="p-4 text-bad-fg">
         Could not reach the backend at its configured URL: {optionsError}. Check
         that the backend is running and that <code>BACKEND_URL</code> in{" "}
         <code>public/config.js</code> is correct.
@@ -661,7 +661,7 @@ export function LivePage() {
   return (
     <main className="p-4">
       {cameraError && (
-        <p className="mt-0 mb-2.5 text-xs text-[#ff9aa6]">{cameraError}</p>
+        <p className="mt-0 mb-2.5 text-xs text-bad-fg">{cameraError}</p>
       )}
       <ControlsStageLayout
         columns={!mayAnalyze ? [] : [

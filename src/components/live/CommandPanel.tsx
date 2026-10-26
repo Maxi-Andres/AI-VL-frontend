@@ -115,7 +115,7 @@ export function CommandPanel({
           }}
           placeholder="e.g. levantá las manos"
           rows={2}
-          className="w-full resize-y rounded-md border border-line bg-[#0a0b0f] p-2 font-mono text-xs leading-[1.4]"
+          className="w-full resize-y rounded-md border border-line bg-sunken p-2 font-mono text-xs leading-[1.4]"
         />
       </Field>
 
@@ -159,7 +159,7 @@ export function CommandPanel({
           </span>
           <span
             className={`font-mono text-sm font-semibold ${
-              result.skill === "unknown" ? "text-[#ff9aa6]" : "text-accent"
+              result.skill === "unknown" ? "text-bad-fg" : "text-accent"
             }`}
           >
             {result.skill}
@@ -174,7 +174,7 @@ export function CommandPanel({
       )}
 
       {/* Exact JSON the robot executor receives. */}
-      <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-md border border-line bg-[#0a0b0f] p-2 font-mono text-xs leading-[1.4]">
+      <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-md border border-line bg-sunken p-2 font-mono text-xs leading-[1.4]">
         {decision ? JSON.stringify(decision, null, 2) : ""}
       </pre>
 
@@ -228,13 +228,13 @@ export function CommandPanel({
       </div>
       {/* Loud warnings when a dangerous mode is on. */}
       {!safeMode && (
-        <p className="m-0 mt-1 flex items-center gap-1 text-[11px] font-semibold text-[#ff5a5f]">
+        <p className="m-0 mt-1 flex items-center gap-1 text-[11px] font-semibold text-bad-fg">
           <IconAlertTriangle size={13} stroke={2} className="shrink-0" />
           Safe OFF — acrobatics (flips/handstand) enabled
         </p>
       )}
       {execEnabled && autoRun && (
-        <p className="m-0 mt-1 flex items-center gap-1 text-[11px] font-semibold text-[#ff5a5f]">
+        <p className="m-0 mt-1 flex items-center gap-1 text-[11px] font-semibold text-bad-fg">
           <IconAlertTriangle size={13} stroke={2} className="shrink-0" />
           Auto ON — runs on interpret, no button press needed
         </p>

@@ -69,10 +69,10 @@ export function TeamPage() {
   const act = (text: string, run: () => Promise<void>) => setConfirm({ text, run });
 
   return (
-    <main className="mx-auto max-w-5xl p-6">
+    <main className="mx-auto max-w-5xl px-4 py-7 lg:px-8">
       <div className="mb-6 flex flex-wrap items-end gap-4">
         <div>
-          <h1 className="m-0 text-xl font-semibold text-fg">Team &amp; roles</h1>
+          <h1 className="m-0 text-[26px] font-extrabold tracking-[-0.025em]">Team &amp; roles</h1>
           <p className="m-0 mt-1 text-sm text-muted">
             {me.org.name}
             {team && (() => {
@@ -83,7 +83,7 @@ export function TeamPage() {
         </div>
         <button
           onClick={() => setInviting(true)}
-          className="ml-auto flex cursor-pointer items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-[#05210f] transition hover:brightness-110 active:scale-95"
+          className="ml-auto flex cursor-pointer items-center gap-2 rounded-xl bg-fg px-3.5 py-2 text-[13px] font-bold text-bg shadow-card transition hover:-translate-y-px hover:shadow-lift"
         >
           <IconUserPlus size={17} />
           Invite member
@@ -100,8 +100,8 @@ export function TeamPage() {
       )}
 
       {me.role === "owner" && team && team.members.filter((m) => m.role === "owner" && m.active).length === 1 && (
-        <div className="mb-4 flex items-start gap-3 rounded-xl border border-[#c97a10]/40 bg-[#c97a10]/10 px-4 py-3 text-sm">
-          <IconShieldHalf size={18} className="mt-0.5 shrink-0 text-[#e0a040]" />
+        <div className="mb-4 flex items-start gap-3 rounded-xl border border-warn-fg/30 bg-warn-bg px-4 py-3 text-sm">
+          <IconShieldHalf size={18} className="mt-0.5 shrink-0 text-warn-fg" />
           <div>
             <b className="text-fg">You are the only owner.</b>{" "}
             <span className="text-muted">
@@ -112,7 +112,7 @@ export function TeamPage() {
         </div>
       )}
 
-      <section className="overflow-hidden rounded-xl border border-line bg-panel">
+      <section className="overflow-hidden rounded-2xl border border-line bg-panel shadow-card">
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-line text-left text-[11px] tracking-wider text-muted uppercase">
@@ -211,7 +211,7 @@ export function TeamPage() {
       {!!team?.invitations.length && (
         <section className="mt-6">
           <h2 className="m-0 mb-2 text-sm font-semibold text-fg">Pending invitations</h2>
-          <div className="overflow-hidden rounded-xl border border-line bg-panel">
+          <div className="overflow-hidden rounded-2xl border border-line bg-panel shadow-card">
             {team.invitations.map((inv: Invitation) => (
               <div key={inv.id} className="flex items-center gap-3 border-b border-line px-4 py-3 text-sm last:border-0">
                 <IconMail size={18} className="shrink-0 text-muted" />
@@ -237,7 +237,7 @@ export function TeamPage() {
         <h2 className="m-0 mb-3 text-sm font-semibold text-fg">What each role can do</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {ROLES.map((r) => (
-            <div key={r.role} className="rounded-xl border border-line bg-panel p-3.5">
+            <div key={r.role} className="rounded-2xl border border-line bg-panel shadow-card p-3.5">
               <div className="text-sm font-semibold text-fg">{r.label}</div>
               <div className="mt-1 text-xs leading-relaxed text-muted">{r.summary}</div>
             </div>
@@ -320,7 +320,7 @@ function ConfirmDialog({ text, onCancel, onConfirm }: {
             setBusy(true);
             await onConfirm();
           }}
-          className="flex cursor-pointer items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-[#05210f] disabled:opacity-60"
+          className="flex cursor-pointer items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-on-accent disabled:opacity-60"
         >
           {busy && <IconLoader2 size={15} className="animate-spin" />}
           Confirm
@@ -356,7 +356,7 @@ function LinkDialog({ title, to, link, valid, onClose }: {
         <input readOnly value={link} onFocus={(e) => e.target.select()}
           className="min-w-0 flex-1 bg-transparent font-mono text-xs text-fg outline-none" />
         <button onClick={copy}
-          className="flex cursor-pointer items-center gap-1.5 rounded-md bg-accent px-2.5 py-1.5 text-xs font-semibold text-[#05210f]">
+          className="flex cursor-pointer items-center gap-1.5 rounded-md bg-accent px-2.5 py-1.5 text-xs font-semibold text-on-accent">
           {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
           {copied ? "Copied" : "Copy"}
         </button>
@@ -418,7 +418,7 @@ function InviteDialog({ roles, onClose }: { roles: typeof ROLES; onClose: () => 
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="cursor-pointer rounded-lg px-3.5 py-2 text-sm text-muted hover:text-fg">Cancel</button>
           <button type="submit" disabled={busy || !email}
-            className="flex cursor-pointer items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-[#05210f] disabled:opacity-50">
+            className="flex cursor-pointer items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-on-accent disabled:opacity-50">
             {busy && <IconLoader2 size={15} className="animate-spin" />}
             Create invitation link
           </button>

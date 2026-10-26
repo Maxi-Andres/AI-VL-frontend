@@ -76,7 +76,7 @@ const MODEL_URL = `${import.meta.env.BASE_URL}g1/g1.urdf`;
 
 /** Text colour per temperature band — the same hues the parts are painted in. */
 const TEMP_TEXT: Record<string, string> = {
-  warm: "text-[#f5b942]",
+  warm: "text-warn-fg",
   hot: "text-[#f97316]",
   critical: "text-[#ef4444] font-semibold",
 };
@@ -474,7 +474,7 @@ export function RobotViewer({
         </div>
       )}
       {loadError && (
-        <div className="absolute inset-0 grid place-items-center p-4 text-sm text-[#ff9aa6]">
+        <div className="absolute inset-0 grid place-items-center p-4 text-sm text-bad-fg">
           <StatusText status={{ tone: "error", text: loadError }} />
         </div>
       )}
@@ -550,7 +550,7 @@ export function RobotViewer({
                 aimRef.current(v.id);
               }}
               className={`cursor-pointer rounded px-2 py-1 text-xs ${
-                view === v.id ? "bg-[#2a2e3a] font-semibold text-fg" : "text-muted hover:text-fg"
+                view === v.id ? "bg-subtle font-semibold text-fg" : "text-muted hover:text-fg"
               }`}
             >
               {v.label}

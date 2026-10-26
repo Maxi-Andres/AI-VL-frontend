@@ -605,7 +605,7 @@ export function ControlPage() {
             </Button>
           </div>
           {!supported ? (
-            <p className="m-0 mb-2 text-xs text-[#ff9aa6]">
+            <p className="m-0 mb-2 text-xs text-bad-fg">
               “{robot}” is not supported by the executor yet. Switch to Go2 or G1
               in the header.
             </p>

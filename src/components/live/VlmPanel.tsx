@@ -180,7 +180,7 @@ export function VlmPanel({
           onChange={(e) => onPromptChange(e.target.value)}
           placeholder="e.g. What brand is the gauge? Is the reading within normal range?"
           rows={3}
-          className="w-full resize-y rounded-md border border-line bg-[#0a0b0f] p-2 font-mono text-xs leading-[1.4]"
+          className="w-full resize-y rounded-md border border-line bg-sunken p-2 font-mono text-xs leading-[1.4]"
         />
       </Field>
 
@@ -336,7 +336,7 @@ export function VlmPanel({
           </Button>
         )}
       </div>
-      <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-md border border-line bg-[#0a0b0f] p-2 font-mono text-xs leading-[1.4]">
+      <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-md border border-line bg-sunken p-2 font-mono text-xs leading-[1.4]">
         {output}
       </pre>
     </div>
