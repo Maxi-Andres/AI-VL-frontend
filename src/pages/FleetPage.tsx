@@ -436,8 +436,8 @@ function RobotCard({ robot, site, presence, net, editable, onEdit }: {
           {/* Always visible: an edit that only shows on hover is one nobody finds. */}
           {editable && (
             <button onClick={onEdit} title="Edit name, model, serial and site" aria-label={`Edit ${robot.name}`}
-              className="ml-auto flex shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-line px-2 py-1 text-[11.5px] font-bold text-muted transition hover:border-accent hover:bg-good-bg hover:text-good-fg">
-              <IconPencil size={13} />Edit
+              className="ml-auto grid size-7 shrink-0 cursor-pointer place-items-center rounded-lg text-muted transition hover:bg-good-bg hover:text-good-fg">
+              <IconPencil size={16} />
             </button>
           )}
         </div>
