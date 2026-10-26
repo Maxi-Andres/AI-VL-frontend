@@ -21,6 +21,19 @@ export interface FleetRobot {
   model: string;
   serial: string;
   site_id: string | null;
+  /** Last known state, kept by the server whether or not anyone is watching. Null fields:
+   * never measured (no ping address yet). */
+  status: {
+    online: boolean | null;
+    since: string | null;
+    last_seen_at: string | null;
+    latency_ms: number | null;
+    /** How commands reach it: "relay" (the agent on the robot) or "dds" (same network). */
+    link: string | null;
+    battery_pct: number | null;
+    battery_charging: boolean | null;
+    battery_at: string | null;
+  };
 }
 
 export interface Fleet {

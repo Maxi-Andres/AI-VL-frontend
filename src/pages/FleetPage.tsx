@@ -29,7 +29,7 @@ import { robotState } from "../components/layout/PresencePills";
 import { useRobot } from "../components/layout/RobotContext";
 import { BACKEND_URL } from "../config";
 import { Avatar } from "../components/ui/Avatar";
-import { ActivityRow } from "../components/fleet/ActivityFeed";
+import { ActivityRow, ago, span } from "../components/fleet/ActivityFeed";
 import { TINT } from "../components/ui/tones";
 import { PILL, systemRows } from "../components/layout/systemRows";
 import { SiteMap } from "../components/fleet/SiteMap";
@@ -47,6 +47,10 @@ import type { Presence } from "../types";
 // live video; every robot as a card (with its live picture when it is the one streaming);
 // each site's floor plan or map; and what changed lately. The "Clarity" mockup, on real data.
 // Admins also build it here. Theme tokens only, so it reads right in light and dark.
+
+// How commands reach a robot, in words: the agent on the robot, or DDS on the same network.
+const LINK: Record<string, string> = { relay: "Relay", dds: "LAN" };
+const KIND: Record<string, string> = { go2: "Quadruped", g1: "Humanoid" };
 
 function greeting(name: string): string {
   const h = new Date().getHours();
@@ -106,7 +110,11 @@ export function FleetPage() {
   useEffect(() => {
     const ctl = new AbortController();
     void load(ctl.signal);
-    const tick = window.setInterval(() => setNow(new Date()), 30_000);
+    // The clock on the site card, and the robots' last known state the server keeps.
+    const tick = window.setInterval(() => {
+      setNow(new Date());
+      void load(ctl.signal);
+    }, 30_000);
     return () => {
       ctl.abort();
       window.clearInterval(tick);
@@ -452,13 +460,22 @@ function RobotCard({ robot, site, presence, net, editable, onEdit }: {
     setRobot(robot.slot);
     navigate(path);
   };
-  const tone = state?.tone ?? "idle";
+  // What is measured now wins; when now has nothing to say (no probe yet, the page just
+  // opened), the state the server last recorded speaks — it is kept with nobody watching.
+  const st = robot.status;
+  const tone = state && state.tone !== "idle" ? state.tone : st.online === true ? "good" : st.online === false ? "bad" : "idle";
   const badge = { good: "text-good-fg", warn: "text-warn-fg", bad: "text-bad-fg", idle: "text-muted" }[tone];
+  const offline = tone === "bad";
+  const label = offline
+    ? `Offline${st.online === false && st.since ? ` · ${span(st.since)}` : ""}`
+    : tone === "good" ? "Online" : state?.text && state.text !== "unknown" ? state.text : "Not measured";
+  const freshBattery = typeof battery?.percent === "number" && !battery.stale ? battery.percent : null;
+  const lastBattery = freshBattery ?? st.battery_pct;
 
   return (
     <article className="group overflow-hidden rounded-xl border border-line bg-panel transition duration-200 hover:-translate-y-0.5 hover:border-dim hover:shadow-lift">
       <button onClick={() => open("/live")} aria-label={`Open ${robot.name} live`}
-        className="relative block h-[120px] w-full cursor-pointer overflow-hidden bg-gradient-to-br from-[#123f3a] via-[#1b2a33] to-[#2a2a14] text-left">
+        className={`relative block h-[120px] w-full cursor-pointer overflow-hidden bg-gradient-to-br from-[#123f3a] via-[#1b2a33] to-[#2a2a14] text-left transition ${offline ? "opacity-80 grayscale" : ""}`}>
         {live && frameOk ? (
           <img src={`${BACKEND_URL}/api/robot-frame?t=${frame}`} alt={`${robot.name}, live`} onError={() => setFrameOk(false)}
             className="absolute inset-0 size-full object-cover" />
@@ -468,7 +485,7 @@ function RobotCard({ robot, site, presence, net, editable, onEdit }: {
         <span className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/50" />
         <span className={`absolute top-2.5 left-2.5 flex items-center gap-1.5 rounded-full bg-panel px-2.5 py-0.5 text-[11.5px] font-bold shadow-card ${badge}`} title={state?.title}>
           <span className={`size-1.5 rounded-full bg-current ${tone === "good" ? "animate-pulse" : ""}`} />
-          {state?.text ?? "…"}
+          {label}
         </span>
         {live && (
           <span className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 text-[11.5px] font-bold text-white">
@@ -480,19 +497,26 @@ function RobotCard({ robot, site, presence, net, editable, onEdit }: {
         <div className="flex items-center gap-2">
           <Icon size={17} className="shrink-0 text-accent" />
           <b className="min-w-0 truncate text-[14.5px]">{robot.name}</b>
+          <span className="ml-auto shrink-0 text-xs text-dim" title={robot.model}>{KIND[robot.slot] ?? robot.model}</span>
           {/* Always visible: an edit that only shows on hover is one nobody finds. */}
           {editable && (
             <button onClick={onEdit} title="Edit name, model, serial and site" aria-label={`Edit ${robot.name}`}
-              className="ml-auto grid size-7 shrink-0 cursor-pointer place-items-center rounded-lg text-muted transition hover:bg-good-bg hover:text-good-fg">
+              className="-mr-1 grid size-7 shrink-0 cursor-pointer place-items-center rounded-lg text-muted transition hover:bg-good-bg hover:text-good-fg">
               <IconPencil size={16} />
             </button>
           )}
         </div>
-        <div className="mt-0.5 truncate text-[12.5px] text-muted">{robot.model}{site ? ` · ${site}` : ""}</div>
+        <div className="mt-0.5 truncate text-[12.5px] text-muted">
+          {[robot.model.replace(/^Unitree /, ""), site, st.link ? LINK[st.link] ?? st.link : null].filter(Boolean).join(" · ")}
+        </div>
         <div className="mt-3 grid grid-cols-3 gap-2 border-t border-dashed border-line pt-3">
-          <Stat label="Battery" value={typeof battery?.percent === "number" ? `${Math.round(battery.percent)}%` : "—"} />
-          <Stat label="Link" value={state?.text ?? "—"} />
-          <Stat label="Serial" value={robot.serial || "—"} />
+          <Stat label="Battery" value={lastBattery !== null ? `${Math.round(lastBattery)}%` : "—"}
+            dim={freshBattery === null && lastBattery !== null}
+            title={freshBattery === null && st.battery_at ? `Last reading, ${ago(st.battery_at)}` : undefined} />
+          <Stat label="Latency" mono value={!offline && st.latency_ms !== null ? `${Math.max(1, Math.round(st.latency_ms))} ms` : "—"}
+            title="Round trip from this server to the robot" />
+          <Stat label="Seen" value={tone === "good" ? "Now" : st.last_seen_at ? ago(st.last_seen_at) : "Never"}
+            title={st.last_seen_at ? new Date(st.last_seen_at).toLocaleString() : undefined} />
         </div>
         <div className="mt-3 flex gap-2">
           <SmallButton onClick={() => open("/live")}><IconVideo size={14} />Live</SmallButton>
@@ -503,11 +527,11 @@ function RobotCard({ robot, site, presence, net, editable, onEdit }: {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, dim, mono, title }: { label: string; value: string; dim?: boolean; mono?: boolean; title?: string }) {
   return (
-    <div className="min-w-0 text-[11.5px] font-bold text-dim">
+    <div className="min-w-0 text-[11.5px] font-bold text-dim" title={title}>
       {label}
-      <b className="block truncate text-[13px] text-fg">{value}</b>
+      <b className={`block truncate text-[13px] ${dim ? "text-muted" : "text-fg"} ${mono ? "font-mono" : ""}`}>{value}</b>
     </div>
   );
 }

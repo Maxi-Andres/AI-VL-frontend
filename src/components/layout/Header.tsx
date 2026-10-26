@@ -1,4 +1,5 @@
-import { NavLink } from "react-router-dom";
+import { useLayoutEffect, useRef, useState } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
 import {
   IconBroadcast,
@@ -29,16 +30,41 @@ const TABS: { to: string; label: string; icon: typeof IconBroadcast; perm?: Perm
 ];
 
 const tabClass = ({ isActive }: { isActive: boolean }) =>
-  `relative flex h-full items-center gap-[7px] px-3 text-[13.5px] font-bold whitespace-nowrap transition-colors ${
-    isActive
-      ? "text-fg after:absolute after:inset-x-3 after:-bottom-px after:h-0.5 after:rounded-full after:bg-fg"
-      : "text-muted hover:text-fg"
+  `flex h-full items-center gap-[7px] px-3 text-[13.5px] font-bold whitespace-nowrap transition-colors ${
+    isActive ? "text-fg" : "text-muted hover:text-fg"
   }`;
+
+/** Where the active tab's underline sits, measured off the link React Router marks current —
+ * one bar that slides to the new tab instead of one per tab that blinks on and off. */
+function useTabBar(nav: React.RefObject<HTMLElement | null>) {
+  const { pathname } = useLocation();
+  const [bar, setBar] = useState<{ left: number; width: number } | null>(null);
+  useLayoutEffect(() => {
+    const el = nav.current;
+    if (!el) return;
+    const measure = () => {
+      const a = el.querySelector<HTMLElement>('a[aria-current="page"]');
+      setBar(a ? { left: a.offsetLeft + 12, width: a.offsetWidth - 24 } : null);
+    };
+    measure();
+    const ro = new ResizeObserver(measure); // fonts loading, tabs appearing with permissions
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [nav, pathname]);
+  return bar;
+}
 
 /** The app bar: brand, company, the pages this role may use, and a right-hand slot. */
 export function Header({ children }: Props) {
   const can = useCan();
   const me = useMe();
+  const nav = useRef<HTMLElement>(null);
+  const bar = useTabBar(nav);
+  // No slide on the very first paint: the bar appears under the current tab, then moves.
+  const [ready, setReady] = useState(false);
+  useLayoutEffect(() => {
+    if (bar && !ready) requestAnimationFrame(() => setReady(true));
+  }, [bar, ready]);
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-panel/85 backdrop-blur-md backdrop-saturate-150">
       <div className="flex h-16 items-center gap-4 px-4 lg:gap-6 lg:px-6">
@@ -52,13 +78,18 @@ export function Header({ children }: Props) {
           <span className="size-5 rounded-md bg-gradient-to-br from-[#2fc1b1] to-[#d8cf3c]" />
           {me.org.name}
         </span>
-        <nav className="-mb-px flex h-full min-w-0 overflow-x-auto [scrollbar-width:none]">
+        <nav ref={nav} className="relative -mb-px flex h-full min-w-0 overflow-x-auto [scrollbar-width:none]">
           {TABS.filter((t) => !t.perm || can(t.perm)).map(({ to, label, icon: Icon, end }) => (
             <NavLink key={to} to={to} end={end} className={tabClass}>
               <Icon size={18} stroke={1.8} />
               {label}
             </NavLink>
           ))}
+          {bar && (
+            <span aria-hidden style={{ left: bar.left, width: bar.width }}
+              className={`pointer-events-none absolute bottom-0 h-[3px] rounded-t-full bg-fg ${
+                ready ? "transition-[left,width] duration-300 ease-[cubic-bezier(.2,.8,.2,1)]" : ""}`} />
+          )}
         </nav>
         <div className="ml-auto flex shrink-0 items-center gap-2.5">{children}</div>
       </div>

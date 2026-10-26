@@ -7,6 +7,8 @@ import {
   IconLock,
   IconMapPin,
   IconMapPinPlus,
+  IconPlugConnected,
+  IconPlugConnectedX,
   IconRobot,
   IconUserCheck,
   IconUserCircle,
@@ -18,6 +20,15 @@ import { TINT } from "../ui/tones";
 
 // One line of the company's activity (the audit log, the notable part): Fleet shows the
 // latest few, Settings → Activity all of it.
+
+/** "2 h", "5 min", "3 d" — how long a state has held, for a badge. */
+export function span(iso: string): string {
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return "now";
+  if (s < 3600) return `${Math.floor(s / 60)} min`;
+  if (s < 86400) return `${Math.floor(s / 3600)} h`;
+  return `${Math.floor(s / 86400)} d`;
+}
 
 export function ago(iso: string): string {
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -43,6 +54,8 @@ const FEED: Record<string, { icon: typeof IconActivity; tint: keyof typeof TINT;
   "fleet.plan_uploaded": { icon: IconBuildingWarehouse, tint: "info", text: (e) => <><b>{e.actor}</b> uploaded {e.target}'s floor plan</> },
   "fleet.robot_added": { icon: IconRobot, tint: "good", text: (e) => <><b>{e.actor}</b> registered {e.target}</> },
   "fleet.robot_changed": { icon: IconRobot, tint: "info", text: (e) => <><b>{e.actor}</b> edited {e.target}</> },
+  "robot.online": { icon: IconPlugConnected, tint: "good", text: (e) => <><b>{e.target}</b> came back online</> },
+  "robot.offline": { icon: IconPlugConnectedX, tint: "bad", text: (e) => <><b>{e.target}</b> went offline</> },
   "fleet.robot_removed": { icon: IconRobot, tint: "bad", text: (e) => <><b>{e.actor}</b> removed {e.target}</> },
 };
 
