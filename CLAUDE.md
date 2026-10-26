@@ -47,6 +47,13 @@ The frontend knows exactly one URL: the backend's, resolved in **`src/config.ts`
 
 ## Key patterns
 
+- **Accounts**: nothing past `AuthGate` (`src/auth/`) renders until someone is signed in;
+  before that it shows sign-in or the first-run setup. The session is an httpOnly cookie —
+  the frontend never sees a token. **Every backend call goes through `backendFetch`**
+  (`src/api/backend.ts`): it sends the cookie and turns a 401 into "back to sign-in".
+- **The light redesign** (`.theme-light` in `src/index.css`) is applied per subtree while the
+  app moves to it screen by screen; sign-in and setup are the first. Font: Manrope, bundled
+  (`@fontsource-variable/manrope`) — installs may have no internet.
 - **Container/presentational**: `LivePage` (and `MonitorPage`) own control state and
   wire the hooks; `components/live/*` and `components/ui/*` stay presentational.
 - **Detection socket discipline**: `useDetectionSocket` pumps frames over
@@ -67,4 +74,5 @@ graph (`get_architecture`, `search_graph`) rather than a hand-maintained tree he
 
 `bun run dev` serves on `http://localhost:5173` (plain HTTP on purpose — localhost
 is a secure context, so `getUserMedia` works). Make sure the backend is reachable
-and its `CORS_ORIGINS` allows this origin. See `README.md` for build/preview.
+and its `CORS_ORIGINS` names this origin explicitly (`CORS_ORIGINS=http://localhost:5173`) —
+the session cookie is never allowed for `*`. See `README.md` for build/preview.

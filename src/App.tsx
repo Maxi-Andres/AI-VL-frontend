@@ -1,5 +1,7 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { AuthProvider } from "./auth/AuthContext";
+import { AuthGate } from "./auth/AuthGate";
 import { Layout } from "./components/layout/Layout";
 import { LivePage } from "./pages/LivePage";
 import { ControlPage } from "./pages/ControlPage";
@@ -12,8 +14,19 @@ const JointsPage = lazy(() =>
   import("./pages/JointsPage").then((m) => ({ default: m.JointsPage })),
 );
 
-/** Routing: a shared Layout (header + nav) wraps the routed pages. */
+/** Routing: a shared Layout (header + nav) wraps the routed pages. Nothing past AuthGate
+ * renders — or opens a socket — until someone is signed in. */
 export function App() {
+  return (
+    <AuthProvider>
+      <AuthGate>
+        <AppRoutes />
+      </AuthGate>
+    </AuthProvider>
+  );
+}
+
+function AppRoutes() {
   return (
     <BrowserRouter>
       <Routes>

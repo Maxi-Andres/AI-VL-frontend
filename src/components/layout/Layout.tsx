@@ -7,6 +7,7 @@ import { VideoTransportProvider } from "./VideoTransportContext";
 import { PresencePills } from "./PresencePills";
 import { VoiceAssistantProvider, useVoiceAssistantContext } from "./VoiceAssistantContext";
 import { VoiceStatusBadge } from "./VoiceStatusBadge";
+import { UserMenu } from "./UserMenu";
 
 function HeaderWithStatus() {
   const { connected, voicePhase } = useStatus();
@@ -34,6 +35,7 @@ function HeaderWithStatus() {
         <VoiceStatusBadge phase={voicePhase} wakeWords={wakeWords} />
         <PresencePills />
         <StatusBadge connected={connected} />
+        <UserMenu />
       </div>
     </Header>
   );

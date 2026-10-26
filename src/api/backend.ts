@@ -1,6 +1,7 @@
 // REST helpers for the backend gateway. All network knowledge of the backend
 // lives here (plus the WebSocket in useDetectionSocket).
 import { BACKEND_URL } from "../config";
+import { notifySignedOut } from "../auth/signedOut";
 import type {
   CommandResponse,
   DetectedObject,
@@ -12,18 +13,34 @@ import type {
   VlmResponse,
 } from "../types";
 
+/**
+ * Every call to the backend goes through here. It sends the session cookie even when the
+ * page and the backend are on different origins (the vite dev server talks to :8000
+ * directly; same-origin in the deploy, where this changes nothing), and it reports a 401 —
+ * the session expired or was revoked — so the app can return to the sign-in screen.
+ * `quiet401` is for the sign-in flow itself, where a 401 is an answer, not news.
+ */
+export async function backendFetch(
+  path: string,
+  init: RequestInit = {},
+  { quiet401 = false }: { quiet401?: boolean } = {},
+): Promise<Response> {
+  const r = await fetch(`${BACKEND_URL}${path}`, { credentials: "include", ...init });
+  if (r.status === 401 && !quiet401) notifySignedOut();
+  return r;
+}
+
 // The GETs below take an optional `signal` for the same reason the POSTs do: a fetch fired
 // on mount outlives a component that unmounts before it answers, and its `.then` then writes
 // state into a dead tree. Optional, so every existing call site keeps working untouched.
 export async function fetchOptions(signal?: AbortSignal): Promise<Options> {
-  const r = await fetch(`${BACKEND_URL}/api/options`, { signal });
+  const r = await backendFetch(`/api/options`, { signal });
   if (!r.ok) throw new Error(`GET /api/options -> ${r.status}`);
   return r.json();
 }
 
 export async function fetchClasses(model: string): Promise<string[]> {
-  const r = await fetch(
-    `${BACKEND_URL}/api/classes?model=${encodeURIComponent(model)}`,
+  const r = await backendFetch(`/api/classes?model=${encodeURIComponent(model)}`,
   );
   if (!r.ok) throw new Error(`GET /api/classes -> ${r.status}`);
   const data = (await r.json()) as { classes: string[] };
@@ -44,7 +61,7 @@ export interface DetectResult {
  * Analysed with the session's shared YOLO params, exactly like the live path.
  */
 export async function detectFrame(jpeg: Blob, signal?: AbortSignal): Promise<DetectResult> {
-  const r = await fetch(`${BACKEND_URL}/api/detect`, {
+  const r = await backendFetch(`/api/detect`, {
     method: "POST",
     headers: { "Content-Type": "image/jpeg" },
     body: jpeg,
@@ -72,7 +89,7 @@ export async function askVlm(
   req: VlmRequest,
   signal?: AbortSignal,
 ): Promise<VlmResponse> {
-  const r = await fetch(`${BACKEND_URL}/api/vlm`, {
+  const r = await backendFetch(`/api/vlm`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
@@ -91,7 +108,7 @@ export async function askVlm(
  * (the backend refuses a stale one). For questions asked from a page without video. */
 export async function fetchRobotFrame(signal?: AbortSignal): Promise<string | null> {
   try {
-    const r = await fetch(`${BACKEND_URL}/api/robot-frame`, { signal });
+    const r = await backendFetch(`/api/robot-frame`, { signal });
     if (!r.ok) return null;
     const blob = await r.blob();
     return await new Promise<string>((resolve, reject) => {
@@ -110,7 +127,7 @@ export async function askVlmStream(
   onDelta: (piece: string) => void,
   signal?: AbortSignal,
 ): Promise<string> {
-  const r = await fetch(`${BACKEND_URL}/api/vlm/stream`, {
+  const r = await backendFetch(`/api/vlm/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
@@ -143,7 +160,7 @@ export async function interpretCommand(
   robot?: string,
   signal?: AbortSignal,
 ): Promise<CommandResponse> {
-  const r = await fetch(`${BACKEND_URL}/api/command`, {
+  const r = await backendFetch(`/api/command`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, model, robot }),
@@ -164,7 +181,7 @@ export async function executeCommand(
   params: Record<string, unknown>,
   safeMode: boolean,
 ): Promise<ExecuteResponse> {
-  const r = await fetch(`${BACKEND_URL}/api/execute`, {
+  const r = await backendFetch(`/api/execute`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ robot, skill, params, safe_mode: safeMode }),
@@ -190,7 +207,7 @@ export interface RobotCameraStatus {
 export async function setRobotCamera(
   action: "start" | "stop",
 ): Promise<RobotCameraStatus> {
-  const r = await fetch(`${BACKEND_URL}/api/robot-camera/${action}`, {
+  const r = await backendFetch(`/api/robot-camera/${action}`, {
     method: "POST",
   });
   return r.json();
@@ -200,7 +217,7 @@ export async function setRobotCamera(
 export async function getRobotCameraStatus(
   signal?: AbortSignal,
 ): Promise<RobotCameraStatus> {
-  const r = await fetch(`${BACKEND_URL}/api/robot-camera/status`, { signal });
+  const r = await backendFetch(`/api/robot-camera/status`, { signal });
   return r.json();
 }
 
@@ -215,7 +232,7 @@ export interface RobotCameraConfig {
 export async function setRobotCameraConfig(
   cfg: RobotCameraConfig,
 ): Promise<RobotCameraStatus> {
-  const r = await fetch(`${BACKEND_URL}/api/robot-camera/config`, {
+  const r = await backendFetch(`/api/robot-camera/config`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(cfg),
@@ -237,7 +254,7 @@ export interface RobotNet {
 }
 
 export async function getRobotNet(signal?: AbortSignal): Promise<RobotNet> {
-  const r = await fetch(`${BACKEND_URL}/api/robot-net`, { signal });
+  const r = await backendFetch(`/api/robot-net`, { signal });
   return r.json();
 }
 
@@ -247,7 +264,7 @@ export async function setRobotNet(
   peers: string[],
   iface?: string,
 ): Promise<RobotNet> {
-  const r = await fetch(`${BACKEND_URL}/api/robot-net`, {
+  const r = await backendFetch(`/api/robot-net`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ peers, iface }),
@@ -331,7 +348,7 @@ export interface RobotTransports {
 export async function getRobotTransport(
   signal?: AbortSignal,
 ): Promise<RobotTransports> {
-  const r = await fetch(`${BACKEND_URL}/api/robot-transport`, { signal });
+  const r = await backendFetch(`/api/robot-transport`, { signal });
   return r.json();
 }
 
@@ -344,7 +361,7 @@ export async function setRobotTransport(cfg: {
   url?: string;
   ping_ip?: string;
 }): Promise<{ ok: boolean; mode?: string; url?: string; error?: string }> {
-  const r = await fetch(`${BACKEND_URL}/api/robot-transport`, {
+  const r = await backendFetch(`/api/robot-transport`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(cfg),
@@ -364,7 +381,7 @@ export async function setRobotTransport(cfg: {
 export async function fetchPresence(
   signal?: AbortSignal,
 ): Promise<Presence | null> {
-  const r = await fetch(`${BACKEND_URL}/api/presence`, { signal });
+  const r = await backendFetch(`/api/presence`, { signal });
   if (r.status === 404) return null;
   if (!r.ok) throw new Error(`GET /api/presence -> ${r.status}`);
   return r.json();
@@ -372,7 +389,7 @@ export async function fetchPresence(
 
 /** List the robots the command interpreter can target (for the robot selector). */
 export async function fetchRobots(): Promise<RobotInfo[]> {
-  const r = await fetch(`${BACKEND_URL}/api/skills`);
+  const r = await backendFetch(`/api/skills`);
   if (!r.ok) throw new Error(`GET /api/skills -> ${r.status}`);
   const data = (await r.json()) as { robots?: RobotInfo[] };
   return data.robots ?? [];
@@ -414,8 +431,7 @@ export interface SkillCatalog {
  * command_common). Used to build the drive pad's preset-action buttons so they
  * never drift from what the robot can actually do. */
 export async function fetchSkills(robot: string): Promise<SkillCatalog> {
-  const r = await fetch(
-    `${BACKEND_URL}/api/skills?robot=${encodeURIComponent(robot)}`,
+  const r = await backendFetch(`/api/skills?robot=${encodeURIComponent(robot)}`,
   );
   if (!r.ok) throw new Error(`GET /api/skills -> ${r.status}`);
   const data = (await r.json()) as Partial<SkillCatalog>;
@@ -433,7 +449,7 @@ export async function transcribeAudio(
   if (opts?.language) q.set("language", opts.language);
   if (opts?.translate) q.set("translate", "true");
   const qs = q.toString();
-  const r = await fetch(`${BACKEND_URL}/api/transcribe${qs ? `?${qs}` : ""}`, {
+  const r = await backendFetch(`/api/transcribe${qs ? `?${qs}` : ""}`, {
     method: "POST",
     headers: { "Content-Type": blob.type || "application/octet-stream" },
     body: blob,
@@ -447,7 +463,7 @@ export async function fetchTtsVoices(signal?: AbortSignal): Promise<{
   voices: string[];
   default: string;
 }> {
-  const r = await fetch(`${BACKEND_URL}/api/tts/voices`, { signal });
+  const r = await backendFetch(`/api/tts/voices`, { signal });
   if (!r.ok) throw new Error(`GET /api/tts/voices -> ${r.status}`);
   return r.json();
 }
@@ -457,7 +473,7 @@ export async function synthesizeSpeech(
   text: string,
   voice?: string,
 ): Promise<Blob> {
-  const r = await fetch(`${BACKEND_URL}/api/speak`, {
+  const r = await backendFetch(`/api/speak`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, voice }),
@@ -478,7 +494,7 @@ export interface RobotAudioReply {
 }
 
 async function robotAudio(path: string, init?: RequestInit): Promise<RobotAudioReply> {
-  const r = await fetch(`${BACKEND_URL}/api/robot-audio/${path}`, init);
+  const r = await backendFetch(`/api/robot-audio/${path}`, init);
   try {
     return await r.json();
   } catch {
@@ -551,8 +567,7 @@ export async function getRobotVideo(
   robot: string,
   signal?: AbortSignal,
 ): Promise<RobotVideoState> {
-  const r = await fetch(
-    `${BACKEND_URL}/api/robot-video?robot=${encodeURIComponent(robot)}`, { signal });
+  const r = await backendFetch(`/api/robot-video?robot=${encodeURIComponent(robot)}`, { signal });
   return r.json();
 }
 
@@ -585,7 +600,7 @@ export async function setRobotVideo(cfg: {
   pending_restart?: string[];
   error?: string;
 }> {
-  const r = await fetch(`${BACKEND_URL}/api/robot-video`, {
+  const r = await backendFetch(`/api/robot-video`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(cfg),

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "@fontsource-variable/manrope";
 
 /* Dark minimalist theme. These map to Tailwind utilities: --color-bg -> bg-bg,
    --color-muted -> text-muted, --color-line -> border-line, etc. */
@@ -10,6 +11,46 @@
   --color-muted: #8b90a0;
   --color-accent: #4ade80;
   --color-accent2: #60a5fa;
+  /* Added with the light redesign; also defined below for .theme-light. */
+  --color-dim: #5c6273;
+  --color-danger: #f2555a;
+  --color-brand: #54bbb0;
+  --color-brand2: #d8cf3c;
+}
+
+/* Motion for the redesigned screens. Off for people who ask the OS for less motion. */
+@theme {
+  --animate-rise: rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-shake: shake 0.4s ease-in-out;
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(10px); }
+  }
+  @keyframes shake {
+    20%, 60% { transform: translateX(-5px); }
+    40%, 80% { transform: translateX(5px); }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise, .animate-shake { animation: none; }
+}
+
+/* The light redesign (the "Clarity" mockup), applied per subtree while the app moves to it
+   screen by screen: wrap a screen in .theme-light and every bg-bg / text-fg / border-line
+   under it re-points here. The sign-in and setup screens are the first. */
+.theme-light {
+  --color-bg: #f5f6f8;
+  --color-panel: #ffffff;
+  --color-line: #e2e5eb;
+  --color-fg: #0f1623;
+  --color-muted: #5f6878;
+  --color-dim: #98a0ae;
+  --color-accent: #1f9e91;
+  --color-accent2: #3567d6;
+  --color-danger: #d93f45;
+  color: var(--color-fg);
+  background: var(--color-bg);
+  font-family: "Manrope Variable", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 html,
