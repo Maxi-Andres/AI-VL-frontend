@@ -13,6 +13,7 @@ import {
   IconBolt,
   IconDeviceGamepad2,
   IconFold,
+  IconInfoCircle,
   IconLayoutSidebarRightCollapse,
   IconLayoutSidebarRightExpand,
   IconList,
@@ -25,7 +26,8 @@ import {
   IconShieldOff,
   IconSpeakerphone,
 } from "@tabler/icons-react";
-import { ADVANCED_GROUP, ActionPad, actionGroupTitles } from "../components/control/ActionPad";
+import { ADVANCED_GROUP, ActionPad, actionGroupTitles, pretty } from "../components/control/ActionPad";
+import { ControlsHelp, type PadAction } from "../components/control/ControlsHelp";
 import { RobotSpeaker } from "../components/control/RobotSpeaker";
 import { choiceSendable, unsendableSkills } from "../components/control/unsendableSkills";
 import { useRobotTransports } from "../hooks/useRobotTransports";
@@ -90,6 +92,12 @@ const PAD_SKILLS: Record<number, string[]> = {
   [PAD.LEFT]: ["scrape", "shake_hand"],
   [PAD.RIGHT]: ["dance1", "pose"],
 };
+
+// The names those buttons go by in the controls help, in the order it lists them.
+const PAD_BUTTONS: [number, string][] = [
+  [PAD.A, "A"], [PAD.B, "B"], [PAD.X, "X"], [PAD.Y, "Y"],
+  [PAD.UP, "D-pad ↑"], [PAD.DOWN, "D-pad ↓"], [PAD.LEFT, "D-pad ←"], [PAD.RIGHT, "D-pad →"],
+];
 
 interface Vel {
   vx: number;
@@ -198,7 +206,12 @@ export function ControlPage() {
   const [log, setLog] = useState<{ at: Date; what: string; ok: boolean; ms: number; text: string }[]>([]);
   const [cockpit, setCockpit] = useState(false);
   const [drawer, setDrawer] = useState(false);
-  const [videoMenu, setVideoMenu] = useState(false);
+  // The two popovers that drop from the stage's top bar; one at a time, never with the drawer.
+  const [menu, setMenu] = useState<"video" | "help" | null>(null);
+  const toggleMenu = (m: "video" | "help") => {
+    setMenu((cur) => (cur === m ? null : m));
+    setDrawer(false);
+  };
   // The cockpit fills the page (`.stage-expanded`) and the page goes to the browser's own
   // fullscreen (lib/screen.ts); leaving either way — F, Esc, F11, the button — undoes both.
   const toggleCockpit = useCallback(() => setCockpit((c) => !c), []);
@@ -522,14 +535,11 @@ export function ControlPage() {
   const battery = transports?.[robot]?.relay?.battery;
   const pct = typeof battery?.percent === "number" ? Math.round(battery.percent) : null;
   const groupTitles = actionGroupTitles(skills);
+  const padActions: PadAction[] = PAD_BUTTONS.flatMap(([index, button]) => {
+    const skill = PAD_SKILLS[index]?.find((n) => n in skills && !unsendable.has(n));
+    return skill ? [{ button, action: pretty(skill, skills[skill]) }] : [];
+  });
   const live = !!(frameUrl || (transport === "h264" && h264Stream) || transport === "intra");
-
-  const keyCap = (k: string, label = k.toUpperCase()) => (
-    <kbd className={`inline-grid h-6 min-w-6 place-items-center rounded-md border px-1.5 font-mono text-[11px] font-semibold transition ${
-      pressed.has(k) ? "translate-y-px border-accent bg-accent text-on-accent" : "border-line"}`}>
-      {label}
-    </kbd>
-  );
 
   const speedSeg = (
     <Segmented className="flex rounded-lg bg-subtle p-0.5" title={t("Speed preset (LB / RB on a gamepad)")}
@@ -633,7 +643,7 @@ export function ControlPage() {
 
           {/* Top: state chips, video settings, fullscreen */}
           {/* z-20: the video menu that drops from this bar must land over the actions drawer. */}
-          <div className={`absolute inset-x-3 top-3 z-20 flex items-center gap-2 ${cockpit ? "cockpit-glass rounded-2xl p-2 pl-3" : ""}`}>
+          <div className="absolute inset-x-3 top-3 z-20 flex items-center gap-2">
             <span className="on-video flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11.5px] font-extrabold tracking-wider">
               <span className={`size-2 rounded-full ${live ? "animate-pulse bg-[#ff5a5f]" : "bg-dim"}`} />
               {live ? t("LIVE") : t("NO VIDEO")}
@@ -653,18 +663,30 @@ export function ControlPage() {
             <span className="flex-1" />
             {cockpit && (
               <button type="button" aria-pressed={drawer} title={t("All actions")}
-                onClick={() => { setDrawer((d) => !d); setVideoMenu(false); }}
+                onClick={() => { setDrawer((d) => !d); setMenu(null); }}
                 className={`grid size-9 cursor-pointer place-items-center rounded-lg transition ${drawer ? openBtn : "on-video"}`}>
                 {drawer ? <IconLayoutSidebarRightCollapse size={18} /> : <IconLayoutSidebarRightExpand size={18} />}
               </button>
             )}
             <div className="relative">
-              <button type="button" aria-pressed={videoMenu} title={t("Video quality and transport")}
-                onClick={() => { setVideoMenu((v) => !v); setDrawer(false); }}
-                className={`grid size-9 cursor-pointer place-items-center rounded-lg transition ${videoMenu ? openBtn : "on-video"}`}>
+              <button type="button" aria-pressed={menu === "help"} title={t("Controls")}
+                onClick={() => toggleMenu("help")}
+                className={`grid size-9 cursor-pointer place-items-center rounded-lg transition ${menu === "help" ? openBtn : "on-video"}`}>
+                <IconInfoCircle size={18} />
+              </button>
+              {menu === "help" && (
+                <div className="absolute top-11 right-0 z-20 flex max-h-[min(560px,calc(100dvh-120px))] w-[340px] animate-rise flex-col overflow-y-auto rounded-xl border border-line bg-panel p-4 text-fg shadow-lift">
+                  <ControlsHelp pressed={pressed} padActions={padActions} />
+                </div>
+              )}
+            </div>
+            <div className="relative">
+              <button type="button" aria-pressed={menu === "video"} title={t("Video quality and transport")}
+                onClick={() => toggleMenu("video")}
+                className={`grid size-9 cursor-pointer place-items-center rounded-lg transition ${menu === "video" ? openBtn : "on-video"}`}>
                 <IconAdjustmentsHorizontal size={18} />
               </button>
-              {videoMenu && (
+              {menu === "video" && (
                 <div className="absolute top-11 right-0 z-20 flex w-[300px] animate-rise flex-col gap-2 rounded-xl border border-line bg-panel p-3 text-fg shadow-lift">
                   {/* Here rather than only in Settings: this is the view being judged, so
                       the switch has to be within reach of the person judging it. */}
@@ -679,8 +701,8 @@ export function ControlPage() {
             </button>
           </div>
 
-          {/* Bottom: sticks on a touch screen, keys on a computer (a mouse cannot hold two
-              sticks at once, so on a PC they were only in the way) */}
+          {/* Bottom: sticks on a touch screen only (a mouse cannot hold two sticks at once, so
+              on a PC they were only in the way). Every control is listed in the info popover. */}
           {isTouch && (
             <>
               <div className={`absolute bottom-5 left-5 z-10 ${cockpit ? "cockpit-glass rounded-full p-3" : ""}`}>
@@ -690,21 +712,6 @@ export function ControlPage() {
                 <Joystick label={t("Rotate")} axis="x" onChange={(x) => { rightRef.current = { x }; }} />
               </div>
             </>
-          )}
-          {!isTouch && (
-            <div className={`pointer-events-none absolute inset-x-0 z-10 flex justify-center ${cockpit ? "bottom-28" : "bottom-4"}`}>
-              <div className="on-video flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold">
-                {pad ? (
-                  <>{t("Left stick move · Right stick rotate · Start arm · Back stop · LB/RB speed")}</>
-                ) : (
-                  <>
-                    {keyCap("w")}{keyCap("a")}{keyCap("s")}{keyCap("d")}<span>{t("move")}</span>
-                    {keyCap("arrowleft", "←")}{keyCap("arrowright", "→")}<span>{t("turn")}</span>
-                    {!armed && <span className="on-video-muted">· {t("arm first")}</span>}
-                  </>
-                )}
-              </div>
-            </div>
           )}
 
           {/* Cockpit: speed, readings and STOP in one glass ribbon; all actions in a drawer. */}
@@ -716,7 +723,7 @@ export function ControlPage() {
                 {speedSeg}
                 {stopButton(true)}
               </div>
-              <aside className={`cockpit-glass absolute top-[76px] right-3 bottom-3 z-10 flex w-[380px] flex-col overflow-hidden rounded-2xl transition-transform duration-300 ${drawer ? "" : "translate-x-[calc(100%+24px)]"}`}>
+              <aside className={`cockpit-glass absolute top-14 right-3 bottom-3 z-10 flex w-[380px] flex-col overflow-hidden rounded-2xl transition-transform duration-300 ${drawer ? "" : "translate-x-[calc(100%+24px)]"}`}>
                 <div className="flex items-center gap-2 border-b border-line px-4 py-3 text-sm font-extrabold">
                   <IconBolt size={16} className="text-accent" />{t("All actions")}
                 </div>

@@ -65,7 +65,7 @@ const prettify = (name: string) =>
 
 /** Display name for a skill: the catalog's label wins (it is matched to the Unitree
  * app's wording), then a local fallback, then a prettified id. */
-const pretty = (name: string, info?: SkillInfo) =>
+export const pretty = (name: string, info?: SkillInfo) =>
   info?.label ?? LABELS[name] ?? prettify(name);
 
 /** First param of a skill that offers a fixed set of `values` (e.g. arm_action's
