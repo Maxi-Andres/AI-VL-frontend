@@ -4,12 +4,13 @@ import {
   IconAdjustmentsHorizontal,
   IconArrowUp,
   IconChevronDown,
+  IconHeadset,
+  IconHeadsetOff,
   IconMessage,
   IconMessageOff,
   IconMicrophone,
   IconMicrophone2,
   IconMicrophone2Off,
-  IconMicrophoneOff,
   IconPlayerStopFilled,
   IconScan,
   IconSparkles,
@@ -31,10 +32,22 @@ export const VLM_IMG_DEFAULT = 1152;
 
 /** Hands-free voice controls, produced by useVoiceAssistant. */
 export interface VoiceControls {
-  /** Wake-word listening (Web Speech) + recording are available in this browser. */
+  /** The mic can record here (the hands-free "just speak" mode and the mic button need no more). */
   micSupported: boolean;
+  /** The browser can also listen for a wake word (Web Speech; not in Brave or Firefox). */
+  wakeSupported: boolean;
+  /** Hands-free on: it listens by itself and sends what it hears. */
   voiceMode: boolean;
   onToggleVoiceMode: () => void;
+  /** How hands-free listens: "open" = just speak; "wake" = say "robot" first. */
+  listenMode: "open" | "wake";
+  onListenModeChange: (m: "open" | "wake") => void;
+  /** The mic button: one spoken question, sent when the speaker stops. */
+  onListenOnce: () => void;
+  /** Where the voice loop is: off, listening, recording, transcribing, thinking, speaking. */
+  phase: string;
+  /** How loud answers play — this device's or the robot speaker's, whichever speaks. */
+  volume: { value: number | null; max: number; where: "device" | "robot"; onChange: (v: number) => void };
   /** Text-to-speech is available in this browser. */
   speechSupported: boolean;
   spokenMode: boolean;
@@ -162,6 +175,8 @@ export function VlmPanel({
 }: Props) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [settings, setSettings] = useState(false);
+  // The mic is taking a question: recording it or turning it into text.
+  const hearing = voice.phase === "recording" || voice.phase === "transcribing";
   const pending = useRef<Turn["kind"] | null>(null);
   const wasBusy = useRef(false);
   const nextId = useRef(1);
@@ -225,7 +240,7 @@ export function VlmPanel({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div ref={scroller} className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1"
+      <div ref={scroller} className="-mx-1 min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-1"
         onScroll={(e) => {
           const el = e.currentTarget;
           stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
@@ -252,7 +267,7 @@ export function VlmPanel({
               </div>
             </div>
           ) : (
-            <div className="grid gap-4 pb-1">
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-4 pb-1">
               <div className="flex justify-end">
                 <button type="button" onClick={() => setTurns([])} disabled={busy}
                   className="flex cursor-pointer items-center gap-1 text-[11.5px] font-bold text-dim hover:text-fg disabled:opacity-40">
@@ -264,7 +279,7 @@ export function VlmPanel({
                 const answer = last && live ? live.answer : t.answer;
                 const st = last && live ? live.status : t.status;
                 return (
-                  <div key={t.id} className="grid animate-rise gap-2">
+                  <div key={t.id} className="grid min-w-0 animate-rise grid-cols-[minmax(0,1fr)] gap-2">
                     <Asked turn={t} />
                     <Answer turn={t} answer={answer} status={st} streaming={last && busy}
                       voice={voice} />
@@ -296,9 +311,17 @@ export function VlmPanel({
             className="block max-h-32 min-h-[52px] w-full resize-none bg-transparent px-3 pt-2.5 text-[13px] text-fg outline-none [field-sizing:content] placeholder:text-dim" />
           <div className="flex items-center gap-1 px-2 pb-2">
             {voice.micSupported && (
+              <button type="button" onClick={voice.onListenOnce} disabled={!canAsk || busy || hearing || voice.voiceMode}
+                title="Speak a question — it is sent when you stop talking" aria-label="Speak a question"
+                className={`grid size-7 cursor-pointer place-items-center rounded-lg transition duration-200 active:scale-90 disabled:cursor-default ${
+                  hearing && !voice.voiceMode ? "animate-pulse bg-bad-bg text-bad-fg" : "text-muted hover:bg-subtle hover:text-fg disabled:opacity-40 disabled:hover:bg-transparent"}`}>
+                <IconMicrophone size={15} />
+              </button>
+            )}
+            {voice.micSupported && (
               <Toggle on={voice.voiceMode} onClick={voice.onToggleVoiceMode}
-                title={`Hands-free ${voice.voiceMode ? "on" : "off"}: say “robot”, then your question`}
-                icon={voice.voiceMode ? <IconMicrophone size={15} /> : <IconMicrophoneOff size={15} />} />
+                title={`Hands-free ${voice.voiceMode ? "on" : "off"}: ${voice.listenMode === "wake" ? "say “robot”, then your question" : "just speak — each question is sent by itself"}`}
+                icon={voice.voiceMode ? <IconHeadset size={15} /> : <IconHeadsetOff size={15} />} />
             )}
             {voice.robotMic && (
               <Toggle on={voice.robotEar} onClick={voice.onToggleRobotEar}
@@ -322,8 +345,12 @@ export function VlmPanel({
           </div>
         </div>
         {(voice.status || voice.robotEarStatus) && (
-          <p className="m-0 truncate text-[11.5px] text-muted" title={[voice.status, voice.robotEarStatus].filter(Boolean).join(" · ")}>
-            {[voice.status, voice.robotEarStatus].filter(Boolean).join(" · ")}
+          <p className="m-0 flex items-center gap-1.5 truncate text-[11.5px] text-muted" title={[voice.status, voice.robotEarStatus].filter(Boolean).join(" · ")}>
+            {/* Green while it listens, red while it hears you: you can see it is working. */}
+            {voice.phase !== "off" && (
+              <span className={`size-1.5 shrink-0 rounded-full ${hearing ? "animate-pulse bg-bad-fg" : voice.phase === "listening" ? "animate-pulse bg-good-fg" : "bg-dim"}`} />
+            )}
+            <span className="truncate">{[voice.status, voice.robotEarStatus].filter(Boolean).join(" · ")}</span>
           </p>
         )}
 
@@ -334,6 +361,34 @@ export function VlmPanel({
           <div className="min-h-0 overflow-hidden">
             <div className="grid max-h-[46vh] gap-3 overflow-y-auto rounded-xl border border-line bg-panel p-3">
               <SettingsGroup title="Voice">
+                {voice.speechSupported && (
+                  <Row label="Volume" hint={voice.volume.where === "robot" ? "The robot's own speaker" : "On this device"}>
+                    <div className="flex w-40 items-center gap-2">
+                      <IconVolume size={14} className="shrink-0 text-muted" />
+                      <input type="range" min={0} max={voice.volume.max} step={voice.volume.max > 10 ? 5 : 1}
+                        value={voice.volume.value ?? 0} disabled={voice.volume.value === null}
+                        onChange={(e) => voice.volume.onChange(Number(e.target.value))}
+                        aria-label={voice.volume.where === "robot" ? "Robot speaker volume" : "Volume on this device"}
+                        className="min-w-0 flex-1 accent-[var(--color-accent)]" />
+                      <span className="w-9 shrink-0 text-right text-[11px] text-muted tabular-nums">
+                        {voice.volume.value === null ? "—" : voice.volume.where === "robot" ? `${voice.volume.value}/${voice.volume.max}` : `${voice.volume.value}%`}
+                      </span>
+                    </div>
+                  </Row>
+                )}
+                {voice.micSupported && (
+                  <Row label="Hands-free listens" hint={voice.wakeSupported ? undefined : "This browser cannot hear a wake word"}>
+                    <div className="flex rounded-lg bg-subtle p-0.5">
+                      {([["open", "Just speak"], ["wake", "Say “robot”"]] as const).map(([m, label]) => (
+                        <button key={m} type="button" onClick={() => voice.onListenModeChange(m)}
+                          disabled={m === "wake" && !voice.wakeSupported}
+                          className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${voice.listenMode === m ? "bg-panel text-fg shadow-card" : "text-muted"}`}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </Row>
+                )}
                 {voice.speechSupported && (
                   <Row label="Filler" hint="A short word if the answer is slow to start">
                     <Toggle on={voice.fillerMode} onClick={voice.onToggleFillerMode} title="Filler"
@@ -397,8 +452,8 @@ function Asked({ turn }: { turn: Turn }) {
   if (turn.kind === "analysis") {
     return (
       <div className="flex justify-end">
-        <span className="flex items-center gap-1.5 rounded-2xl rounded-br-md border border-accent/40 bg-good-bg px-3 py-1.5 text-[12.5px] font-bold text-good-fg">
-          <IconScan size={15} />Find objects
+        <span className="flex max-w-[85%] flex-wrap items-center gap-x-1.5 rounded-2xl rounded-br-md border border-accent/40 bg-good-bg px-3 py-1.5 text-[12.5px] font-bold text-good-fg">
+          <IconScan size={15} className="shrink-0" />Find objects
           <span className="font-semibold opacity-70">· {turn.question}</span>
         </span>
       </div>
@@ -471,12 +526,15 @@ function FoundList({ found, raw }: { found: Found[]; raw: string }) {
   if (!found.length) return <><p className="m-0">Nothing found for this scope.</p><Raw text={raw} /></>;
   return (
     <div>
-      <p className="m-0 mb-1.5 font-bold">Found {found.length} {found.length === 1 ? "thing" : "things"} — boxed in blue on the picture.</p>
+      <p className="m-0 mb-1.5 font-bold">
+        Found {found.length} {found.length === 1 ? "thing" : "things"}
+        <span className="font-semibold text-muted"> · each one is outlined in blue on the video</span>
+      </p>
       <ul className="m-0 grid list-none gap-1 p-0">
         {found.map((o, i) => (
           <li key={i} className="flex items-baseline gap-2 rounded-lg bg-panel px-2 py-1">
             <span className="min-w-0 flex-1">
-              <span className="block truncate font-semibold">{o.description || o.type || "Object"}</span>
+              <span className="line-clamp-2 block font-semibold break-words">{o.description || o.type || "Object"}</span>
               {o.reading !== null && o.reading !== undefined && o.reading !== "" && (
                 <span className="block text-[11.5px] text-muted">Reads {String(o.reading)}</span>
               )}

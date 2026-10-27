@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { IconPlayerStopFilled, IconVolume } from "@tabler/icons-react";
-import { getRobotVolume, sayOnRobot, setRobotVolume, stopRobotAudio } from "../../api/backend";
+import { sayOnRobot, stopRobotAudio } from "../../api/backend";
+import { useRobotVolume } from "../../hooks/useRobotVolume";
 import { serverVoiceName, useVoiceChoice, voiceLabel } from "../../lib/voiceChoice";
 import { Button } from "../ui/Button";
 import { StatusText, type Status } from "../ui/StatusText";
@@ -14,33 +15,16 @@ import { StatusText, type Status } from "../ui/StatusText";
  */
 export function RobotSpeaker({ robot }: { robot: string }) {
   const [text, setText] = useState("");
-  const [volume, setVolume] = useState<number | null>(null);
-  // Each robot's own scale (Go2 0-10, G1 0-100), as the robot reports it.
-  const [volumeMax, setVolumeMax] = useState(10);
   const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState(false);
-  const commitTimer = useRef<number | undefined>(undefined);
+  const { volume, max: volumeMax, error: volumeError, change: changeVolume } = useRobotVolume(robot);
   const [voiceChoice] = useVoiceChoice();
   const voice = serverVoiceName(voiceChoice);
 
+  // The volume's own trouble (none reported, or not set) shows in the same status line.
   useEffect(() => {
-    const ctl = new AbortController();
-    getRobotVolume(robot, ctl.signal)
-      .then((r) => {
-        if (r.ok && typeof r.volume === "number") {
-          setVolume(r.volume);
-          if (typeof r.max === "number") setVolumeMax(r.max);
-        }
-        else if (!ctl.signal.aborted) setStatus({ tone: "warn", text: r.error ?? "no volume" });
-      })
-      .catch(() => {
-        /* aborted, or the backend is down: the slider just stays empty */
-      });
-    return () => {
-      ctl.abort();
-      window.clearTimeout(commitTimer.current);
-    };
-  }, [robot]);
+    if (volumeError) setStatus({ tone: "warn", text: volumeError });
+  }, [volumeError]);
 
   const say = useCallback(async () => {
     const t = text.trim();
@@ -65,19 +49,6 @@ export function RobotSpeaker({ robot }: { robot: string }) {
     const r = await stopRobotAudio(robot).catch(() => null);
     setStatus(r?.ok ? { tone: "stopped", text: "Stopped" } : { tone: "error", text: r?.error ?? "stop failed" });
   }, [robot]);
-
-  // The slider moves freely; the robot is told once it settles, not on every step.
-  const changeVolume = useCallback(
-    (level: number) => {
-      setVolume(level);
-      window.clearTimeout(commitTimer.current);
-      commitTimer.current = window.setTimeout(async () => {
-        const r = await setRobotVolume(robot, level).catch(() => null);
-        if (!r?.ok) setStatus({ tone: "error", text: r?.error ?? "volume not set" });
-      }, 250);
-    },
-    [robot],
-  );
 
   return (
     <div className="mb-3 flex flex-col gap-1.5">

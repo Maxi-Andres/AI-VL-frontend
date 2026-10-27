@@ -8,6 +8,7 @@ import {
 import { useRobot } from "../components/layout/RobotContext";
 import { speakable } from "../lib/speakable";
 import { effectiveVoice, useVoiceChoice, voiceLabel } from "../lib/voiceChoice";
+import { speechVolume } from "../lib/speechVolume";
 import { SpeechQueue, type Player } from "../lib/speechQueue";
 
 /**
@@ -198,6 +199,7 @@ export function useSpeech() {
         const blob = await synthesizeSpeech(text, uri.slice("piper:".length));
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
+        audio.volume = speechVolume();
         return {
           play: () =>
             new Promise<void>((res) => {
@@ -222,6 +224,7 @@ export function useSpeech() {
         play: () =>
           new Promise<void>((res) => {
             const u = new SpeechSynthesisUtterance(text);
+            u.volume = speechVolume();
             const v = uri
               ? window.speechSynthesis.getVoices().find((x) => x.voiceURI === uri)
               : undefined;
@@ -267,6 +270,7 @@ export function useSpeech() {
       }
       window.speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
+      u.volume = speechVolume();
       const v = uri
         ? window.speechSynthesis.getVoices().find((x) => x.voiceURI === uri)
         : undefined;
@@ -317,6 +321,7 @@ export function useSpeech() {
           .then((blob) => {
             const url = URL.createObjectURL(blob);
             const audio = new Audio(url);
+            audio.volume = speechVolume();
             audioRef.current = audio;
             currentUrlRef.current = url;
             const done = () => {

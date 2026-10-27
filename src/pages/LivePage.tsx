@@ -22,6 +22,8 @@ import { useCamera } from "../hooks/useCamera";
 import { useDetectionSocket } from "../hooks/useDetectionSocket";
 import { useOptions } from "../hooks/useOptions";
 import { usePresence } from "../hooks/usePresence";
+import { useRobotVolume } from "../hooks/useRobotVolume";
+import { setSpeechVolume, useSpeechVolume } from "../lib/speechVolume";
 import { useVideoTransport } from "../components/layout/VideoTransportContext";
 import { VideoTransportSwitch } from "../components/live/VideoTransportSwitch";
 import { RobotCameraSwitch } from "../components/live/RobotCameraSwitch";
@@ -503,6 +505,11 @@ export function LivePage() {
   // read-aloud button.
   const { va, registerAsk } = useVoiceAssistantContext();
   const { presence } = usePresence();
+  // Spoken answers' volume: the robot speaker's when it speaks through the robot, else this
+  // device's.
+  const toRobotSpeaker = va.speechOutput === "robot" && va.robotSpeaker;
+  const robotVolume = useRobotVolume(cmdRobot, toRobotSpeaker);
+  const deviceVolume = useSpeechVolume();
   // While this page is open, questions are about ITS frame and the answer shows in its panel;
   // elsewhere the app-wide assistant asks about the robot's camera (VoiceAssistantContext).
   useEffect(() => {
@@ -857,8 +864,16 @@ export function LivePage() {
                 onAskPrompt={handleAskPrompt}
                 voice={{
                   micSupported: va.micSupported,
+                  wakeSupported: va.wakeSupported,
                   voiceMode: va.voiceMode,
                   onToggleVoiceMode: va.toggleVoiceMode,
+                  listenMode: va.listenMode,
+                  onListenModeChange: va.setListenMode,
+                  onListenOnce: va.listenOnce,
+                  phase: va.phase,
+                  volume: toRobotSpeaker
+                    ? { value: robotVolume.volume, max: robotVolume.max, where: "robot", onChange: robotVolume.change }
+                    : { value: Math.round(deviceVolume * 100), max: 100, where: "device", onChange: (v) => setSpeechVolume(v / 100) },
                   speechSupported: va.speechSupported,
                   spokenMode: va.spokenMode,
                   onToggleSpokenMode: va.toggleSpokenMode,

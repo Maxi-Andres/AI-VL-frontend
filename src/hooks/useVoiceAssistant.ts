@@ -10,11 +10,16 @@ import { useSpeech } from "./useSpeech";
 import { useWakeWord } from "./useWakeWord";
 
 /**
- * Hands-free, "Alexa"-style voice assistant for the VLM free prompt, shared by
- * the live page and the monitor. When voice mode is on it keeps listening for the
- * wake word "robot"; on hearing it, it records the following spoken command,
- * transcribes it locally with Whisper, submits it automatically, and — when
- * spoken mode is on — reads the answer aloud. Then it goes back to listening.
+ * Hands-free voice assistant for the VLM free prompt, shared by the live page and the monitor.
+ * Hands-free (voice mode) listens one of two ways:
+ *  - "open" (the default): just speak. The mic's own level says when someone starts and stops
+ *    talking; the phrase is transcribed on the server with Whisper and sent by itself. No
+ *    browser speech recognition is involved, so it works everywhere (Brave and Firefox have
+ *    none). While an answer is being spoken it does not listen, so it never answers its own
+ *    voice; then it listens again.
+ *  - "wake": say "robot" first (the browser's Web Speech hears the word), then the question.
+ * Either way the answer is read aloud when spoken mode is on. `listenOnce` is the same for a
+ * single question — the mic button in the chat.
  *
  * A second way in: the ROBOT's own microphone (the G1's, through its relay), listened to on
  * the server for its name, "Bender", like Alexa. "Bender, qué ves" is answered at once; a bare
@@ -30,6 +35,9 @@ const LS_VOICE = "aivl.voiceMode";
 const LS_SPOKEN = "aivl.spokenMode";
 const LS_FILLER = "aivl.fillerMode";
 const LS_ROBOT_EAR = "aivl.robotEar";
+const LS_LISTEN = "aivl.listenMode";
+// What Whisper makes of noise or breath on a quiet mic: never worth a question to the VLM.
+const NOT_A_QUESTION = /^(\W*|gracias\W*|subt[ií]tulos.*|thank you\W*|\.+)$/i;
 // Said by the robot on a bare "Bender": it heard its name and waits for the question.
 const WAKE_ACK = "¿Sí?";
 
@@ -74,6 +82,8 @@ interface Args {
   phrase?: string;
 }
 
+export type ListenMode = "open" | "wake";
+
 export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
   const recorder = useAudioRecorder();
   const speech = useSpeech();
@@ -84,6 +94,10 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
   const [fillerMode, setFillerMode] = useState(() => readFlag(LS_FILLER));
   const [status, setStatus] = useState("");
   const [phase, setPhase] = useState<VoicePhase>("off");
+  const [listenMode, setListenModeState] = useState<ListenMode>(() =>
+    typeof localStorage !== "undefined" && localStorage.getItem(LS_LISTEN) === "wake" ? "wake" : "open");
+  const listenModeRef = useRef(listenMode);
+  listenModeRef.current = listenMode;
 
   // Refs so the async wake handler always sees the latest values / callback.
   const voiceModeRef = useRef(voiceMode);
@@ -119,9 +133,23 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
   // Stable ref to the wake handler (declared below) so useWakeWord keeps one cb.
   const handleWakeRef = useRef<() => Promise<void>>(async () => {});
 
-  const micSupported = wake.supported && recorder.supported;
+  // The mic needs only recording; the wake word also needs the browser's speech recognition.
+  const micSupported = recorder.supported;
+  const wakeSupported = wake.supported && recorder.supported;
+  const speakingRef = useRef(false);
+  speakingRef.current = speech.speaking;
+  // When the last spoken answer ended (MAX while one is playing). A phrase recorded after this
+  // could not have been the robot's own voice.
+  const speechEnd = useRef(0);
+  useEffect(() => {
+    speechEnd.current = speech.speaking ? Number.MAX_SAFE_INTEGER : Date.now();
+  }, [speech.speaking]);
+  // Bumped to end an open-listening loop (hands-free off, or switched to the wake word).
+  const loopGen = useRef(0);
 
   const LISTENING = 'Listening for the wake word "robot"…';
+  const OPEN_LISTENING = "Listening — just ask";
+  const ECHO_MS = 700;
 
   // The answer half of a voice turn — think, then speak sentence by sentence — shared by the
   // device mic (after recording and transcribing) and the robot's ear (which sends text).
@@ -170,11 +198,15 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
     return spoke;
   }, [speech]);
 
+  // One spoken question: record until the speaker goes quiet, transcribe, answer. Used after
+  // the wake word, and by the mic button for a single question.
   const handleWake = useCallback(async () => {
     if (busyRef.current) return; // one command at a time
     busyRef.current = true;
     speech.cancel(); // barge-in: saying "robot" interrupts a spoken answer
     wake.stop(); // free the mic to record the command cleanly
+    loopGen.current++; // and an open-listening loop lets go of it too
+    recorder.abort();
 
     let spoke = false;
     try {
@@ -189,7 +221,7 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
       setStatus("Transcribing…");
       const res = await transcribeAudio(blob);
       const text = res.text?.trim();
-      if (res.error || !text) {
+      if (res.error || !text || NOT_A_QUESTION.test(text)) {
         setStatus(res.error ? `Error: ${res.error}` : "Nothing recognized");
         return;
       }
@@ -202,16 +234,70 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
       // interrupts it — the barge-in in speech.cancel() above.)
       busyRef.current = false;
       if (voiceModeRef.current) {
-        setStatus(LISTENING);
+        setStatus(listenModeRef.current === "wake" ? LISTENING : OPEN_LISTENING);
         // If still speaking, let the queue's onDone flip the phase back later.
         if (!spoke) setPhase("listening");
-        wake.start();
+        if (listenModeRef.current === "wake") wake.start();
+        else void openLoopRef.current();
       } else {
         setPhase("off");
+        // A single question (the mic button): clear the working line, keep a "didn't catch it".
+        setStatus((st) => (st === "Thinking…" || st === "Transcribing…" ? "" : st));
       }
     }
   }, [recorder, speech, wake, answerText]);
   handleWakeRef.current = handleWake;
+
+  // "Just speak": listen, and every phrase heard becomes a question. Waits out a spoken answer
+  // (the mic would hear it) and any question already in flight.
+  const openLoop = useCallback(async () => {
+    const gen = ++loopGen.current;
+    const live = () => gen === loopGen.current && voiceModeRef.current && listenModeRef.current === "open";
+    while (live()) {
+      // Not while an answer plays, nor in its echo just after.
+      if (speakingRef.current || busyRef.current || Date.now() - speechEnd.current < ECHO_MS) {
+        await new Promise((r) => setTimeout(r, 250));
+        continue;
+      }
+      setPhase("listening");
+      setStatus(OPEN_LISTENING);
+      const t0 = Date.now();
+      let blob: Blob | null;
+      try {
+        blob = await recorder.recordUtterance({ startTimeoutMs: 8000, maxMs: 15000 });
+      } catch (e) {
+        setStatus(`Microphone error: ${e instanceof Error ? e.message : String(e)}`);
+        return;
+      }
+      if (!live()) return;
+      // Nothing said — or an answer started playing while it listened, so what it heard may be
+      // its own voice: drop it rather than answer itself.
+      if (!blob || speechEnd.current > t0) continue;
+      busyRef.current = true;
+      let spoke = false;
+      try {
+        setPhase("transcribing");
+        setStatus("Transcribing…");
+        const res = await transcribeAudio(blob);
+        const text = res.text?.trim();
+        if (!live()) return;
+        if (res.error) {
+          setStatus(`Error: ${res.error}`);
+          await new Promise((r) => setTimeout(r, 1500));
+          continue;
+        }
+        if (!text || NOT_A_QUESTION.test(text)) continue;
+        spoke = await answerText(text);
+      } catch (e) {
+        setStatus(`Voice error: ${e instanceof Error ? e.message : String(e)}`);
+      } finally {
+        busyRef.current = false;
+        if (!spoke && live()) setPhase("listening");
+      }
+    }
+  }, [recorder, answerText]);
+  const openLoopRef = useRef(openLoop);
+  openLoopRef.current = openLoop;
 
   // A "Bender, …" command from the robot's own microphone: the same answer, no recording here.
   const handleEarCommand = useCallback(async (text: string) => {
@@ -240,21 +326,26 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
     },
   });
 
-  // Start/stop the wake-word listener as voice mode is turned on/off.
+  // Start/stop listening as hands-free is turned on/off or its way of listening changes.
   useEffect(() => {
-    if (voiceMode && micSupported) {
-      setStatus('Listening for the wake word "robot"…');
+    loopGen.current++; // ends an open loop from before
+    recorder.abort();
+    if (voiceMode && listenMode === "wake" && wakeSupported) {
+      setStatus(LISTENING);
       setPhase("listening");
       wake.start();
+    } else if (voiceMode && listenMode === "open" && micSupported) {
+      wake.stop();
+      void openLoop();
     } else {
       wake.stop();
       speech.cancel();
       busyRef.current = false;
-      setStatus("");
+      setStatus(voiceMode && listenMode === "wake" ? "This browser cannot listen for a wake word — choose “Just speak”" : "");
       setPhase("off");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [voiceMode, micSupported]);
+  }, [voiceMode, listenMode, micSupported, wakeSupported]);
 
   // When the spoken answer finishes (queue drained), drop back to "listening".
   const robotListening = robotEar && robotMic;
@@ -277,6 +368,16 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
         localStorage.setItem(LS_VOICE, next ? "1" : "0");
       return next;
     });
+  }, []);
+
+  const setListenMode = useCallback((m: ListenMode) => {
+    setListenModeState(m);
+    if (typeof localStorage !== "undefined") localStorage.setItem(LS_LISTEN, m);
+  }, []);
+
+  // The mic button: one question, sent when the speaker stops.
+  const listenOnce = useCallback(() => {
+    void handleWakeRef.current();
   }, []);
 
   const toggleRobotEar = useCallback(() => {
@@ -308,6 +409,12 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
 
   return {
     micSupported,
+    wakeSupported,
+    listenMode,
+    setListenMode,
+    listenOnce,
+    /** A question is being recorded or worked on right now. */
+    busy: phase === "recording" || phase === "transcribing" || phase === "thinking",
     speechSupported: speech.supported,
     voiceMode,
     spokenMode,

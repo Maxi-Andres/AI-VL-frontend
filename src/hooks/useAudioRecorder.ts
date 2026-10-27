@@ -249,5 +249,12 @@ export function useAudioRecorder() {
     };
   }, []);
 
-  return { recording, error, supported, start, stop, recordUtterance };
+  /** Cut a recordUtterance() short (hands-free switched off mid-listen): it resolves with what
+   * it has — null if nobody had started speaking. */
+  const abort = useCallback(() => {
+    const r = recorderRef.current;
+    if (r && r.state !== "inactive") r.stop();
+  }, []);
+
+  return { recording, error, supported, start, stop, recordUtterance, abort };
 }
