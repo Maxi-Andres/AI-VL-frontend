@@ -171,13 +171,10 @@ button.on-video:hover:not(:disabled) {
   background: rgb(10 14 20 / 0.78);
 }
 
-/* "Fullscreen" for the video (Live's stages, Drive's cockpit) is the stage filling the browser
-   window — NOT the Fullscreen API. On this GNOME + NVIDIA desktop (and over its remote
-   desktop), Firefox's switch into and out of native fullscreen froze the whole browser: no
-   tab could be closed or opened. Filling the page asks the window system for nothing, so
-   there is no switch to freeze on. F11 still gives the browser's own fullscreen to who wants
-   it. The element stays where it is in the page (no remount: the picture and the robot link
-   go on), fixed over everything else. */
+/* Fullscreen video (Live's stages, Drive's cockpit), first layer: the stage fills the page,
+   fixed over everything else. It stays where it is in the page (no remount: the picture and
+   the robot link go on). The second layer — the page in the browser's own fullscreen — is
+   lib/screen.ts, requested for <html>, never for the stage. */
 .stage-expanded {
   position: fixed !important;
   inset: 0 !important;

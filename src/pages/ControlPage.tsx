@@ -33,6 +33,7 @@ import { CameraCanvas } from "../components/live/CameraCanvas";
 import { useRobot } from "../components/layout/RobotContext";
 import { Segmented } from "../components/ui/Segmented";
 import { msg, useT } from "../i18n";
+import { enterScreen, leaveScreen, onScreenLeft } from "../lib/screen";
 
 // Max velocities per speed preset (m/s, m/s, rad/s), PER ROBOT. Below these sit two more
 // clamps — the executor's (go2_/g1_commands MAX_*) and the relay's (MAX_* in its relay.env) —
@@ -198,10 +199,18 @@ export function ControlPage() {
   const [cockpit, setCockpit] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const [videoMenu, setVideoMenu] = useState(false);
-  // The cockpit fills the browser window (`.stage-expanded`), not the screen through the
-  // Fullscreen API: entering and leaving native fullscreen froze the whole of Firefox on
-  // this GNOME + NVIDIA desktop. F11 still gives the browser's own fullscreen.
+  // The cockpit fills the page (`.stage-expanded`) and the page goes to the browser's own
+  // fullscreen (lib/screen.ts); leaving either way — F, Esc, F11, the button — undoes both.
   const toggleCockpit = useCallback(() => setCockpit((c) => !c), []);
+  useEffect(() => {
+    if (!cockpit) return;
+    enterScreen();
+    const stopWatching = onScreenLeft(() => setCockpit(false));
+    return () => {
+      stopWatching();
+      leaveScreen();
+    };
+  }, [cockpit]);
 
   // Live input sources (read in the dispatch loop; refs so they don't re-trigger it).
   const leftRef = useRef({ x: 0, y: 0 }); // translate stick
