@@ -18,6 +18,7 @@ import {
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
+import { toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import URDFLoader, { type URDFJoint, type URDFRobot } from "urdf-loader";
 import { JOINTS, JOINT_BY_URDF, readJoint, tempLevel, type JointFrame } from "../../lib/g1Joints";
 import { liveStalls, type StallAlert } from "../../lib/jointControl";
@@ -139,6 +140,9 @@ const COLORS = {
   },
 };
 
+// Faces meeting at less than this are shaded as one smooth surface; sharper meets stay an edge.
+const CREASE_ANGLE = (35 * Math.PI) / 180;
+
 interface Part {
   mesh: Mesh;
   material: MeshStandardMaterial;
@@ -177,6 +181,10 @@ export function RobotViewer({
   const viewRef = useRef<View>("robot");
   // Set by the scene effect: points the camera for a view (and follows a hand each frame).
   const aimRef = useRef<(v: View) => void>(() => {});
+  // Draw only when something changed: the loop runs every display frame (for the orbit's
+  // damping), but rendering the whole robot at 60-144 Hz to show the same picture was the cost
+  // of this page. A joint frame (~30 Hz live), a colour, the camera or the size sets this.
+  const dirtyRef = useRef(true);
   // Latest callbacks for the listeners registered once in the setup effect.
   const cb = useRef({ onHover, onSelect, onLimits });
   useEffect(() => {
@@ -202,6 +210,7 @@ export function RobotViewer({
       const g = GRID[isDark() ? "dark" : "light"];
       grid = new GridHelper(4, 16, g.major, g.minor);
       scene.add(grid);
+      dirtyRef.current = true;
     };
     paintGrid();
     // Re-draw the floor when the person switches theme (user menu) with this page open.
@@ -223,6 +232,10 @@ export function RobotViewer({
     controls.minDistance = 0.15;
     controls.maxDistance = 6;
     controls.update();
+    // Fired by update() whenever the camera actually moved, damping included.
+    controls.addEventListener("change", () => {
+      dirtyRef.current = true;
+    });
 
     const resize = () => {
       const w = host.clientWidth;
@@ -233,6 +246,7 @@ export function RobotViewer({
       renderer.domElement.style.height = `${h}px`;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
+      dirtyRef.current = true;
     };
     const ro = new ResizeObserver(resize);
     ro.observe(host);
@@ -312,7 +326,12 @@ export function RobotViewer({
       new STLLoader(manager).load(
         path,
         (geometry) => {
-          done(new Mesh(geometry, new MeshStandardMaterial()));
+          // STL carries one normal per triangle, so every face was lit flat and the decimated
+          // meshes showed each facet. Creased normals smooth across gentle angles and keep the
+          // machined edges sharp.
+          const smooth = toCreasedNormals(geometry, CREASE_ANGLE);
+          if (smooth !== geometry) geometry.dispose();
+          done(new Mesh(smooth, new MeshStandardMaterial()));
           pending -= 1;
           finish();
         },
@@ -407,8 +426,10 @@ export function RobotViewer({
       const p = handPoint(v);
       if (!p) return;
       const shift = p.clone().sub(controls.target);
+      if (shift.lengthSq() < 1e-12) return;
       controls.target.add(shift);
       camera.position.add(shift);
+      dirtyRef.current = true;
     };
 
     let raf = 0;
@@ -416,6 +437,8 @@ export function RobotViewer({
       raf = requestAnimationFrame(loop);
       follow();
       controls.update();
+      if (!dirtyRef.current) return;
+      dirtyRef.current = false;
       renderer.render(scene, camera);
     };
     loop();
@@ -472,6 +495,7 @@ export function RobotViewer({
       const moving = Object.keys(ghost);
       for (const g of model.ghostMeshes) g.mesh.visible = moving.some((j) => g.above.has(j));
     }
+    dirtyRef.current = true;
   }, [frame, showTilt, ghost, loaded]);
 
   // ---- colour: temperature, then hover and selection on top ----
@@ -488,6 +512,7 @@ export function RobotViewer({
         p.material.emissiveIntensity = joint === selected ? 0.55 : 0.3;
       }
     }
+    dirtyRef.current = true;
   }, [frame, selected, hovered, colorByTemp, loaded]);
 
   const warm = warmJoints(frame, t);
