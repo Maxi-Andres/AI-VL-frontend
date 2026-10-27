@@ -167,6 +167,32 @@ function fadeOut(material: LineBasicMaterial) {
   };
 }
 
+const box = new Box3();
+const meshBox = new Box3();
+
+/**
+ * Put the robot's lowest point on the floor for the pose it is in now. The URDF hangs from the
+ * pelvis, and nothing in the joint frame says how high the pelvis is: stood once in the zero
+ * pose, the robot floated in a squat (asked 2026-10-27) — the legs fold up under a pelvis that
+ * stayed at standing height. Whatever is lowest (feet, or hands on the ground) is the contact.
+ *
+ * Cheap bounds first (each mesh's box, loose when the part is turned), then exact vertices only
+ * for the few meshes that could be the lowest — at ~30 Hz, never all 620k vertices.
+ */
+function standOnFloor(model: Model) {
+  model.upright.position.y = 0;
+  model.upright.updateMatrixWorld(true);
+  const loose = model.meshes.map((m) => {
+    if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+    return { m, min: meshBox.copy(m.geometry.boundingBox!).applyMatrix4(m.matrixWorld).min.y };
+  });
+  const lowest = Math.min(...loose.map((l) => l.min));
+  box.makeEmpty();
+  for (const l of loose) if (l.min < lowest + 0.06) box.expandByObject(l.m, true);
+  model.upright.position.y = -box.min.y;
+  model.upright.updateMatrixWorld(true);
+}
+
 interface Part {
   mesh: Mesh;
   material: MeshStandardMaterial;
@@ -181,6 +207,8 @@ interface Model {
   /** urdf joint name -> the meshes it moves directly. */
   parts: Map<string, Part[]>;
   meshes: Mesh[];
+  /** The Z-up -> Y-up group the robot hangs from; its height keeps the robot on the floor. */
+  upright: Group;
 }
 
 /** The nearest moving joint at or above `obj`, by URDF name. */
@@ -343,7 +371,7 @@ export function RobotViewer({
       for (const j of Object.values(ghostRobot.joints)) j.ignoreLimits = true;
       ghostRobot.visible = false;
       upright.add(ghostRobot);
-      modelRef.current = { robot, ghost: ghostRobot, ghostMeshes, parts, meshes };
+      modelRef.current = { robot, ghost: ghostRobot, ghostMeshes, parts, meshes, upright };
       setLoaded(true);
     };
     // meshopt-compressed GLB: the whole original geometry in ~3 MB (scripts/build_g1_model.py).
@@ -520,6 +548,7 @@ export function RobotViewer({
     // what this page is about, and spinning the model would fight the camera.
     model.robot.rotation.set(roll, pitch, 0, "ZYX");
     model.ghost.rotation.copy(model.robot.rotation);
+    standOnFloor(model);
     model.ghost.visible = showGhost;
     if (showGhost) {
       const moving = Object.keys(ghost);
