@@ -3,10 +3,12 @@
 // Requested for <html>, never for the stage: the stage keeps its in-page expansion either
 // way, and if the browser refuses or fails, that expansion is still there.
 //
-// History: requesting fullscreen for the stage element froze the whole of Firefox on this
-// GNOME + NVIDIA desktop (2026-10-27) and the exact trigger was never isolated. The 3D view's
-// leaked WebGL contexts, fixed the same day, are the main suspect. If the freeze comes back,
-// drop enterScreen() from the callers: the in-page expansion works on its own.
+// NOT CALLED for now. On the GNOME + NVIDIA desktop this runs on, the switch into native
+// fullscreen froze the whole of Firefox, three times on 2026-10-27 — each one an NVRM
+// "Out of memory [NV_ERR_NO_MEMORY]" burst in the kernel log: the GPU had no VRAM left for the
+// new full-screen surface (llama-server 4.4 GB + iacore 1.7 GB of 8). The page-filling layer
+// asks the GPU for nothing new. Call enterScreen()/onScreenLeft() again from FullscreenButton and
+// the Drive cockpit once that machine has the headroom.
 
 export function enterScreen(): void {
   if (!document.fullscreenElement) void document.documentElement.requestFullscreen?.().catch(() => undefined);

@@ -35,7 +35,6 @@ import { CameraCanvas } from "../components/live/CameraCanvas";
 import { useRobot } from "../components/layout/RobotContext";
 import { Segmented } from "../components/ui/Segmented";
 import { msg, useT } from "../i18n";
-import { enterScreen, leaveScreen, onScreenLeft } from "../lib/screen";
 
 // Max velocities per speed preset (m/s, m/s, rad/s), PER ROBOT. Below these sit two more
 // clamps — the executor's (go2_/g1_commands MAX_*) and the relay's (MAX_* in its relay.env) —
@@ -212,18 +211,9 @@ export function ControlPage() {
     setMenu((cur) => (cur === m ? null : m));
     setDrawer(false);
   };
-  // The cockpit fills the page (`.stage-expanded`) and the page goes to the browser's own
-  // fullscreen (lib/screen.ts); leaving either way — F, Esc, F11, the button — undoes both.
+  // The cockpit fills the page (`.stage-expanded`), not the screen: native fullscreen froze
+  // Firefox on this machine for lack of VRAM (lib/screen.ts).
   const toggleCockpit = useCallback(() => setCockpit((c) => !c), []);
-  useEffect(() => {
-    if (!cockpit) return;
-    enterScreen();
-    const stopWatching = onScreenLeft(() => setCockpit(false));
-    return () => {
-      stopWatching();
-      leaveScreen();
-    };
-  }, [cockpit]);
 
   // Live input sources (read in the dispatch loop; refs so they don't re-trigger it).
   const leftRef = useRef({ x: 0, y: 0 }); // translate stick
