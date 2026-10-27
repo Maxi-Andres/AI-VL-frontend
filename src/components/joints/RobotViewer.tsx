@@ -439,6 +439,13 @@ export function RobotViewer({
       });
       grid?.dispose();
       renderer.dispose();
+      // dispose() frees three's buffers but leaves the WebGL context to the garbage collector,
+      // which may take its time: every visit to Joints left one more context holding GPU
+      // memory. Firefox, on a GPU already ~87% full with the VLM, ended in a blank page or a
+      // crash of the whole browser (2026-10-27). Lose the context now, and shrink the canvas.
+      renderer.forceContextLoss();
+      renderer.domElement.width = 0;
+      renderer.domElement.height = 0;
       el.remove();
       modelRef.current = null;
     };
