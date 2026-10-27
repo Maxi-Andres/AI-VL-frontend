@@ -5,7 +5,7 @@ import { backendFetch } from "./backend";
 export type Role = "viewer" | "operator" | "admin" | "owner";
 
 export interface Me {
-  user: { id: string; name: string; email: string };
+  user: { id: string; name: string; email: string; color: string };
   org: { id: string; name: string };
   role: Role;
   permissions: string[];
@@ -86,10 +86,10 @@ export async function signOut(): Promise<void> {
   await backendFetch("/api/auth/logout", { method: "POST" }, { quiet401: true });
 }
 
-/** Your own name (Settings → Profile). Returns who you are now. */
-export async function updateProfile(name: string): Promise<Me> {
+/** Your own name or colour (Settings → Profile). Returns who you are now. */
+export async function updateProfile(change: { name?: string; color?: string }): Promise<Me> {
   const r = await backendFetch("/api/auth/me", {
-    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }),
+    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(change),
   });
   if (!r.ok) throw await readError(r);
   return r.json();

@@ -130,7 +130,7 @@ export function TeamSettings() {
               <tr key={m.id} className={`border-b border-line last:border-0 ${m.active ? "" : "opacity-55"}`}>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <Avatar id={m.id} name={m.name || m.email} size={34} />
+                    <Avatar id={m.id} name={m.name || m.email} color={m.color} size={34} />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 font-medium text-fg">
                         {m.name}

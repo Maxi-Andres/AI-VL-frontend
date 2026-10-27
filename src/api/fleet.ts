@@ -21,6 +21,8 @@ export interface FleetRobot {
   model: string;
   serial: string;
   site_id: string | null;
+  /** Its colour (lib/colors.ts): random when registered, changeable in its dialog. */
+  color: string;
   /** Last known state, kept by the server whether or not anyone is watching. Null fields:
    * never measured (no ping address yet). */
   status: {
@@ -111,6 +113,7 @@ export interface RobotInput {
   slot?: string;
   serial?: string;
   site_id?: string | null;
+  color?: string;
   unassign?: boolean;
 }
 
@@ -134,8 +137,36 @@ export interface ActivityEvent {
   detail: Record<string, unknown>;
 }
 
-/** Notable changes in the company, newest first (admins: the log names people). */
-export async function getActivity(signal?: AbortSignal, page?: { limit: number; offset: number }): Promise<ActivityEvent[]> {
-  const q = page ? `?limit=${page.limit}&offset=${page.offset}` : "";
-  return (await check(await backendFetch(`/api/activity${q}`, { signal }))).json();
+export interface ActivityPage {
+  events: ActivityEvent[];
+  /** How many match in all, for the page numbers. */
+  total: number;
+}
+
+export type ActivityKind = "people" | "access" | "sites" | "robots";
+
+/** Notable changes in the company, newest first, a page at a time (admins: the log names
+ * people). */
+export async function getActivity(signal?: AbortSignal, page?: { limit: number; offset: number; kind?: ActivityKind | null }): Promise<ActivityPage> {
+  const q = new URLSearchParams();
+  if (page) {
+    q.set("limit", String(page.limit));
+    q.set("offset", String(page.offset));
+    if (page.kind) q.set("kind", page.kind);
+  }
+  return (await check(await backendFetch(`/api/activity${q.size ? `?${q}` : ""}`, { signal }))).json();
+}
+
+export interface Notifications {
+  events: (ActivityEvent & { unread: boolean })[];
+  unread: number;
+}
+
+/** The bell: the latest events you may see (not your own doings), and how many are new. */
+export async function getNotifications(signal?: AbortSignal): Promise<Notifications> {
+  return (await check(await backendFetch("/api/notifications", { signal }))).json();
+}
+
+export async function markNotificationsSeen(): Promise<void> {
+  await check(await backendFetch("/api/notifications/seen", { method: "POST" }));
 }

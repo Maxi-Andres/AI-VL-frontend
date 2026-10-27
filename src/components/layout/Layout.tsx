@@ -3,11 +3,12 @@ import { Header } from "./Header";
 import { StatusProvider, useStatus } from "./StatusContext";
 import { RobotProvider } from "./RobotContext";
 import { VideoTransportProvider } from "./VideoTransportContext";
-import { RobotStatus } from "./RobotStatus";
 import { VoiceAssistantProvider, useVoiceAssistantContext } from "./VoiceAssistantContext";
 import { VoiceStatusBadge } from "./VoiceStatusBadge";
 import { UserMenu } from "./UserMenu";
 import { SystemStatus } from "./SystemStatus";
+import { NotificationBell } from "./NotificationBell";
+import { SearchPalette } from "./SearchPalette";
 
 function HeaderWithStatus() {
   const { connected, voicePhase } = useStatus();
@@ -17,8 +18,9 @@ function HeaderWithStatus() {
   return (
     <Header>
       <VoiceStatusBadge phase={voicePhase} wakeWords={wakeWords} />
-      <RobotStatus />
       <SystemStatus connected={connected} />
+      <SearchPalette />
+      <NotificationBell />
       <UserMenu />
     </Header>
   );

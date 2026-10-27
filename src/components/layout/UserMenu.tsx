@@ -57,7 +57,7 @@ export function UserMenu() {
     <div ref={ref} className="relative">
       <button onClick={() => setOpen((v) => !v)} aria-expanded={open}
         className="flex cursor-pointer items-center gap-2.5 rounded-xl py-1 pr-2 pl-1 transition hover:bg-subtle">
-        <Avatar id={me.user.id} name={me.user.name || me.user.email} size={34} />
+        <Avatar id={me.user.id} name={me.user.name || me.user.email} color={me.user.color} size={34} />
         <span className="hidden text-left md:block">
           <b className="block text-[13px] leading-tight">{me.user.name}</b>
           <small className="block text-[11.5px] leading-tight text-dim">{ROLE_LABEL[me.role]}</small>
@@ -66,7 +66,7 @@ export function UserMenu() {
       </button>
       <DropMenu open={open} className="top-[52px] w-[270px]">
         <div className="mb-1 flex items-center gap-2.5 border-b border-line p-2.5">
-          <Avatar id={me.user.id} name={me.user.name || me.user.email} size={34} />
+          <Avatar id={me.user.id} name={me.user.name || me.user.email} color={me.user.color} size={34} />
           <div className="min-w-0">
             <b className="block truncate text-[13px]">{me.user.name}</b>
             <small className="block truncate text-[11.5px] text-dim">{me.user.email}</small>

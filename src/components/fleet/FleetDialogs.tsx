@@ -4,6 +4,9 @@ import { IconBone, IconLoader2, IconMapPin, IconPhotoUp, IconRobot, IconSearch, 
 import { searchAddress, type Place } from "../../lib/geocode";
 import { deletePlan, deleteRobot, deleteSite, saveRobot, saveSite, uploadPlan } from "../../api/fleet";
 import type { Fleet, FleetRobot, Site } from "../../api/fleet";
+import { ColorPicker } from "../ui/ColorPicker";
+import { RobotIcon } from "./RobotIcon";
+import { colorOf, randomColor, type ColorName } from "../../lib/colors";
 import { SiteMap } from "./SiteMap";
 
 // The Fleet page's editors: a site (name, address, time zone, location, floor plan) and a
@@ -243,6 +246,8 @@ export function RobotDialog({ robot, siteId, fleet, onClose }: {
   const [slot, setSlot] = useState(robot?.slot ?? firstFree);
   const [serial, setSerial] = useState(robot?.serial ?? "");
   const [site, setSite] = useState<string>(robot?.site_id ?? siteId ?? "");
+  // A new robot gets a colour at random, shown here so it can be changed before saving.
+  const [color, setColor] = useState<ColorName>(() => (robot ? colorOf(robot.color, robot.id) : randomColor()));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const takenBy = (s: string) => fleet.robots.find((r) => r.slot === s && r.id !== robot?.id)?.name;
@@ -254,7 +259,7 @@ export function RobotDialog({ robot, siteId, fleet, onClose }: {
     setError(null);
     try {
       await saveRobot(robot?.id ?? null, {
-        name, slot, serial, ...(site ? { site_id: site } : robot ? { unassign: true } : {}),
+        name, slot, serial, color, ...(site ? { site_id: site } : robot ? { unassign: true } : {}),
       });
       onClose(true);
     } catch (err) {
@@ -310,6 +315,13 @@ export function RobotDialog({ robot, siteId, fleet, onClose }: {
                   </label>
                 );
               })}
+            </div>
+          </div>
+          <div>
+            <Label>Colour</Label>
+            <div className="flex items-center gap-3">
+              <RobotIcon slot={slot} color={color} size={34} />
+              <ColorPicker value={color} onChange={setColor} label="Robot colour" />
             </div>
           </div>
           <div>

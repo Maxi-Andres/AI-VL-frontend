@@ -9,6 +9,7 @@ export interface Member {
   name: string;
   email: string;
   role: Role;
+  color: string;
   active: boolean;
   last_login_at: string | null;
   joined_at: string | null;

@@ -59,11 +59,12 @@ const FEED: Record<string, { icon: typeof IconActivity; tint: keyof typeof TINT;
   "fleet.robot_removed": { icon: IconRobot, tint: "bad", text: (e) => <><b>{e.actor}</b> removed {e.target}</> },
 };
 
-export function ActivityRow({ ev }: { ev: ActivityEvent }) {
+export function ActivityRow({ ev, unread = false }: { ev: ActivityEvent; unread?: boolean }) {
   const f = FEED[ev.action] ?? { icon: IconActivity, tint: "info" as const, text: (e: ActivityEvent) => <>{e.action} {e.target}</> };
   const Icon = f.icon;
   return (
-    <li className="flex gap-3 border-b border-line py-3 last:border-0">
+    <li className={`relative flex gap-3 border-b border-line py-3 last:border-0 ${
+      unread ? "before:absolute before:top-1/2 before:-left-2 before:size-1.5 before:-translate-y-1/2 before:rounded-full before:bg-accent" : ""}`}>
       <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${TINT[f.tint]}`}><Icon size={16} /></span>
       <div className="min-w-0 text-[13px]">
         <p className="m-0">{f.text(ev)}</p>

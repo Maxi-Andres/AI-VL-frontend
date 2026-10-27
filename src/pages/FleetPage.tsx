@@ -30,6 +30,7 @@ import { useRobot } from "../components/layout/RobotContext";
 import { BACKEND_URL } from "../config";
 import { Avatar } from "../components/ui/Avatar";
 import { ActivityRow, ago, span } from "../components/fleet/ActivityFeed";
+import { RobotIcon } from "../components/fleet/RobotIcon";
 import { TINT } from "../components/ui/tones";
 import { PILL, systemRows } from "../components/layout/systemRows";
 import { SiteMap } from "../components/fleet/SiteMap";
@@ -94,7 +95,7 @@ export function FleetPage() {
   // leaves the others on screen.
   const load = useCallback(async (signal?: AbortSignal) => {
     if (mayManage) getTeam(signal).then(setTeam).catch(() => undefined);
-    if (mayConfigure) getActivity(signal).then(setActivity).catch(() => undefined);
+    if (mayConfigure) getActivity(signal).then((p) => setActivity(p.events)).catch(() => undefined);
     try {
       setFleet(await getFleet(signal));
     } catch (e) {
@@ -166,7 +167,7 @@ export function FleetPage() {
               <div className="flex">
                 {activeMembers.slice(0, 4).map((m, i) => (
                   <span key={m.id} style={{ zIndex: 10 - i }} className="-ml-2 rounded-full border-2 border-panel first:ml-0">
-                    <Avatar id={m.id} name={m.name || m.email} size={28} />
+                    <Avatar id={m.id} name={m.name || m.email} color={m.color} size={28} />
                   </span>
                 ))}
               </div>
@@ -495,7 +496,7 @@ function RobotCard({ robot, site, presence, net, editable, onEdit }: {
       </button>
       <div className="p-3.5">
         <div className="flex items-center gap-2">
-          <Icon size={17} className="shrink-0 text-accent" />
+          <RobotIcon slot={robot.slot} color={robot.color} id={robot.id} size={26} />
           <b className="min-w-0 truncate text-[14.5px]">{robot.name}</b>
           <span className="ml-auto shrink-0 text-xs text-dim" title={robot.model}>{KIND[robot.slot] ?? robot.model}</span>
           {/* Always visible: an edit that only shows on hover is one nobody finds. */}
