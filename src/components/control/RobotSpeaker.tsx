@@ -5,6 +5,7 @@ import { useRobotVolume } from "../../hooks/useRobotVolume";
 import { serverVoiceName, useVoiceChoice, voiceLabel } from "../../lib/voiceChoice";
 import { Button } from "../ui/Button";
 import { StatusText, type Status } from "../ui/StatusText";
+import { useT } from "../../i18n";
 
 /**
  * The robot's own speaker: type something and the robot says it, stop it, and set its volume.
@@ -14,6 +15,7 @@ import { StatusText, type Status } from "../ui/StatusText";
  * to send no voice, so the robot always spoke with the server's default.
  */
 export function RobotSpeaker({ robot }: { robot: string }) {
+  const t = useT();
   const [text, setText] = useState("");
   const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState(false);
@@ -27,28 +29,28 @@ export function RobotSpeaker({ robot }: { robot: string }) {
   }, [volumeError]);
 
   const say = useCallback(async () => {
-    const t = text.trim();
-    if (!t) return;
+    const said = text.trim();
+    if (!said) return;
     setBusy(true);
-    setStatus({ tone: "busy", text: "Sending to the robot…" });
+    setStatus({ tone: "busy", text: t("Sending to the robot…") });
     try {
-      const r = await sayOnRobot(robot, t, voice);
+      const r = await sayOnRobot(robot, said, voice);
       setStatus(
         r.ok
-          ? { tone: "ok", text: `Speaking (${(r.seconds ?? 0).toFixed(1)} s)` }
-          : { tone: "error", text: r.error ?? "the robot did not take it" },
+          ? { tone: "ok", text: t("Speaking ({s} s)", { s: (r.seconds ?? 0).toFixed(1) }) }
+          : { tone: "error", text: r.error ?? t("the robot did not take it") },
       );
     } catch (e) {
-      setStatus({ tone: "error", text: `backend unreachable: ${String(e)}` });
+      setStatus({ tone: "error", text: t("backend unreachable: {error}", { error: String(e) }) });
     } finally {
       setBusy(false);
     }
-  }, [robot, text, voice]);
+  }, [robot, text, voice, t]);
 
   const stop = useCallback(async () => {
     const r = await stopRobotAudio(robot).catch(() => null);
-    setStatus(r?.ok ? { tone: "stopped", text: "Stopped" } : { tone: "error", text: r?.error ?? "stop failed" });
-  }, [robot]);
+    setStatus(r?.ok ? { tone: "stopped", text: t("Stopped") } : { tone: "error", text: r?.error ?? t("stop failed") });
+  }, [robot, t]);
 
   return (
     <div className="mb-3 flex flex-col gap-1.5">
@@ -62,7 +64,7 @@ export function RobotSpeaker({ robot }: { robot: string }) {
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Type something for the robot to say…"
+          placeholder={t("Type something for the robot to say…")}
           className="min-w-0 flex-1 rounded-md border border-line bg-bg px-2 py-1 text-xs text-fg focus:border-accent focus:outline-none"
         />
         <Button
@@ -71,19 +73,19 @@ export function RobotSpeaker({ robot }: { robot: string }) {
           className="px-2 py-1 text-[11px]"
           disabled={busy || !text.trim()}
         >
-          Say
+          {t("Say")}
         </Button>
         <Button
           type="button"
           variant="secondary"
           className="px-2 py-1 text-[11px]"
-          title="Stop speaking"
+          title={t("Stop speaking")}
           onClick={() => void stop()}
         >
           <IconPlayerStopFilled size={12} />
         </Button>
       </form>
-      <label className="flex items-center gap-2 text-xs text-muted" title="Robot speaker volume">
+      <label className="flex items-center gap-2 text-xs text-muted" title={t("Robot speaker volume")}>
         <IconVolume size={14} />
         <input
           type="range"
@@ -100,7 +102,9 @@ export function RobotSpeaker({ robot }: { robot: string }) {
         </span>
       </label>
       <p className="m-0 text-[11px] text-muted">
-        Voice: {voice ? voiceLabel(voice) : "the server's default"} · pick it on Live
+        {voice
+          ? t("Voice: {voice} · pick it on Live", { voice: voiceLabel(voice) })
+          : t("Voice: the server's default · pick it on Live")}
       </p>
       <StatusText status={status} className="text-xs text-muted" />
     </div>

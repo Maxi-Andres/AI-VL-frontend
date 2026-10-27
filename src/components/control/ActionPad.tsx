@@ -4,6 +4,7 @@ import { IconChevronDown, IconLock } from "@tabler/icons-react";
 import type { SkillInfo } from "../../api/backend";
 import type { ChoiceSendable } from "./unsendableSkills";
 import { choiceGroups } from "./choiceGroups";
+import { msg, useT } from "../../i18n";
 
 interface Props {
   /** The robot's skill catalog (from GET /api/skills). */
@@ -35,26 +36,28 @@ const EXCLUDE = new Set(["walk", "turn", "stop", "move", "unknown"]);
 
 // Preferred grouping + order (Go2 + G1 names mixed; missing ones are just skipped).
 // Any catalog skill not listed here still shows up under "More"; `hidden` catalog
-// skills (raw mode control) go to their own "Advanced" group at the end.
+// skills (raw mode control) go to their own "Advanced" group at the end. Titles are marked with
+// msg() and stay English as identities (the folded set); t() translates them where drawn.
 const GROUPS: { title: string; skills: string[] }[] = [
   // Startup order first — the G1 only works as damping -> Preparation -> a locomotion
   // mode, so the buttons read in the order an operator presses them.
-  { title: "Mode", skills: ["damp", "stand_up", "lie_up", "walk_waist", "run_waist", "climb", "start", "run", "balance_stand", "zero_torque"] },
-  { title: "Posture", skills: ["stand_down", "sit", "rise_sit", "recovery_stand", "squat", "high_stand", "low_stand"] },
-  { title: "Gestures", skills: ["hello", "stretch", "scrape", "heart", "dance1", "dance2", "pose", "wave_hand", "shake_hand"] },
-  { title: "Acrobatics", skills: ["front_jump", "front_pounce", "front_flip", "back_flip", "left_flip", "handstand", "walk_upright"] },
+  { title: msg("Mode"), skills: ["damp", "stand_up", "lie_up", "walk_waist", "run_waist", "climb", "start", "run", "balance_stand", "zero_torque"] },
+  { title: msg("Posture"), skills: ["stand_down", "sit", "rise_sit", "recovery_stand", "squat", "high_stand", "low_stand"] },
+  { title: msg("Gestures"), skills: ["hello", "stretch", "scrape", "heart", "dance1", "dance2", "pose", "wave_hand", "shake_hand"] },
+  { title: msg("Acrobatics"), skills: ["front_jump", "front_pounce", "front_flip", "back_flip", "left_flip", "handstand", "walk_upright"] },
 ];
 
-export const ADVANCED_GROUP = "Advanced (raw mode)";
+export const ADVANCED_GROUP = msg("Advanced (raw mode)");
+const MORE_GROUP = msg("More");
 
 // Fallback display names for catalog entries that carry no `label` of their own
 // (older iacore). The catalog is the source of truth — add names there, not here.
 const LABELS: Record<string, string> = {
-  stand_down: "Lie down", rise_sit: "Rise", recovery_stand: "Recover",
-  hello: "Wave / greet", scrape: "Bow", dance1: "Dance 1", dance2: "Dance 2",
-  front_jump: "Jump", front_pounce: "Pounce", front_flip: "Front flip",
-  back_flip: "Back flip", left_flip: "Side flip", walk_upright: "Upright",
-  set_gait: "Gait",
+  stand_down: msg("Lie down"), rise_sit: msg("Rise"), recovery_stand: msg("Recover"),
+  hello: msg("Wave / greet"), scrape: msg("Bow"), dance1: msg("Dance 1"), dance2: msg("Dance 2"),
+  front_jump: msg("Jump"), front_pounce: msg("Pounce"), front_flip: msg("Front flip"),
+  back_flip: msg("Back flip"), left_flip: msg("Side flip"), walk_upright: msg("Upright"),
+  set_gait: msg("Gait"),
 };
 
 const prettify = (name: string) =>
@@ -95,9 +98,7 @@ function freeParam(
   return { key: keys[0], type: p.type ?? "string", def: p.default };
 }
 
-const NOT_ON_RELAY =
-  "Not available over the relay yet: the executor refuses it before it reaches the robot. " +
-  "It needs adding to the relay's allowlist (robot-command-relay) and the executor's map.";
+const NOT_ON_RELAY = msg("Not available over the relay yet: the executor refuses it before it reaches the robot. It needs adding to the relay's allowlist (robot-command-relay) and the executor's map.");
 
 /** The robot's preset actions, grouped and foldable, filtered by `query`. Group headers stick
  * to the top of the caller's scroll box, so a long G1 catalog never loses its place. */
@@ -105,6 +106,7 @@ export function ActionPad({
   skills, dangerous, disabled, safeMode, unsendable, choiceOk, onAction,
   query = "", collapsed, onToggleGroup, glass,
 }: Props) {
+  const t = useT();
   const blockedBySafe = new Set(dangerous);
   // Which side (on/off) was last chosen per flag skill, so the pad shows the
   // current selection. Undefined until the user picks one.
@@ -116,7 +118,8 @@ export function ActionPad({
   // Typed values for the free-value skills (raw FSM / mode ids).
   const [freeVals, setFreeVals] = useState<Record<string, string>>({});
   const q = query.trim().toLowerCase();
-  const matches = (label: string) => !q || label.toLowerCase().includes(q);
+  // Searched as drawn: in the language on screen.
+  const matches = (label: string) => !q || t(label).toLowerCase().includes(q);
 
   const names = Object.keys(skills).filter((n) => !EXCLUDE.has(n));
   // Skills with a choice param render as their own titled block (not in the grids).
@@ -135,7 +138,7 @@ export function ActionPad({
   const more = names.filter(
     (n) => !grouped.has(n) && !choiceSet.has(n) && !hidden.has(n),
   );
-  if (more.length) groups.push({ title: "More", items: more });
+  if (more.length) groups.push({ title: MORE_GROUP, items: more });
   // Raw mode control last, clearly separated from the normal actions.
   const advanced = [...hidden].filter((n) => !choiceSet.has(n));
   if (advanced.length) groups.push({ title: ADVANCED_GROUP, items: advanced });
@@ -166,14 +169,13 @@ export function ActionPad({
     const bySafe = safeMode && blockedBySafe.has(name);
     const blocked = bySafe || offRelay;
     const title = offRelay
-      ? `${NOT_ON_RELAY}\n\n${info?.desc ?? ""}`
+      ? `${t(NOT_ON_RELAY)}\n\n${info?.desc ?? ""}`
       : bySafe
-      ? `Blocked by Safe mode: it can make the robot lose its support or change ` +
-        `control mode. Turn Safe off to allow.\n\n${info?.desc ?? ""}`
+      ? `${t("Blocked by Safe mode: it can make the robot lose its support or change control mode. Turn Safe off to allow.")}\n\n${info?.desc ?? ""}`
       : info?.desc;
     const label = pretty(name, info);
     const lock = blocked && <IconLock size={13} className="shrink-0 opacity-70" />;
-    const text = <span className={`truncate ${offRelay ? "line-through" : ""}`}>{label}</span>;
+    const text = <span className={`truncate ${offRelay ? "line-through" : ""}`}>{t(label)}</span>;
     const free = freeParam(info);
     if (free) {
       // One free value (an FSM/mode id): type it, then send. This is how an operator
@@ -192,7 +194,7 @@ export function ActionPad({
           <button type="button" className={`${btn} justify-center px-3`}
             disabled={disabled || blocked || value.trim() === ""}
             onClick={() => onAction(name, { [free.key]: free.type.startsWith("number") ? Number(value) : value })}>
-            Go
+            {t("Go")}
           </button>
         </div>
       );
@@ -205,9 +207,9 @@ export function ActionPad({
         <div key={name} className="col-span-2 flex items-center gap-1.5" title={title}>
           <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[12.5px] font-semibold">{lock}{text}</span>
           <button type="button" aria-pressed={sel === true} disabled={disabled || blocked}
-            className={`${btn} justify-center px-3 ${sel === true ? on : ""}`} onClick={() => chooseFlag(name, true)}>On</button>
+            className={`${btn} justify-center px-3 ${sel === true ? on : ""}`} onClick={() => chooseFlag(name, true)}>{t("On")}</button>
           <button type="button" aria-pressed={sel === false} disabled={disabled || blocked}
-            className={`${btn} justify-center px-3 ${sel === false ? on : ""}`} onClick={() => chooseFlag(name, false)}>Off</button>
+            className={`${btn} justify-center px-3 ${sel === false ? on : ""}`} onClick={() => chooseFlag(name, false)}>{t("Off")}</button>
         </div>
       );
     }
@@ -245,7 +247,7 @@ export function ActionPad({
         return (
           <Group key={name} title={title} count={sets.reduce((n, g) => n + g.values.length, 0)} ui={ui}
             shut={collapsed.has(title) && !q} onToggle={() => onToggleGroup(title)}>
-            {offRelay && <p className={`m-0 mb-2 text-[11px] ${ui.sub}`} title={NOT_ON_RELAY}>Not available over the relay yet.</p>}
+            {offRelay && <p className={`m-0 mb-2 text-[11px] ${ui.sub}`} title={t(NOT_ON_RELAY)}>{t("Not available over the relay yet.")}</p>}
             {sets.map((g) => (
               <div key={g.title ?? ""} className="mb-1.5 last:mb-0">
                 {g.title && <h4 className={`m-0 mt-1 mb-1.5 text-[10.5px] font-bold tracking-wider uppercase ${ui.sub}`}>{g.title}</h4>}
@@ -254,7 +256,8 @@ export function ActionPad({
                     const off = !choiceOk(name, v);
                     return (
                       <button key={v} type="button" className={btn} disabled={disabled || blocked || off}
-                        title={off ? NOT_ON_RELAY : g.title ? `Needs: ${g.title}.\n\n${info?.desc ?? ""}` : info?.desc}
+                        title={off ? t(NOT_ON_RELAY) : g.title
+                          ? `${t("Needs: {mode}.", { mode: g.title })}\n\n${info?.desc ?? ""}` : info?.desc}
                         onClick={() => onAction(name, { [choice.key]: v })}>
                         {(off || blocked) && <IconLock size={13} className="shrink-0 opacity-70" />}
                         <span className={`truncate ${off ? "line-through" : ""}`}>{choice.labels?.[v] ?? prettify(v)}</span>
@@ -275,11 +278,12 @@ function Group({ title, count, shut, onToggle, ui, children }: {
   title: string; count: number; shut: boolean; onToggle: () => void;
   ui: { card: string; head: string; count: string }; children: ReactNode;
 }) {
+  const t = useT();
   return (
     <section className={`mb-2 rounded-xl border ${ui.card}`}>
       <button type="button" onClick={onToggle} aria-expanded={!shut}
         className={`sticky top-0 z-[1] flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2.5 text-left text-[12.5px] font-extrabold ${ui.head}`}>
-        {title}
+        {t(title)}
         <span className={`rounded-full px-1.5 text-[11px] font-bold ${ui.count}`}>{count}</span>
         <IconChevronDown size={16} className={`ml-auto opacity-60 transition-transform ${shut ? "-rotate-90" : ""}`} />
       </button>
@@ -292,5 +296,5 @@ function Group({ title, count, shut, onToggle, ui, children }: {
 export function actionGroupTitles(skills: Record<string, SkillInfo>): string[] {
   const names = Object.keys(skills).filter((n) => !EXCLUDE.has(n));
   const choice = names.filter((n) => choiceParam(skills[n])).map((n) => pretty(n, skills[n]));
-  return [...GROUPS.map((g) => g.title), "More", ADVANCED_GROUP, ...choice];
+  return [...GROUPS.map((g) => g.title), MORE_GROUP, ADVANCED_GROUP, ...choice];
 }

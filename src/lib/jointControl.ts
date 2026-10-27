@@ -3,6 +3,7 @@
  * can be tested on their own. The socket is hooks/useJointControl.ts; the panel is
  * components/joints/ControlPanel.tsx.
  */
+import { msg, t } from "../i18n";
 import { HAND_JOINTS, JOINT_BY_URDF } from "./g1Joints";
 
 /** The limits the robot applies to a target, as the relay reports them on "take". */
@@ -50,23 +51,57 @@ export const GHOST_MIN_RAD = (2 * Math.PI) / 180;
 export function describeEvent(event: string): string | null {
   const stall = /^stall (\S+)/.exec(event);
   if (stall) {
-    const joint = stall[1].replace(/_/g, " ");
-    return `${joint[0].toUpperCase()}${joint.slice(1)} pushed against something: it stopped ` +
-      "where it was.";
+    const joint = stallName(stall[1]);
+    return t("{joint} pushed against something: it stopped where it was.", {
+      joint: `${joint[0].toUpperCase()}${joint.slice(1)}`,
+    });
   }
   const m = /^(releasing|released) (\S+)/.exec(event);
   if (!m) return null;
   const done = m[1] === "released";
-  if (m[2] === "requested") return done ? "Released." : null;
-  const why: Record<string, string> = {
-    eof: "the link to the robot closed",
-    deadman: "nothing arrived from this page for 5 s",
-    state_lost: "the robot stopped reporting its joints",
-    fsm_lost: "the robot's mode could not be read",
+  if (m[2] === "requested") return done ? t("Released.") : null;
+  // [while the ramp runs, once it has ended] — whole sentences, so each language words its own.
+  const why: Record<string, [string, string]> = {
+    eof: [
+      msg("Releasing: the link to the robot closed."),
+      msg("Released: the link to the robot closed."),
+    ],
+    deadman: [
+      msg("Releasing: nothing arrived from this page for 5 s."),
+      msg("Released: nothing arrived from this page for 5 s."),
+    ],
+    state_lost: [
+      msg("Releasing: the robot stopped reporting its joints."),
+      msg("Released: the robot stopped reporting its joints."),
+    ],
+    fsm_lost: [
+      msg("Releasing: the robot's mode could not be read."),
+      msg("Released: the robot's mode could not be read."),
+    ],
   };
-  const reason = why[m[2]]
-    ?? (m[2].startsWith("fsm_") ? `the robot left Walk (mode ${m[2].slice(4)})` : m[2]);
-  return `${done ? "Released" : "Releasing"}: ${reason}.`;
+  const known = why[m[2]];
+  if (known) return t(known[done ? 1 : 0]);
+  if (m[2].startsWith("fsm_")) {
+    const mode = m[2].slice(4);
+    return done
+      ? t("Released: the robot left Walk (mode {mode}).", { mode })
+      : t("Releasing: the robot left Walk (mode {mode}).", { mode });
+  }
+  return done
+    ? t("Released: {reason}.", { reason: m[2] })
+    : t("Releasing: {reason}.", { reason: m[2] });
+}
+
+/** A stalled joint as the operator reads it, from the relay's name for it ("left_shoulder_pitch"
+ * -> "left shoulder pitch"): a body joint by its translated label and side. */
+function stallName(name: string): string {
+  const ref = JOINT_BY_URDF.get(`${name}_joint`);
+  if (ref?.source !== "body") return name.replace(/_/g, " ");
+  const side = /^(left|right)_/.exec(name)?.[1];
+  const label = t(ref.label);
+  if (side === "left") return t("left {joint}", { joint: label });
+  if (side === "right") return t("right {joint}", { joint: label });
+  return label;
 }
 
 /** A joint that gave up pushing (rule 8 of joint_ctl_core.hpp), as the viewer lists it. */

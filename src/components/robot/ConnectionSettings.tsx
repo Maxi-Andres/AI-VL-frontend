@@ -7,6 +7,7 @@ import {
   type RobotNet,
 } from "../../api/backend";
 import { useRobot } from "../layout/RobotContext";
+import { useT } from "../../i18n";
 
 /**
  * How this machine reaches the SELECTED robot: the online-check address, the command
@@ -29,6 +30,7 @@ import { useRobot } from "../layout/RobotContext";
  * there is no way to re-point DDS in place.
  */
 export function ConnectionSettings() {
+  const t = useT();
   const [net, setNet] = useState<RobotNet | null>(null);
   const [ip, setIp] = useState("");
   const [busy, setBusy] = useState(false);
@@ -112,7 +114,7 @@ export function ConnectionSettings() {
     setRobotTransport({ robot, ping_ip: pingIp })
       .then((r) => {
         if (r.ok) loadedRef.current = { ...loadedRef.current, ping: pingIp };
-        setMsg(r.ok ? `${robot}: address saved` : r.error || "invalid address");
+        setMsg(r.ok ? t("{robot}: address saved", { robot }) : r.error || t("invalid address"));
         setTimeout(loadStatus, 1500);
       })
       .catch((e) => setMsg(String(e)));
@@ -125,8 +127,8 @@ export function ConnectionSettings() {
     setRobotTransport({ robot, mode: nextMode, url: url || undefined })
       .then((r) => {
         setMsg(r.ok
-          ? `${robot}: ${nextMode} — executor restarting…`
-          : r.error || "could not switch transport");
+          ? t("{robot}: {mode} — executor restarting…", { robot, mode: nextMode })
+          : r.error || t("could not switch transport"));
         if (r.ok) {
           setMode(nextMode);
           // The executor re-execs to apply this, so it is unreachable for a few seconds.
@@ -148,7 +150,7 @@ export function ConnectionSettings() {
         setNet(n);
         setIp((n.peers ?? []).join(", "));
       })
-      .catch(() => setNet({ ok: false, error: "executor unreachable" }));
+      .catch(() => setNet({ ok: false, error: t("executor unreachable") }));
 
   useEffect(() => {
     load();
@@ -163,16 +165,16 @@ export function ConnectionSettings() {
       if (res.ok) {
         setMsg(
           peers.length
-            ? `Unicast to ${peers.join(", ")}. Executor restarting…`
-            : "Back to multicast. Executor restarting…",
+            ? t("Unicast to {peers}. Executor restarting…", { peers: peers.join(", ") })
+            : t("Back to multicast. Executor restarting…"),
         );
         // It is down for a moment while it re-execs; re-read once it is back.
         window.setTimeout(load, 6000);
       } else {
-        setMsg(res.error ?? "could not apply");
+        setMsg(res.error ?? t("could not apply"));
       }
     } catch {
-      setMsg("could not reach the gateway");
+      setMsg(t("could not reach the gateway"));
     } finally {
       setBusy(false);
     }
@@ -190,34 +192,36 @@ export function ConnectionSettings() {
           }`}
         />
         <span className={robotInfo?.online ? "text-emerald-500" : "text-muted"}>
-          {robot}: {pingIp ? (robotInfo?.online ? "online" : "offline") : "no address set"}
+          {pingIp
+            ? robotInfo?.online ? t("{robot}: online", { robot }) : t("{robot}: offline", { robot })
+            : t("{robot}: no address set", { robot })}
         </span>
         {mode === "relay" && robotInfo?.senderAlive === false && (
-          <span className="text-amber-500">· relay up, sender down</span>
+          <span className="text-amber-500">{t("· relay up, sender down")}</span>
         )}
       </div>
 
       <label className="block text-[11px] text-muted">
-        Command transport
+        {t("Command transport")}
         <select
           value={mode}
           disabled={busy || !ready}
           onChange={(e) => applyTransport(e.target.value, relayUrl)}
           className={field}
         >
-          <option value="relay">Relay on the robot — any network</option>
-          <option value="dds">DDS from this machine — same subnet only</option>
+          <option value="relay">{t("Relay on the robot — any network")}</option>
+          <option value="dds">{t("DDS from this machine — same subnet only")}</option>
         </select>
         <span className="mt-0.5 block text-[10px] leading-tight text-muted/70">
           {mode === "relay"
-            ? "Commands go over HTTP to the relay on the robot, which publishes DDS there."
-            : "Commands are published as DDS from this machine — only while the robot shares its subnet."}
+            ? t("Commands go over HTTP to the relay on the robot, which publishes DDS there.")
+            : t("Commands are published as DDS from this machine — only while the robot shares its subnet.")}
         </span>
       </label>
 
       {mode === "relay" && (
         <label className="block text-[11px] text-muted">
-          Relay URL
+          {t("Relay URL")}
           <input
             value={relayUrl}
             onChange={(e) => setRelayUrl(e.target.value)}
@@ -230,7 +234,7 @@ export function ConnectionSettings() {
               }
             }}
             placeholder={robot === "g1" ? "http://192.168.51.115:8092" : "http://10.1.254.18:8092"}
-            title="Applies on Enter or when the field loses focus"
+            title={t("Applies on Enter or when the field loses focus")}
             spellCheck={false}
             className={field}
           />
@@ -238,7 +242,7 @@ export function ConnectionSettings() {
       )}
 
       <label className="block text-[11px] text-muted">
-        Online check address
+        {t("Online check address")}
         <input
           value={pingIp}
           disabled={!ready}
@@ -252,8 +256,7 @@ export function ConnectionSettings() {
           className={field}
         />
         <span className="mt-0.5 block text-[10px] leading-tight text-muted/70">
-          Pinged from the server ONLY to light the online dot — it does not affect commands or
-          video. Empty = no check.
+          {t("Pinged from the server ONLY to light the online dot — it does not affect commands or video. Empty = no check.")}
         </span>
       </label>
 
@@ -261,11 +264,11 @@ export function ConnectionSettings() {
 
       <details className="rounded-md border border-line p-2">
         <summary className="cursor-pointer text-[11px] text-muted">
-          Advanced — DDS discovery peers (all robots, same-subnet DDS only)
+          {t("Advanced — DDS discovery peers (all robots, same-subnet DDS only)")}
         </summary>
         <div className="mt-2 space-y-2">
           <label className="block text-[11px] text-muted">
-            Robot IP(s), comma-separated — empty = multicast
+            {t("Robot IP(s), comma-separated — empty = multicast")}
             <input
               value={ip}
               onChange={(e) => setIp(e.target.value)}
@@ -280,14 +283,14 @@ export function ConnectionSettings() {
             onClick={apply}
             className="rounded-md border border-line px-2 py-1 text-[11px] text-fg transition duration-100 hover:border-accent active:scale-95 disabled:opacity-50 disabled:active:scale-100"
           >
-            {busy ? "Applying…" : "Apply + restart executor"}
+            {busy ? t("Applying…") : t("Apply + restart executor")}
           </button>
           <p className="m-0 text-[10px] leading-tight text-muted">
             {net?.error
               ? net.error
-              : `Interface ${net?.iface ?? "?"} · discovery ${net?.discovery ?? "?"}`}
-            . Only for DDS from this machine with the robot on ANOTHER subnet of the same site:
-            discovery is multicast and multicast does not cross a router. Not used with the relay.
+              : t("Interface {iface} · discovery {discovery}", { iface: net?.iface ?? "?", discovery: net?.discovery ?? "?" })}
+            {". "}
+            {t("Only for DDS from this machine with the robot on ANOTHER subnet of the same site: discovery is multicast and multicast does not cross a router. Not used with the relay.")}
           </p>
         </div>
       </details>

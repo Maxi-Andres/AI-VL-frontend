@@ -29,12 +29,16 @@ import { ProfileSettings } from "../components/settings/ProfileSettings";
 import { RobotSettings } from "../components/settings/RobotSettings";
 import { TeamSettings } from "../components/settings/TeamSettings";
 import { VideoSettings } from "../components/settings/VideoSettings";
+import { rich } from "../i18n/rich";
+import { useT } from "../i18n";
 
 // Settings — everything in one place, by who it is about: your account (Profile for everyone;
 // the team and the activity log for admins), then the robot (connection, camera, telemetry,
 // safety, installed services) and its live video for those who configure. A menu on the left
 // lists the blocks and follows the scroll; each block is marked `data-nav` in its own
-// component, so the menu never keeps a copy of their titles.
+// component, so the menu never keeps a copy of their titles. Those titles are identifiers
+// (the menu's icons and the section ids are keyed on them) and stay in English; each is
+// marked msg() where it is written and translated here, where the menu shows it.
 
 const ICON: Record<string, typeof IconRobot> = { go2: IconBone, g1: IconRobot };
 
@@ -64,9 +68,10 @@ interface NavItem {
   group: string;
 }
 
-const slug = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+const slug = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 export function SettingsPage() {
+  const t = useT();
   const { robot, setRobot, robots } = useRobot();
   const can = useCan();
   const location = useLocation();
@@ -131,22 +136,22 @@ export function SettingsPage() {
         className={`flex w-full cursor-pointer items-center gap-2.5 rounded-[9px] px-2.5 py-2 text-left text-[13px] font-bold transition ${
           active === n.id ? "bg-good-bg text-good-fg" : "text-muted hover:bg-subtle hover:text-fg"}`}>
         <Icon size={17} className="shrink-0" />
-        <span className="truncate">{n.title}</span>
+        <span className="truncate">{t(n.title)}</span>
       </button>
     );
   };
-  const heading = (t: string) => (
-    <h4 className="m-0 mt-4 mb-1.5 px-2.5 text-[11px] font-extrabold tracking-[.1em] text-dim uppercase first:mt-0">{t}</h4>
+  const heading = (text: string) => (
+    <h4 className="m-0 mt-4 mb-1.5 px-2.5 text-[11px] font-extrabold tracking-[.1em] text-dim uppercase first:mt-0">{text}</h4>
   );
 
   return (
     <main className="grid lg:h-[calc(100dvh-65px)] lg:grid-cols-[270px_minmax(0,1fr)] lg:overflow-hidden">
       <nav className="min-w-0 border-b border-line bg-panel px-3.5 py-5 lg:overflow-x-hidden lg:overflow-y-auto lg:border-r lg:border-b-0">
-        {heading("Account")}
+        {heading(t("Account"))}
         {nav.filter((n) => n.group === "account").map(navLink)}
         {mayConfigure && (
           <>
-            {heading("Robot")}
+            {heading(t("Robot"))}
             <div className="mb-1.5 grid min-w-0 gap-1">
               {robots.map((r) => {
                 const Icon = ICON[r.id] ?? IconRobot;
@@ -161,7 +166,7 @@ export function SettingsPage() {
                       {/* Two lines, not an ellipsis: "Unitree Go2 (quadruped robot dog)" must read whole. */}
                       <span className="line-clamp-2 text-[13px] leading-snug font-bold">{names[r.id] ?? r.label}</span>
                       <span className="line-clamp-2 text-[11.5px] leading-snug text-dim">
-                        {r.id === robot ? "Configuring this robot" : names[r.id] ? r.label : "Switch to this robot"}
+                        {r.id === robot ? t("Configuring this robot") : names[r.id] ? r.label : t("Switch to this robot")}
                       </span>
                     </span>
                   </button>
@@ -169,7 +174,7 @@ export function SettingsPage() {
               })}
             </div>
             {nav.filter((n) => n.group === "robot").map(navLink)}
-            {heading("Video")}
+            {heading(t("Video"))}
             {nav.filter((n) => n.group === "video").map(navLink)}
           </>
         )}
@@ -186,15 +191,15 @@ export function SettingsPage() {
           {mayConfigure && (
             <>
               <div id="robot" data-group="robot" className="scroll-mt-4">
-                <h2 className="m-0 mb-1 text-lg font-extrabold tracking-[-0.015em]">Robot</h2>
+                <h2 className="m-0 mb-1 text-lg font-extrabold tracking-[-0.015em]">{t("Robot")}</h2>
                 <p className="m-0 mb-3.5 text-[13px] text-muted">
-                  Everything configured on <b className="text-fg">{robotName}</b>.
+                  {rich(t("Everything configured on {robot}."), { robot: <b className="text-fg">{robotName}</b> })}
                 </p>
                 <RobotSettings />
               </div>
               <div id="video" data-group="video" className="scroll-mt-4">
-                <h2 className="m-0 mb-1 text-lg font-extrabold tracking-[-0.015em]">Video</h2>
-                <p className="m-0 mb-3.5 text-[13px] text-muted">How the live picture reaches this browser.</p>
+                <h2 className="m-0 mb-1 text-lg font-extrabold tracking-[-0.015em]">{t("Video")}</h2>
+                <p className="m-0 mb-3.5 text-[13px] text-muted">{t("How the live picture reaches this browser.")}</p>
                 <VideoSettings />
               </div>
             </>

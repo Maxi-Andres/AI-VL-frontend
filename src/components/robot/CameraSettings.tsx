@@ -5,6 +5,7 @@ import {
   type RobotCameraConfig,
 } from "../../api/backend";
 import { useRobot } from "../layout/RobotContext";
+import { useT } from "../../i18n";
 
 const FPS = [5, 8, 10, 15, 20, 30];
 const RES = ["native", "720p", "480p", "360p"];
@@ -26,6 +27,7 @@ const selCls =
  * One change here hits the bridge and affects every viewer (Live and Drive).
  */
 export function CameraSettings() {
+  const t = useT();
   const { robot } = useRobot();
   const [fps, setFps] = useState(15);
   const [resolution, setResolution] = useState("native");
@@ -64,7 +66,7 @@ export function CameraSettings() {
             push({ robot: next });
           }}
         />
-        Test pattern instead of the {robot} camera (no robot needed)
+        {t("Test pattern instead of the {robot} camera (no robot needed)", { robot })}
       </label>
       <label className="block text-[11px] text-muted">
         FPS
@@ -83,7 +85,7 @@ export function CameraSettings() {
         </select>
       </label>
       <label className="block text-[11px] text-muted">
-        Resolution
+        {t("Resolution")}
         <select
           className={selCls}
           value={resolution}
@@ -93,12 +95,12 @@ export function CameraSettings() {
           }}
         >
           {RES.map((r) => (
-            <option key={r} value={r}>{r}</option>
+            <option key={r} value={r}>{r === "native" ? t("native") : r}</option>
           ))}
         </select>
       </label>
       <label className="block text-[11px] text-muted">
-        Quality
+        {t("Quality")}
         <select
           className={selCls}
           value={quality}
@@ -109,13 +111,12 @@ export function CameraSettings() {
           }}
         >
           {QUAL.map((q) => (
-            <option key={q} value={q}>{q === 0 ? "Native" : q}</option>
+            <option key={q} value={q}>{q === 0 ? t("Native") : q}</option>
           ))}
         </select>
       </label>
       <p className="col-span-3 m-0 text-[11px] leading-tight text-muted">
-        Lower = less latency for remote viewers. Anything but Native re-encodes on the bridge.
-        This is the MJPEG view only; H.264 is encoded on the robot.
+        {t("Lower = less latency for remote viewers. Anything but Native re-encodes on the bridge. This is the MJPEG view only; H.264 is encoded on the robot.")}
       </p>
     </div>
   );

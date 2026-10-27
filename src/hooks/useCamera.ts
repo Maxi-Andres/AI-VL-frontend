@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { t } from "../i18n";
 
 /** Which camera to request: rear ("environment") or front ("user"). */
 export type Facing = "environment" | "user";
@@ -27,7 +28,7 @@ export function useCamera() {
     });
     // Swap the live stream in place (keeps the same <video> element and any
     // open detection socket).
-    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = stream;
     const video = videoRef.current;
     if (video) {
@@ -42,13 +43,13 @@ export function useCamera() {
       await acquire(facing);
       setActive(true);
     } catch (e) {
-      setError(`Camera error: ${e instanceof Error ? e.message : String(e)}`);
+      setError(t("Camera error: {error}", { error: e instanceof Error ? e.message : String(e) }));
       throw e;
     }
   }, [acquire, facing]);
 
   const stop = useCallback(() => {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     const video = videoRef.current;
     if (video) video.srcObject = null;
@@ -62,7 +63,7 @@ export function useCamera() {
     try {
       await acquire(next);
     } catch (e) {
-      setError(`Camera error: ${e instanceof Error ? e.message : String(e)}`);
+      setError(t("Camera error: {error}", { error: e instanceof Error ? e.message : String(e) }));
     }
   }, [facing, active, acquire]);
 

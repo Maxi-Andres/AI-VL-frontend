@@ -6,6 +6,8 @@ import { Button } from "../ui/Button";
 import { Field } from "../ui/Field";
 import { NumberField } from "../ui/NumberField";
 import { StatusText, type Status } from "../ui/StatusText";
+import { msg, useT } from "../../i18n";
+import { rich } from "../../i18n/rich";
 
 /** The knobs, in the order they matter for latency.
  *  `live` here is only the DEFAULT ordering hint — the robot is the authority and
@@ -21,6 +23,8 @@ import { StatusText, type Status } from "../ui/StatusText";
  *  robot stays the authority. A wrong range is not a cosmetic problem here: it is the UI
  *  telling the operator a value is settable when the robot will reject it.
  *
+ *  Labels, units and hints are marked msg() here and translated with t() where drawn.
+ *
  *  `step` has to divide the range from `min`, or legal values become unreachable. Measured
  *  against this very table: quality ran min 1 step 5, so the slider could offer 1, 6, 11 …
  *  and never 75 — the robot's own default. idr ran min 1 step 15 and could never offer 15,
@@ -32,106 +36,94 @@ const KNOBS = [
     key: "h264_qp" as const,
     kind: "range" as const,
     fallback: { min: 10, max: 51 },
-    label: "Drive quality",
+    label: msg("Drive quality"),
     unit: "QP",
     step: 1,
     options: [] as number[],
-    hint: "Lower = sharper and more bytes per frame. Measured on the Go2 over LTE: QP 40 at " +
-      "480×270 ≈ 3 kB a frame (0.34 Mbps), QP 38 at 640×360 ≈ 6 kB (0.6-0.7 Mbps), latency " +
-      "unchanged. Every frame stands alone, so a lost one costs one picture, never a freeze.",
+    hint: msg("Lower = sharper and more bytes per frame. Measured on the Go2 over LTE: QP 40 at 480×270 ≈ 3 kB a frame (0.34 Mbps), QP 38 at 640×360 ≈ 6 kB (0.6-0.7 Mbps), latency unchanged. Every frame stands alone, so a lost one costs one picture, never a freeze."),
   },
   {
     key: "h264_width" as const,
     kind: "choice" as const,
     fallback: { min: 64, max: 1920 },
-    label: "Drive size",
-    unit: "px wide",
+    label: msg("Drive size"),
+    unit: msg("px wide"),
     step: 1,
     // Fixed choices, not a slider: 64-1920 in any step skips the sizes that matter.
     options: [320, 480, 640, 854, 960, 1280],
-    hint: "16:9; the robot sets the height to match (640 → 640×360). Bigger costs bytes at " +
-      "the same quality — raise the size or lower the QP, rarely both on LTE.",
+    hint: msg("16:9; the robot sets the height to match (640 → 640×360). Bigger costs bytes at the same quality — raise the size or lower the QP, rarely both on LTE."),
   },
   // --- Recorder: the full-size stream Frigate records, and YOLO/VLM read ------------------
   {
     key: "bitrate" as const,
     kind: "range" as const,
     fallback: { min: 200000, max: 8000000 },
-    label: "Recorder bitrate",
+    label: msg("Recorder bitrate"),
     unit: "bps",
     step: 100000,
     options: [] as number[],
-    hint: "H.264 over SRT, the stream Frigate records and the camera bridge re-reads for YOLO " +
-      "and the VLM. 1.3 Mbps holds over LTE because this machine's SRT receiver waits 900 ms " +
-      "to repair losses (srt-bridge.service); at 150 ms the same bitrate dropped 10-15% of " +
-      "packets and the recording broke into blocks and drifted purple.",
+    hint: msg("H.264 over SRT, the stream Frigate records and the camera bridge re-reads for YOLO and the VLM. 1.3 Mbps holds over LTE because this machine's SRT receiver waits 900 ms to repair losses (srt-bridge.service); at 150 ms the same bitrate dropped 10-15% of packets and the recording broke into blocks and drifted purple."),
   },
   {
     key: "idr" as const,
     kind: "range" as const,
     fallback: { min: 1, max: 300 },
-    label: "Recorder keyframe interval",
-    unit: "frames",
+    label: msg("Recorder keyframe interval"),
+    unit: msg("frames"),
     step: 1,
     options: [] as number[],
-    hint: "Lower = a damaged picture heals sooner and a new viewer starts sooner, at more " +
-      "bitrate. A keyframe is ~22 packets at 1080p; one lost and the picture is wrong until " +
-      "the next one.",
+    hint: msg("Lower = a damaged picture heals sooner and a new viewer starts sooner, at more bitrate. A keyframe is ~22 packets at 1080p; one lost and the picture is wrong until the next one."),
   },
   {
     key: "nvr" as const,
     kind: "toggle" as const,
     fallback: { min: 0, max: 1 },
-    label: "Feed the recorder",
+    label: msg("Feed the recorder"),
     unit: "",
     step: 1,
     options: [] as number[],
-    hint: "Off stops the SRT stream entirely: nothing recorded, and no picture for YOLO and " +
-      "the VLM on the Go2 (its camera bridge reads this stream). Drive is unaffected — it has " +
-      "its own stream.",
+    hint: msg("Off stops the SRT stream entirely: nothing recorded, and no picture for YOLO and the VLM on the Go2 (its camera bridge reads this stream). Drive is unaffected — it has its own stream."),
   },
   {
     key: "maxfps" as const,
     kind: "range" as const,
     fallback: { min: 0, max: 30 },
-    label: "Capture cap",
+    label: msg("Capture cap"),
     unit: "fps",
     step: 1,
     options: [] as number[],
-    hint: "How fast the robot takes pictures from its camera, upstream of every stream. 0 = " +
-      "every new frame the camera makes (~14 fps on the Go2).",
+    hint: msg("How fast the robot takes pictures from its camera, upstream of every stream. 0 = every new frame the camera makes (~14 fps on the Go2)."),
   },
   // --- MJPEG: the robot's JPEG server, port 8093 ------------------------------------------
   {
     key: "fps" as const,
     kind: "range" as const,
     fallback: { min: 0, max: 60 },
-    label: "MJPEG frame cap",
+    label: msg("MJPEG frame cap"),
     unit: "fps",
     step: 1,
     options: [] as number[],
-    hint: "0 = every frame. Applied per viewer.",
+    hint: msg("0 = every frame. Applied per viewer."),
   },
   {
     key: "width" as const,
     kind: "range" as const,
     fallback: { min: 0, max: 1920 },
-    label: "MJPEG downscale to",
-    unit: "px wide",
+    label: msg("MJPEG downscale to"),
+    unit: msg("px wide"),
     step: 160,
     options: [] as number[],
-    hint: "0 = native, forwarded untouched. Anything else costs the robot a decode and " +
-      "re-encode per frame.",
+    hint: msg("0 = native, forwarded untouched. Anything else costs the robot a decode and re-encode per frame."),
   },
   {
     key: "quality" as const,
     kind: "range" as const,
     fallback: { min: 1, max: 100 },
-    label: "MJPEG quality",
+    label: msg("MJPEG quality"),
     unit: "",
     step: 1,
     options: [] as number[],
-    hint: "Only matters while the downscale is above 0: at native size nothing is re-encoded.",
+    hint: msg("Only matters while the downscale is above 0: at native size nothing is re-encoded."),
   },
 ];
 
@@ -140,28 +132,25 @@ const KNOBS = [
 const LIVE_BY_DEFAULT = new Set(["fps", "width", "quality", "h264_qp", "h264_width"]);
 
 /** Grouped by STREAM, not by live/restart: the operator thinks "Drive looks bad" or "the
- *  recording is broken", and each knob carries its own live/restart tag. */
+ *  recording is broken", and each knob carries its own live/restart tag. The title is also
+ *  the section's `data-nav` identifier, so it stays English; it is translated where shown. */
 const GROUPS: { title: string; keys: string[]; note: (robot: string) => string }[] = [
   {
-    title: "Drive view",
+    title: msg("Drive view"),
     keys: ["h264_qp", "h264_width"],
-    note: () => "The all-intra stream Drive shows, over UDP. Both apply to the running " +
-      "stream immediately — safe to move while someone is driving.",
+    note: () => msg("The all-intra stream Drive shows, over UDP. Both apply to the running stream immediately — safe to move while someone is driving."),
   },
   {
-    title: "Recorder",
+    title: msg("Recorder"),
     keys: ["bitrate", "idr", "nvr", "maxfps"],
-    note: () => "The full-size stream, over SRT. Read when the video service starts, so " +
-      "these only take effect after a restart — a few seconds of black on every stream. " +
-      "Not while someone is driving.",
+    note: () => msg("The full-size stream, over SRT. Read when the video service starts, so these only take effect after a restart — a few seconds of black on every stream. Not while someone is driving."),
   },
   {
-    title: "MJPEG",
+    title: msg("MJPEG"),
     keys: ["fps", "width", "quality"],
     note: (robot) => robot === "go2"
-      ? "Nothing reads it on the Go2 any more (Drive uses the stream above, the camera bridge " +
-        "the recorder), so these change nothing you see."
-      : "What the camera bridge reads on this robot — YOLO's and the VLM's picture.",
+      ? msg("Nothing reads it on the Go2 any more (Drive uses the stream above, the camera bridge the recorder), so these change nothing you see.")
+      : msg("What the camera bridge reads on this robot — YOLO's and the VLM's picture."),
   },
 ];
 
@@ -180,6 +169,7 @@ const POLL_MS = 4000;
  * Applying and saving are deliberately separate: you try many values and keep one.
  */
 export function VideoSettings() {
+  const t = useT();
   const { robot } = useRobot();
   const [state, setState] = useState<RobotVideoState | null>(null);
   const [draft, setDraft] = useState<Record<string, number>>({});
@@ -258,7 +248,7 @@ export function VideoSettings() {
 
   const apply = async (persist: boolean) => {
     setBusy(true);
-    setStatus({ tone: "busy", text: persist ? "Saving…" : "Applying…" });
+    setStatus({ tone: "busy", text: persist ? t("Saving…") : t("Applying…") });
     // Without persist, send ONLY the live knobs: the robot refuses restart-only ones that
     // are not being saved, because writing nowhere and doing nothing is a control that
     // lies. Sending them here would just turn every plain Apply into an error.
@@ -277,15 +267,15 @@ export function VideoSettings() {
       setStatus({
         tone: waiting.length ? "warn" : "ok",
         text: waiting.length
-          ? `Saved. ${waiting.join(", ")} apply when the video service restarts`
-          : persist ? "Applied and saved to the robot" : "Applied (not saved)",
+          ? t("Saved. {keys} apply when the video service restarts", { keys: waiting.join(", ") })
+          : persist ? t("Applied and saved to the robot") : t("Applied (not saved)"),
       });
       setSeed(draft); // what is on the robot now: nothing left to apply
       loadStatus();
       // The result stays a moment, then the bar goes with nothing left to do.
       window.setTimeout(() => setStatus((st) => (st && st.tone !== "error" && st.tone !== "busy" ? null : st)), 2500);
     } else {
-      setStatus({ tone: "error", text: res.error ?? "the robot refused it" });
+      setStatus({ tone: "error", text: res.error ?? t("the robot refused it") });
     }
   };
 
@@ -304,18 +294,16 @@ export function VideoSettings() {
 
   return (
     <div className="grid gap-4 leading-relaxed">
-      <section data-nav="Video tuning" className="scroll-mt-4 rounded-2xl border border-line bg-panel p-5 shadow-card">
-      <h3 className="m-0 mb-2 text-[15px] font-extrabold text-fg">Video tuning — {robot}</h3>
+      <section data-nav={msg("Video tuning")} className="scroll-mt-4 rounded-2xl border border-line bg-panel p-5 shadow-card">
+      <h3 className="m-0 mb-2 text-[15px] font-extrabold text-fg">{t("Video tuning — {robot}", { robot })}</h3>
       <p className="m-0 text-sm text-muted">
-        The robot&apos;s video knobs, by stream. The right values differ on cable, LTE and
-        Starlink, which is why they are here and not behind SSH. Each knob says whether it
-        applies now or needs a restart of the robot&apos;s video service.
+        {t("The robot's video knobs, by stream. The right values differ on cable, LTE and Starlink, which is why they are here and not behind SSH. Each knob says whether it applies now or needs a restart of the robot's video service.")}
       </p>
 
       {!reachable && (
         <p className="mt-3 mb-0 rounded-lg bg-warn-bg px-3 py-2 text-sm text-warn-fg">
-          The robot is not answering: {state?.error ?? "unknown error"}. Check that the
-          command transport is set to <strong>relay</strong> under Connection.
+          {rich(t("The robot is not answering: {error}. Check that the command transport is set to {relay} under Connection.",
+            { error: state?.error ?? t("unknown error") }), { relay: <strong>relay</strong> })}
         </p>
       )}
       </section>
@@ -324,8 +312,8 @@ export function VideoSettings() {
         const knobs = KNOBS.filter((k) => keys.includes(k.key));
         return (
           <section key={title} data-nav={title} className="scroll-mt-4 rounded-2xl border border-line bg-panel p-5 shadow-card">
-            <h3 className="m-0 mb-2 text-[15px] font-extrabold text-fg">{title}</h3>
-            <p className="mb-3 text-xs text-muted">{note(robot)}</p>
+            <h3 className="m-0 mb-2 text-[15px] font-extrabold text-fg">{t(title)}</h3>
+            <p className="mb-3 text-xs text-muted">{t(note(robot))}</p>
             <div className="flex flex-col gap-4">
               {knobs.map(({ key, kind, fallback, label, unit, step, options, hint }) => {
                 // The robot is the authority; `fallback` only covers the window before it
@@ -348,17 +336,17 @@ export function VideoSettings() {
                     <Field
                       label={
                         <>
-                          {label}{" "}
+                          {t(label)}{" "}
                           <span className="text-fg">
                             {!isKnown
-                              ? "unknown"
+                              ? t("unknown")
                               : kind === "toggle"
-                                ? value ? "on" : "off"
+                                ? value ? t("on") : t("off")
                                 : value}
-                            {isKnown && kind !== "toggle" && unit ? ` ${unit}` : ""}
+                            {isKnown && kind !== "toggle" && unit ? ` ${t(unit)}` : ""}
                           </span>{" "}
                           <span className={`text-[11px] ${isLive(key) ? "text-emerald-500" : "text-amber-500"}`}>
-                            {isLive(key) ? "· applies now" : "· needs a restart"}
+                            {isLive(key) ? t("· applies now") : t("· needs a restart")}
                           </span>
                         </>
                       }
@@ -383,14 +371,14 @@ export function VideoSettings() {
                             disabled={!editable}
                             onClick={() => setDraft((d) => ({ ...d, [key]: 0 }))}
                           >
-                            Off
+                            {t("Off")}
                           </Button>
                           <Button
                             variant={isKnown && value ? "primary" : "secondary"}
                             disabled={!editable}
                             onClick={() => setDraft((d) => ({ ...d, [key]: 1 }))}
                           >
-                            On
+                            {t("On")}
                           </Button>
                         </div>
                       ) : (
@@ -422,22 +410,20 @@ export function VideoSettings() {
                       </div>
                       )}
                     </Field>
-                    <p className="mb-1 mt-1 text-xs text-muted">{hint}</p>
+                    <p className="mb-1 mt-1 text-xs text-muted">{t(hint)}</p>
                     {!isKnown && (
                       <p className="mb-1 text-xs text-amber-500">
-                        This robot does not report it — its relay is an older build that
-                        only knows the frame cap, the downscale and the quality. Nothing is
-                        shown because nothing is known; update the relay to tune it here.
+                        {t("This robot does not report it — its relay is an older build that only knows the frame cap, the downscale and the quality. Nothing is shown because nothing is known; update the relay to tune it here.")}
                       </p>
                     )}
                     <p className="text-xs text-muted">
                       {runningValue !== undefined && (
-                        <>running: <span className="text-fg">{String(runningValue)}</span>{" · "}</>
+                        <>{rich(t("running: {value}"), { value: <span className="text-fg">{String(runningValue)}</span> })}{" · "}</>
                       )}
-                      saved: <span className="text-fg">{savedRaw ?? "unset"}</span>
+                      {rich(t("saved: {value}"), { value: <span className="text-fg">{savedRaw ?? t("unset")}</span> })}
                       {drifted && (
                         <span className="text-amber-500">
-                          {" "}— differs from what is running; applies on the next restart
+                          {" "}{t("— differs from what is running; applies on the next restart")}
                         </span>
                       )}
                     </p>
@@ -456,23 +442,23 @@ export function VideoSettings() {
         <span className="min-w-0 flex-1 text-[12.5px]">
           {changed.length > 0 ? (
             <>
-              <strong>{changed.length === 1 ? "1 unsaved change" : `${changed.length} unsaved changes`}</strong>
-              <span className="opacity-75"> · Apply changes the running video only; Apply and save also writes the robot&apos;s <code>video.env</code>.</span>
+              <strong>{changed.length === 1 ? t("1 unsaved change") : t("{n} unsaved changes", { n: changed.length })}</strong>
+              <span className="opacity-75">{" · "}{rich(t("Apply changes the running video only; Apply and save also writes the robot's {file}."), { file: <code>video.env</code> })}</span>
             </>
-          ) : <span className="opacity-75">Nothing left to apply.</span>}
+          ) : <span className="opacity-75">{t("Nothing left to apply.")}</span>}
         </span>
         <StatusText status={status} className="text-xs" />
         {changed.length > 0 && (
           <>
             <button type="button" disabled={busy} onClick={() => { setDraft(seed); setStatus(null); }}
               className="cursor-pointer rounded-lg px-2.5 py-1.5 text-[12.5px] font-bold opacity-80 hover:opacity-100 disabled:opacity-40">
-              Discard
+              {t("Discard")}
             </button>
             <Button variant="secondary" className="!border-transparent !bg-bg/15 !text-bg" disabled={busy || !reachable} onClick={() => apply(false)}>
-              Apply
+              {t("Apply")}
             </Button>
             <Button variant="primary" disabled={busy || !reachable} onClick={() => apply(true)}>
-              Apply and save
+              {t("Apply and save")}
             </Button>
           </>
         )}

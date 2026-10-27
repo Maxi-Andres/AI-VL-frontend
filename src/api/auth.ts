@@ -1,6 +1,7 @@
 // Sign-in, first-run setup and the current user. The session lives in an httpOnly cookie the
 // backend sets: this code never sees or stores a token, and nothing here touches localStorage.
 import { backendFetch } from "./backend";
+import { t } from "../i18n";
 
 export type Role = "viewer" | "operator" | "admin" | "owner";
 
@@ -28,12 +29,14 @@ export class AuthError extends Error {
 }
 
 async function readError(r: Response): Promise<AuthError> {
-  let message = `Something went wrong (${r.status}). Try again.`;
+  let message = t("Something went wrong ({status}). Try again.", { status: r.status });
   try {
     const body = (await r.json()) as { detail?: unknown };
-    if (typeof body.detail === "string") message = body.detail;
+    // The server writes its texts in English; they are translated here, by exact match, from
+    // the SERVER dictionary (i18n/es/server.ts). One it does not list stays as it came.
+    if (typeof body.detail === "string") message = t(body.detail);
     // FastAPI validation errors: a list of {msg}. Show the first, without the field path.
-    else if (Array.isArray(body.detail) && body.detail[0]?.msg) message = String(body.detail[0].msg);
+    else if (Array.isArray(body.detail) && body.detail[0]?.msg) message = t(String(body.detail[0].msg));
   } catch {
     /* not JSON: keep the generic message */
   }

@@ -17,7 +17,10 @@
  * joints that follow. Thumb flex and thumb rotation are the two that are easy to swap (Unitree's
  * own teleop code appears to): BrainCo's order — motor 0 flexes, motor 1 rotates — was confirmed
  * on both real thumbs on 2026-10-22 by moving only "thumb flex" and watching it bend.
+ *
+ * Labels and group names are marked with msg(): translate them with t() where they are shown.
  */
+import { msg } from "../i18n";
 
 export const BODY_JOINTS = [
   "left_hip_pitch", "left_hip_roll", "left_hip_yaw", "left_knee",
@@ -34,12 +37,12 @@ export const BODY_JOINTS = [
 /** A BrainCo hand's six motors in the hand's own order, with the URDF joint each one drives
  * (prefixed left_ / right_ in the model) and that joint's upper limit, radians. */
 export const HAND_JOINTS = [
-  { urdf: "thumb_proximal", label: "thumb flex", upper: 1.0472 },
-  { urdf: "thumb_metacarpal", label: "thumb rotation", upper: 1.5184 },
-  { urdf: "index_proximal", label: "index", upper: 1.4661 },
-  { urdf: "middle_proximal", label: "middle", upper: 1.4661 },
-  { urdf: "ring_proximal", label: "ring", upper: 1.4661 },
-  { urdf: "pinky_proximal", label: "pinky", upper: 1.4661 },
+  { urdf: "thumb_proximal", label: msg("thumb flex"), upper: 1.0472 },
+  { urdf: "thumb_metacarpal", label: msg("thumb rotation"), upper: 1.5184 },
+  { urdf: "index_proximal", label: msg("index"), upper: 1.4661 },
+  { urdf: "middle_proximal", label: msg("middle"), upper: 1.4661 },
+  { urdf: "ring_proximal", label: msg("ring"), upper: 1.4661 },
+  { urdf: "pinky_proximal", label: msg("pinky"), upper: 1.4661 },
 ] as const;
 
 /** The relaxed hand: where both hands sat after power-on, read 2026-10-15 (thumbs at ~40%, the
@@ -78,8 +81,20 @@ function bodyGroup(i: number): JointGroup {
   return "Right arm";
 }
 
+/** A body joint's display name, the same for both sides ("left_shoulder_pitch" -> "shoulder
+ * pitch"); the leg check names its pairs with these too. */
+const BODY_LABEL: Record<string, string> = {
+  hip_pitch: msg("hip pitch"), hip_roll: msg("hip roll"), hip_yaw: msg("hip yaw"),
+  knee: msg("knee"), ankle_pitch: msg("ankle pitch"), ankle_roll: msg("ankle roll"),
+  waist_yaw: msg("waist yaw"), waist_roll: msg("waist roll"), waist_pitch: msg("waist pitch"),
+  shoulder_pitch: msg("shoulder pitch"), shoulder_roll: msg("shoulder roll"),
+  shoulder_yaw: msg("shoulder yaw"), elbow: msg("elbow"), wrist_roll: msg("wrist roll"),
+  wrist_pitch: msg("wrist pitch"), wrist_yaw: msg("wrist yaw"),
+};
+
 function pretty(name: string): string {
-  return name.replace(/^(left|right)_/, "").replace(/_/g, " ");
+  const bare = name.replace(/^(left|right)_/, "");
+  return BODY_LABEL[bare] ?? bare.replace(/_/g, " ");
 }
 
 export const JOINTS: JointRef[] = [
@@ -103,9 +118,11 @@ export const JOINTS: JointRef[] = [
 
 export const JOINT_BY_URDF = new Map(JOINTS.map((j) => [j.urdf, j]));
 
-export const GROUPS: JointGroup[] = [
-  "Left leg", "Right leg", "Waist", "Left arm", "Right arm", "Left hand", "Right hand",
-];
+/** Marked with msg() for translation; the union above stays the type. */
+export const GROUPS = [
+  msg("Left leg"), msg("Right leg"), msg("Waist"), msg("Left arm"), msg("Right arm"),
+  msg("Left hand"), msg("Right hand"),
+] as JointGroup[];
 
 // --------------------------------------------------------------------------------------------
 // The wire format: one line of g1_joint_bridge per message (see its header for the fields)
@@ -126,7 +143,8 @@ export interface HandFrame {
   errors: number;
 }
 
-export const FINGER_STATE = ["idle", "moving", "stalled", "turbo"] as const;
+/** Shown with t(). */
+export const FINGER_STATE = [msg("idle"), msg("moving"), msg("stalled"), msg("turbo")] as const;
 
 export interface JointFrame {
   /** Robot clock, unix seconds. */
@@ -270,7 +288,7 @@ export function legPairs(frame: JointFrame | null): LegPairReading[] {
   return LEG_PAIRS.map(([joint, sign]) => {
     const left = deg(frame.q![BODY_JOINTS.indexOf(`left_${joint}` as never)]);
     const right = deg(frame.q![BODY_JOINTS.indexOf(`right_${joint}` as never)]);
-    return { joint: joint.replace("_", " "), left, right, diff: left - sign * right };
+    return { joint: BODY_LABEL[joint], left, right, diff: left - sign * right };
   });
 }
 

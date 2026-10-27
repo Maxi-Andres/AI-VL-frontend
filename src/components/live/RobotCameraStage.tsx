@@ -4,6 +4,7 @@ import { FullscreenButton } from "../ui/FullscreenButton";
 import { CameraCanvas } from "./CameraCanvas";
 import { drawBoxes } from "../../lib/draw";
 import type { DetectedObject } from "../../types";
+import { useT } from "../../i18n";
 
 interface Props {
   /** Changes once per frame (empty until the first one). Ignored when `stream` is set. */
@@ -65,6 +66,7 @@ export function RobotCameraStage({
   videoElRef,
   still = null,
 }: Props) {
+  const t = useT();
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stillRef = useRef<HTMLCanvasElement>(null);
@@ -129,7 +131,7 @@ export function RobotCameraStage({
     <section className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div
         ref={wrapRef}
-        className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-black shadow-lift lg:aspect-auto lg:min-h-[260px] lg:flex-1"
+        className="video-stage relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-black shadow-lift lg:aspect-auto lg:min-h-[260px] lg:flex-1"
       >
         {intraCanvasRef ? (
           <canvas
@@ -153,7 +155,7 @@ export function RobotCameraStage({
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-sm text-white/60">
-            {connected ? "Waiting for frames…" : "Connecting…"}
+            {connected ? t("Waiting for frames…") : t("Connecting…")}
           </div>
         )}
         {still && (

@@ -9,6 +9,7 @@ import { useRobotEar } from "./useRobotEar";
 import { useSpeech } from "./useSpeech";
 import { rememberPref } from "../lib/prefs";
 import { useWakeWord } from "./useWakeWord";
+import { t } from "../i18n";
 
 /**
  * Hands-free voice assistant for the VLM free prompt, shared by the live page and the monitor.
@@ -59,6 +60,10 @@ const FILLER_DELAY_MS = 2000;
 // is spoken. Counted in words, not sentences: a list of six objects is ~60 words and is said
 // whole.
 const SPOKEN_LIMIT = { maxWords: 90, cutNotice: "El resto lo tenés en la pantalla." };
+
+// The standing status lines while hands-free waits, in the language chosen when they are shown.
+const listeningForWake = () => t('Listening for the wake word "robot"…');
+const listeningOpen = () => t("Listening — just ask");
 
 function pickFiller(): string {
   return FILLERS[Math.floor(Math.random() * FILLERS.length)];
@@ -148,8 +153,6 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
   // Bumped to end an open-listening loop (hands-free off, or switched to the wake word).
   const loopGen = useRef(0);
 
-  const LISTENING = 'Listening for the wake word "robot"…';
-  const OPEN_LISTENING = "Listening — just ask";
   const ECHO_MS = 700;
 
   // The answer half of a voice turn — think, then speak sentence by sentence — shared by the
@@ -160,7 +163,7 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
     let fillerTimer: ReturnType<typeof setTimeout> | null = null;
     try {
       setPhase("thinking");
-      setStatus("Thinking…");
+      setStatus(t("Thinking…"));
       // Stream the answer: speak each sentence as soon as it lands, so the reply
       // starts playing while the model is still generating the rest.
       const stream = spokenModeRef.current ? speech.createStream(SPOKEN_LIMIT) : null;
@@ -212,30 +215,30 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
     let spoke = false;
     try {
       setPhase("recording");
-      setStatus("Listening… speak your question");
+      setStatus(t("Listening… speak your question"));
       const blob = await recorder.recordUtterance();
       if (!blob) {
-        setStatus('Didn\'t catch that — say "robot" to try again');
+        setStatus(t('Didn\'t catch that — say "robot" to try again'));
         return;
       }
       setPhase("transcribing");
-      setStatus("Transcribing…");
+      setStatus(t("Transcribing…"));
       const res = await transcribeAudio(blob);
       const text = res.text?.trim();
       if (res.error || !text || NOT_A_QUESTION.test(text)) {
-        setStatus(res.error ? `Error: ${res.error}` : "Nothing recognized");
+        setStatus(res.error ? t("Error: {error}", { error: res.error }) : t("Nothing recognized"));
         return;
       }
       spoke = await answerText(text);
     } catch (e) {
-      setStatus(`Voice error: ${e instanceof Error ? e.message : String(e)}`);
+      setStatus(t("Voice error: {error}", { error: e instanceof Error ? e.message : String(e) }));
     } finally {
       // ALWAYS return to listening so the wake word keeps working every time.
       // (We resume even while the answer is still being spoken, so "robot"
       // interrupts it — the barge-in in speech.cancel() above.)
       busyRef.current = false;
       if (voiceModeRef.current) {
-        setStatus(listenModeRef.current === "wake" ? LISTENING : OPEN_LISTENING);
+        setStatus(listenModeRef.current === "wake" ? listeningForWake() : listeningOpen());
         // If still speaking, let the queue's onDone flip the phase back later.
         if (!spoke) setPhase("listening");
         if (listenModeRef.current === "wake") wake.start();
@@ -243,7 +246,7 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
       } else {
         setPhase("off");
         // A single question (the mic button): clear the working line, keep a "didn't catch it".
-        setStatus((st) => (st === "Thinking…" || st === "Transcribing…" ? "" : st));
+        setStatus((st) => (st === t("Thinking…") || st === t("Transcribing…") ? "" : st));
       }
     }
   }, [recorder, speech, wake, answerText]);
@@ -261,13 +264,13 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
         continue;
       }
       setPhase("listening");
-      setStatus(OPEN_LISTENING);
+      setStatus(listeningOpen());
       const t0 = Date.now();
       let blob: Blob | null;
       try {
         blob = await recorder.recordUtterance({ startTimeoutMs: 8000, maxMs: 15000 });
       } catch (e) {
-        setStatus(`Microphone error: ${e instanceof Error ? e.message : String(e)}`);
+        setStatus(t("Microphone error: {error}", { error: e instanceof Error ? e.message : String(e) }));
         return;
       }
       if (!live()) return;
@@ -278,19 +281,19 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
       let spoke = false;
       try {
         setPhase("transcribing");
-        setStatus("Transcribing…");
+        setStatus(t("Transcribing…"));
         const res = await transcribeAudio(blob);
         const text = res.text?.trim();
         if (!live()) return;
         if (res.error) {
-          setStatus(`Error: ${res.error}`);
+          setStatus(t("Error: {error}", { error: res.error }));
           await new Promise((r) => setTimeout(r, 1500));
           continue;
         }
         if (!text || NOT_A_QUESTION.test(text)) continue;
         spoke = await answerText(text);
       } catch (e) {
-        setStatus(`Voice error: ${e instanceof Error ? e.message : String(e)}`);
+        setStatus(t("Voice error: {error}", { error: e instanceof Error ? e.message : String(e) }));
       } finally {
         busyRef.current = false;
         if (!spoke && live()) setPhase("listening");
@@ -319,10 +322,10 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
     speech.cancel(); // a new question interrupts a spoken answer
     let spoke = false;
     try {
-      setStatus(`Bender heard: “${text}”`);
+      setStatus(t("Bender heard: “{text}”", { text }));
       spoke = await answerText(text);
     } catch (e) {
-      setStatus(`Voice error: ${e instanceof Error ? e.message : String(e)}`);
+      setStatus(t("Voice error: {error}", { error: e instanceof Error ? e.message : String(e) }));
     } finally {
       busyRef.current = false;
       if (!spoke) setPhase(voiceModeRef.current || robotEarRef.current ? "listening" : "off");
@@ -350,7 +353,7 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
     loopGen.current++; // ends an open loop from before
     recorder.abort();
     if (voiceMode && listenMode === "wake" && wakeSupported) {
-      setStatus(LISTENING);
+      setStatus(listeningForWake());
       setPhase("listening");
       wake.start();
     } else if (voiceMode && listenMode === "open" && micSupported) {
@@ -360,7 +363,7 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
       wake.stop();
       speech.cancel();
       busyRef.current = false;
-      setStatus(voiceMode && listenMode === "wake" ? "This browser cannot listen for a wake word — choose “Just speak”" : "");
+      setStatus(voiceMode && listenMode === "wake" ? t("This browser cannot listen for a wake word — choose “Just speak”") : "");
       setPhase("off");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

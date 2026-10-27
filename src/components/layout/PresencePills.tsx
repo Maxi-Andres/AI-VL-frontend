@@ -16,6 +16,7 @@ import { useRobotTransports, type TransportMap } from "../../hooks/useRobotTrans
 import { Pill, type PillTone } from "../ui/Pill";
 import type { Presence, RobotInfo } from "../../types";
 import { useRobot } from "./RobotContext";
+import { t, useT } from "../../i18n";
 
 /** Per-robot glyph. The Go2 is a quadruped, so it gets the bone; anything else
  * falls back to the generic robot icon (the registry can grow without touching
@@ -49,16 +50,19 @@ export function robotState(
   // the G1 report connected off the Go2's video; caught 2026-09-10.
   const isSource = cam.robot === id || (cam.robot === "stream" && probe?.mode === "relay");
   const control = p.executor.online
-    ? `control: executor up${p.executor.dry_run ? " (dry run)" : ""}`
-    : "control: executor down";
+    ? p.executor.dry_run ? t("control: executor up (dry run)") : t("control: executor up")
+    : t("control: executor down");
 
+  const rate = cam.fps ? `${Math.round(cam.fps)} fps` : t("streaming");
   const camera = !isSource
-    ? `camera: not the active source${cam.bridge ? "" : " (bridge down)"}`
+    ? cam.bridge ? t("camera: not the active source") : t("camera: not the active source (bridge down)")
     : cam.live
-      ? `camera: live, ${cam.fps ? `${Math.round(cam.fps)} fps` : "streaming"}${cam.resolution ? ` @ ${cam.resolution}` : ""}`
+      ? cam.resolution
+        ? t("camera: live, {rate} @ {resolution}", { rate, resolution: cam.resolution })
+        : t("camera: live, {rate}", { rate })
       : cam.streaming
-        ? "camera: bridge streaming but no frames arrive"
-        : "camera: bridge up, not started";
+        ? t("camera: bridge streaming but no frames arrive")
+        : t("camera: bridge up, not started");
 
   // A robot with no ping_ip comes back online:false, because the backend pinged an empty
   // string. That is "never measured", NOT "offline" — reporting it as down would repeat the
@@ -66,25 +70,25 @@ export function robotState(
   const probed = Boolean(probe?.ping_ip);
 
   if (probed && probe?.online === true) {
-    return { tone: "good", text: "online", title: `reachable at ${probe.ping_ip} · ${camera} · ${control}` };
+    return { tone: "good", text: t("online"), title: t("reachable at {ip} · {camera} · {control}", { ip: probe.ping_ip ?? "", camera, control }) };
   }
   if (probed && probe?.online === false) {
     return {
       tone: "bad",
-      text: "offline",
-      title: `no ping reply from ${probe?.ping_ip} · ${camera} · ${control}`,
+      text: t("offline"),
+      title: t("no ping reply from {ip} · {camera} · {control}", { ip: probe?.ping_ip ?? "", camera, control }),
     };
   }
 
   // Not probed: no ping_ip set, or the first poll is still in flight. Fall back to the
   // camera, which is weaker but better than claiming anything about a robot never measured.
   if (isSource && cam.live) {
-    return { tone: "good", text: "connected", title: `${camera} · ${control} (no ping configured)` };
+    return { tone: "good", text: t("connected"), title: t("{camera} · {control} (no ping configured)", { camera, control }) };
   }
   return {
     tone: "idle",
-    text: "unknown",
-    title: `no ping address configured for this robot · ${camera} · ${control}`,
+    text: t("unknown"),
+    title: t("no ping address configured for this robot · {camera} · {control}", { camera, control }),
   };
 }
 
@@ -100,6 +104,7 @@ export function robotState(
  * value is still worth having as long as nobody mistakes it for now.
  */
 export function BatteryPill({ net, robotId }: { net: TransportMap | null; robotId: string }) {
+  const t = useT();
   const b = net?.[robotId]?.relay?.battery;
   if (!b || typeof b.percent !== "number") return null;
 
@@ -111,16 +116,16 @@ export function BatteryPill({ net, robotId }: { net: TransportMap | null; robotI
     : pct > 75 ? IconBattery4 : pct > 50 ? IconBattery3 : pct > 25 ? IconBattery2 : IconBattery1;
 
   const detail = [
-    b.charging === true ? "charging" : b.charging === false ? "on battery" : null,
+    b.charging === true ? t("charging") : b.charging === false ? t("on battery") : null,
     typeof b.volts === "number" ? `${b.volts.toFixed(1)} V` : null,
     typeof b.current === "number" ? `${(b.current / 1000).toFixed(2)} A` : null,
     typeof b.temp_c === "number" ? `${b.temp_c} °C` : null,
-    typeof b.cycles === "number" ? `${b.cycles} cycles` : null,
-    stale ? `LAST KNOWN — no reading for ${Math.round(b.age_s ?? 0)} s` : null,
+    typeof b.cycles === "number" ? t("{n} cycles", { n: b.cycles }) : null,
+    stale ? t("LAST KNOWN — no reading for {n} s", { n: Math.round(b.age_s ?? 0) }) : null,
   ].filter(Boolean).join(" · ");
 
   return (
-    <Pill tone={tone} icon={<Icon size={13} stroke={2} />} title={`Battery — ${detail}`}>
+    <Pill tone={tone} icon={<Icon size={13} stroke={2} />} title={t("Battery — {detail}", { detail })}>
       {pct}%
     </Pill>
   );
@@ -130,6 +135,7 @@ function RobotPill(
   { p, robot, selected, net }:
   { p: Presence; robot: RobotInfo; selected: boolean; net: TransportMap | null },
 ) {
+  const t = useT();
   const { tone, text, title } = robotState(p, robot.id, net);
   const name = robot.short ?? robot.id.toUpperCase();
   const Icon = ROBOT_ICONS[robot.id] ?? IconRobot;
@@ -138,7 +144,9 @@ function RobotPill(
       tone={tone}
       dot
       icon={<Icon size={13} stroke={2} />}
-      title={`${robot.label} — ${title}${selected ? " · selected for commands" : ""}`}
+      title={selected
+        ? t("{robot} — {state} · selected for commands", { robot: robot.label, state: title })
+        : t("{robot} — {state}", { robot: robot.label, state: title })}
       className={selected ? "ring-1 ring-line" : ""}
     >
       {name} {text}
@@ -153,6 +161,7 @@ function RobotPill(
  * really reaching the gateway — the honest signal, not a service self-report.
  */
 export function PresencePills() {
+  const t = useT();
   const { presence, reachable } = usePresence();
   const net = useRobotTransports();
   const { robots, robot: selected } = useRobot();
@@ -160,8 +169,8 @@ export function PresencePills() {
   if (!reachable) {
     return (
       <Pill tone="bad" dot icon={<IconPlugConnected size={13} stroke={2} />}
-            title="The backend gateway did not answer — nothing else can be reported">
-        gateway offline
+            title={t("The backend gateway did not answer — nothing else can be reported")}>
+        {t("gateway offline")}
       </Pill>
     );
   }
@@ -181,17 +190,17 @@ export function PresencePills() {
       {selected && <BatteryPill net={net} robotId={selected} />}
 
       {testSource && (
-        <Pill tone="warn" dot title="The camera bridge is streaming its synthetic test pattern">
-          test pattern
+        <Pill tone="warn" dot title={t("The camera bridge is streaming its synthetic test pattern")}>
+          {t("test pattern")}
         </Pill>
       )}
 
       <Pill
         tone={web.total > 0 ? "good" : "idle"}
         icon={<IconUsers size={13} stroke={2} />}
-        title={`${web.producers} streaming a camera · ${web.viewers} watching`}
+        title={t("{producers} streaming a camera · {viewers} watching", { producers: web.producers, viewers: web.viewers })}
       >
-        {web.total} web
+        {t("{n} web", { n: web.total })}
       </Pill>
 
       <Pill
@@ -199,10 +208,9 @@ export function PresencePills() {
         icon={<IconDeviceGamepad2 size={13} stroke={2} />}
         title={
           executor.online
-            ? `Robot executor up${executor.safe_mode ? " · safe mode" : ""}${
-                executor.dry_run ? " · dry run" : ""
-              }`
-            : "Robot executor unreachable — commands cannot move a robot"
+            ? [t("Robot executor up"), executor.safe_mode && t("safe mode"), executor.dry_run && t("dry run")]
+              .filter(Boolean).join(" · ")
+            : t("Robot executor unreachable — commands cannot move a robot")
         }
         className="hidden sm:inline-flex"
       >
@@ -214,8 +222,8 @@ export function PresencePills() {
         icon={<IconCpu size={13} stroke={2} />}
         title={
           iacore.online
-            ? "Inference service up (YOLO / VLM / speech)"
-            : "Inference service unreachable — no detection, VLM or speech"
+            ? t("Inference service up (YOLO / VLM / speech)")
+            : t("Inference service unreachable — no detection, VLM or speech")
         }
         className="hidden sm:inline-flex"
       >

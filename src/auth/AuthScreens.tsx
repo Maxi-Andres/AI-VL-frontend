@@ -26,6 +26,8 @@ import { PASSWORD_MIN, passwordStrength } from "../lib/password";
 import silkLogoOnDark from "../assets/silk-logo.webp";
 import silkLogoOnLight from "../assets/silk-logo-light-bg.webp";
 import { useAuth } from "./AuthContext";
+import { LanguagePicker } from "../components/layout/UserMenu";
+import { msg, t, useT, type Vars } from "../i18n";
 
 // The sign-in and first-run screens: the first part of the app moved to the light redesign
 // (.theme-light, see index.css). Split layout — a brand panel on the left that says what the
@@ -33,18 +35,38 @@ import { useAuth } from "./AuthContext";
 
 const SETUP_CODE_HINT = "cat ~/.pilot/setup-code";
 
+/** What went wrong, in the language chosen now (an AuthError's text is already translated). */
 function messageOf(e: unknown): string {
   if (e instanceof AuthError) {
     if (e.status === 429 && e.retryAfter) {
       const min = Math.ceil(e.retryAfter / 60);
-      return `Too many attempts. Try again in ${min} minute${min === 1 ? "" : "s"}.`;
+      return min === 1
+        ? t("Too many attempts. Try again in 1 minute.")
+        : t("Too many attempts. Try again in {n} minutes.", { n: min });
     }
     return e.message;
   }
-  return "Could not reach the server. Check the connection and try again.";
+  return t("Could not reach the server. Check the connection and try again.");
+}
+
+/** One translatable sentence that carries a little markup, so the word order stays the
+ * translator's: "<br>" breaks the line, "<em>…</em>" is the brand gradient, "<b>…</b>" bold.
+ * The {values} are filled in after the markup is read, so a name never turns into markup. */
+function Rich({ text, vars = {} }: { text: string; vars?: Vars }) {
+  const fill = (part: string) => part.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m));
+  return (
+    <>
+      {text.split(/(<br>|<em>.*?<\/em>|<b>.*?<\/b>)/).map((part, i) =>
+        part === "<br>" ? <br key={i} />
+        : part.startsWith("<em>") ? <Gradient key={i}>{fill(part.slice(4, -5))}</Gradient>
+        : part.startsWith("<b>") ? <b key={i} className="text-fg">{fill(part.slice(3, -4))}</b>
+        : fill(part))}
+    </>
+  );
 }
 
 function BrandPanel({ title, children }: { title: ReactNode; children?: ReactNode }) {
+  const t = useT();
   return (
     <aside className="relative hidden flex-col overflow-hidden bg-[#0a0e14] p-12 text-white lg:flex">
       {/* Glows in the logo's two colours, and a faint grid: the room the robots work in. */}
@@ -67,9 +89,9 @@ function BrandPanel({ title, children }: { title: ReactNode; children?: ReactNod
       </div>
 
       <ul className="relative mt-auto flex flex-wrap gap-x-6 gap-y-2 text-[13px] font-semibold text-white/75">
-        <li className="flex items-center gap-2"><IconShieldLock size={17} className="text-[#5fe3d4]" />Every limit enforced on the robot</li>
-        <li className="flex items-center gap-2"><IconUsers size={17} className="text-[#5fe3d4]" />Teams and roles</li>
-        <li className="flex items-center gap-2"><IconLock size={17} className="text-[#5fe3d4]" />Runs on your own server</li>
+        <li className="flex items-center gap-2"><IconShieldLock size={17} className="text-[#5fe3d4]" />{t("Every limit enforced on the robot")}</li>
+        <li className="flex items-center gap-2"><IconUsers size={17} className="text-[#5fe3d4]" />{t("Teams and roles")}</li>
+        <li className="flex items-center gap-2"><IconLock size={17} className="text-[#5fe3d4]" />{t("Runs on your own server")}</li>
       </ul>
     </aside>
   );
@@ -79,7 +101,9 @@ function Shell({ panel, children }: { panel: ReactNode; children: ReactNode }) {
   return (
     <div className="theme-light grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
       {panel}
-      <main className="flex flex-col items-center justify-center bg-panel px-6 py-12">
+      <main className="relative flex flex-col items-center justify-center bg-panel px-6 py-12">
+        {/* Before signing in, too: the language is chosen here, not only in the user menu. */}
+        <div className="fixed top-5 right-5 z-20"><LanguagePicker className="shadow-card" /></div>
         <img src={silkLogoOnLight} alt="Silk Technologies" className="mb-10 h-8 w-auto lg:hidden" />
         <div className="w-full max-w-[400px] animate-rise">{children}</div>
         <p className="mt-10 text-xs text-dim">Silk Pilot</p>
@@ -115,6 +139,7 @@ function Field({ label, icon, aside, hint, trailing, className = "", ...input }:
 }
 
 function PasswordField(props: Omit<FieldProps, "type" | "trailing">) {
+  const t = useT();
   const [shown, setShown] = useState(false);
   return (
     <Field
@@ -122,7 +147,7 @@ function PasswordField(props: Omit<FieldProps, "type" | "trailing">) {
       type={shown ? "text" : "password"}
       trailing={
         <button type="button" onClick={() => setShown((v) => !v)} className="cursor-pointer text-dim hover:text-fg"
-          aria-label={shown ? "Hide password" : "Show password"}>
+          aria-label={shown ? t("Hide password") : t("Show password")}>
           {shown ? <IconEyeOff size={18} /> : <IconEye size={18} />}
         </button>
       }
@@ -157,6 +182,7 @@ function ErrorNote({ text, shakeKey }: { text: string; shakeKey: number }) {
 // Sign in
 // --------------------------------------------------------------------------- //
 export function SignInScreen({ orgName, expired }: { orgName: string | null; expired: boolean }) {
+  const t = useT();
   const { signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -182,43 +208,45 @@ export function SignInScreen({ orgName, expired }: { orgName: string | null; exp
   }
 
   return (
-    <Shell panel={<BrandPanel title={<>Operate every robot<br />from <Gradient>one place.</Gradient></>}>
+    <Shell panel={<BrandPanel title={<Rich text={t("Operate every robot<br>from <em>one place.</em>")} />}>
       <p className="mt-4 max-w-[440px] text-[15px] text-white/65">
-        Live video, AI perception and safe teleoperation for robots — on your own server.
+        {t("Live video, AI perception and safe teleoperation for robots — on your own server.")}
       </p>
     </BrandPanel>}>
       <h1 className="text-[26px] font-extrabold tracking-[-0.025em]">
-        {orgName ? <>Sign in to {orgName}</> : "Sign in to Pilot"}
+        {orgName ? t("Sign in to {org}", { org: orgName }) : t("Sign in to Pilot")}
       </h1>
-      <p className="mt-1.5 mb-7 text-muted">Welcome back. Use your work account.</p>
+      <p className="mt-1.5 mb-7 text-muted">{t("Welcome back. Use your work account.")}</p>
 
       {expired && !error && (
         <div className="mb-4 rounded-xl bg-[#e4f5f2] px-3.5 py-3 text-[13px] font-semibold text-[#14695f]">
-          Your session ended. Sign in again to continue.
+          {t("Your session ended. Sign in again to continue.")}
         </div>
       )}
       {error && <ErrorNote text={error} shakeKey={tries} />}
 
       <form onSubmit={submit} noValidate>
-        <Field label="Work email" icon={<IconMail size={18} />} type="email" autoComplete="username"
-          autoFocus required placeholder="name@company.com" value={email}
+        <Field label={t("Work email")} icon={<IconMail size={18} />} type="email" autoComplete="username"
+          autoFocus required placeholder={t("name@company.com")} value={email}
           onChange={(e) => setEmail(e.target.value)} />
-        <PasswordField label="Password" icon={<IconLock size={18} />} autoComplete="current-password"
+        <PasswordField label={t("Password")} icon={<IconLock size={18} />} autoComplete="current-password"
           required value={password} onChange={(e) => setPassword(e.target.value)}
           aside={<button type="button" onClick={() => setForgot((v) => !v)}
-            className="cursor-pointer text-[12.5px] font-bold text-accent hover:underline">Forgot?</button>}
-          hint={forgot && <>Ask an admin of {orgName ?? "your workspace"} for a password reset link.</>} />
+            className="cursor-pointer text-[12.5px] font-bold text-accent hover:underline">{t("Forgot?")}</button>}
+          hint={forgot && (orgName
+            ? t("Ask an admin of {org} for a password reset link.", { org: orgName })
+            : t("Ask an admin of your workspace for a password reset link."))} />
         <label className="mt-1 mb-6 flex cursor-pointer items-center gap-2.5 text-[13px] text-muted select-none">
           <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)}
             className="size-4 accent-[#0f1623]" />
-          Keep me signed in on this device for 30 days
+          {t("Keep me signed in on this device for 30 days")}
         </label>
         <PrimaryButton type="submit" busy={busy} disabled={!email || !password}>
-          {busy ? "Signing in…" : "Sign in"}
+          {busy ? t("Signing in…") : t("Sign in")}
         </PrimaryButton>
       </form>
       <p className="mt-6 text-center text-xs text-dim">
-        No account yet? Ask your workspace admin for an invitation.
+        {t("No account yet? Ask your workspace admin for an invitation.")}
       </p>
     </Shell>
   );
@@ -231,9 +259,10 @@ function Gradient({ children }: { children: ReactNode }) {
 // --------------------------------------------------------------------------- //
 // First-run setup
 // --------------------------------------------------------------------------- //
-const STEPS = ["Verify server", "Company", "Your account"] as const;
+const STEPS = [msg("Verify server"), msg("Company"), msg("Your account")];
 
 function Stepper({ step }: { step: number }) {
+  const t = useT();
   return (
     <ol className="mb-8 flex items-center gap-2">
       {STEPS.map((label, i) => (
@@ -242,7 +271,7 @@ function Stepper({ step }: { step: number }) {
             i < step ? "bg-accent text-white" : i === step ? "bg-fg text-white" : "bg-[#eef0f3] text-dim"}`}>
             {i < step ? <IconCheck size={15} stroke={3} /> : i + 1}
           </span>
-          <span className={`hidden text-[12.5px] font-bold sm:block ${i <= step ? "text-fg" : "text-dim"}`}>{label}</span>
+          <span className={`hidden text-[12.5px] font-bold sm:block ${i <= step ? "text-fg" : "text-dim"}`}>{t(label)}</span>
           {i < STEPS.length - 1 && <span className={`h-px flex-1 ${i < step ? "bg-accent" : "bg-line"}`} />}
         </li>
       ))}
@@ -251,6 +280,7 @@ function Stepper({ step }: { step: number }) {
 }
 
 export function SetupScreen() {
+  const t = useT();
   const { setUp } = useAuth();
   const [step, setStep] = useState(0);
   const [code, setCode] = useState("");
@@ -306,10 +336,9 @@ export function SetupScreen() {
   }
 
   return (
-    <Shell panel={<BrandPanel title={<>Let's set up<br /><Gradient>Silk Pilot.</Gradient></>}>
+    <Shell panel={<BrandPanel title={<Rich text={t("Let's set up<br><em>Silk Pilot.</em>")} />}>
       <p className="mt-4 max-w-[440px] text-[15px] text-white/65">
-        Three quick steps. You will be the owner of this workspace: after this, you invite your
-        team and decide what each person can do.
+        {t("Three quick steps. You will be the owner of this workspace: after this, you invite your team and decide what each person can do.")}
       </p>
     </BrandPanel>}>
       <Stepper step={step} />
@@ -317,60 +346,61 @@ export function SetupScreen() {
 
       {step === 0 && (
         <form onSubmit={next} key="s0" className="animate-rise">
-          <h1 className="text-[24px] font-extrabold tracking-[-0.025em]">Verify this server</h1>
+          <h1 className="text-[24px] font-extrabold tracking-[-0.025em]">{t("Verify this server")}</h1>
           <p className="mt-1.5 mb-6 text-muted">
-            So that only someone with access to the server can claim it, it wrote a one-time
-            setup code when it started. On the server, run:
+            {t("So that only someone with access to the server can claim it, it wrote a one-time setup code when it started. On the server, run:")}
           </p>
           <div className="mb-5 flex items-center gap-2 rounded-xl bg-[#0f1623] py-2 pr-2 pl-4 font-mono text-[13px] text-[#c9f2ec]">
             <span className="flex-1">{SETUP_CODE_HINT}</span>
-            <button type="button" onClick={copyHint} aria-label="Copy command"
+            <button type="button" onClick={copyHint} aria-label={t("Copy command")}
               className="grid size-8 cursor-pointer place-items-center rounded-lg text-white/60 hover:bg-white/10 hover:text-white">
               {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
             </button>
           </div>
-          <Field label="Setup code" icon={<IconKey size={18} />} autoFocus placeholder="XXXX-XXXX"
+          <Field label={t("Setup code")} icon={<IconKey size={18} />} autoFocus placeholder="XXXX-XXXX"
             autoComplete="off" spellCheck={false} value={code}
             className="font-mono tracking-[0.2em] uppercase"
             onChange={(e) => setCode(formatCode(e.target.value))} />
-          <PrimaryButton type="submit" disabled={!codeOk}>Continue<IconArrowRight size={18} /></PrimaryButton>
+          <PrimaryButton type="submit" disabled={!codeOk}>{t("Continue")}<IconArrowRight size={18} /></PrimaryButton>
         </form>
       )}
 
       {step === 1 && (
         <form onSubmit={next} key="s1" className="animate-rise">
-          <h1 className="text-[24px] font-extrabold tracking-[-0.025em]">Your company</h1>
-          <p className="mt-1.5 mb-6 text-muted">The workspace your team signs in to. You can rename it later.</p>
-          <Field label="Company name" icon={<IconBuilding size={18} />} autoFocus required
-            autoComplete="organization" placeholder="Acme Logistics" maxLength={120} value={org}
+          <h1 className="text-[24px] font-extrabold tracking-[-0.025em]">{t("Your company")}</h1>
+          <p className="mt-1.5 mb-6 text-muted">{t("The workspace your team signs in to. You can rename it later.")}</p>
+          <Field label={t("Company name")} icon={<IconBuilding size={18} />} autoFocus required
+            autoComplete="organization" placeholder={t("Acme Logistics")} maxLength={120} value={org}
             onChange={(e) => setOrg(e.target.value)} />
           <div className="flex gap-3">
             <BackButton onClick={() => setStep(0)} />
-            <PrimaryButton type="submit" disabled={!org.trim()}>Continue<IconArrowRight size={18} /></PrimaryButton>
+            <PrimaryButton type="submit" disabled={!org.trim()}>{t("Continue")}<IconArrowRight size={18} /></PrimaryButton>
           </div>
         </form>
       )}
 
       {step === 2 && (
         <form onSubmit={finish} key="s2" className="animate-rise">
-          <h1 className="text-[24px] font-extrabold tracking-[-0.025em]">Your account</h1>
+          <h1 className="text-[24px] font-extrabold tracking-[-0.025em]">{t("Your account")}</h1>
           <p className="mt-1.5 mb-6 text-muted">
-            You will be the <b className="text-fg">owner</b> of {org.trim() || "the workspace"}.
+            {org.trim()
+              ? <Rich text={t("You will be the <b>owner</b> of {org}.")} vars={{ org: org.trim() }} />
+              : <Rich text={t("You will be the <b>owner</b> of the workspace.")} />}
           </p>
-          <Field label="Full name" icon={<IconUser size={18} />} autoFocus required autoComplete="name"
+          <Field label={t("Full name")} icon={<IconUser size={18} />} autoFocus required autoComplete="name"
             maxLength={120} value={name} onChange={(e) => setName(e.target.value)} />
-          <Field label="Work email" icon={<IconMail size={18} />} type="email" required autoComplete="username"
-            placeholder="name@company.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <PasswordField label="Password" icon={<IconLock size={18} />} autoComplete="new-password" required
+          <Field label={t("Work email")} icon={<IconMail size={18} />} type="email" required autoComplete="username"
+            placeholder={t("name@company.com")} value={email} onChange={(e) => setEmail(e.target.value)} />
+          <PasswordField label={t("Password")} icon={<IconLock size={18} />} autoComplete="new-password" required
             value={password} onChange={(e) => setPassword(e.target.value)}
-            hint={<StrengthMeter score={strength.score} label={password ? strength.label : `At least ${PASSWORD_MIN} characters`} />} />
-          <PasswordField label="Confirm password" icon={<IconLock size={18} />} autoComplete="new-password" required
+            hint={<StrengthMeter score={strength.score} label={strength.label} />} />
+          <PasswordField label={t("Confirm password")} icon={<IconLock size={18} />} autoComplete="new-password" required
             value={confirm} onChange={(e) => setConfirm(e.target.value)}
-            hint={confirm && confirm !== password ? <span className="text-danger">The passwords do not match</span> : null} />
+            hint={confirm && confirm !== password ? <span className="text-danger">{t("The passwords do not match")}</span> : null} />
           <div className="mt-2 flex gap-3">
             <BackButton onClick={() => setStep(1)} />
             <PrimaryButton type="submit" busy={busy} disabled={!accountOk}>
-              {busy ? "Creating…" : "Create workspace"}
+              {busy ? t("Creating…") : t("Create workspace")}
             </PrimaryButton>
           </div>
         </form>
@@ -380,8 +410,9 @@ export function SetupScreen() {
 }
 
 function BackButton({ onClick }: { onClick: () => void }) {
+  const t = useT();
   return (
-    <button type="button" onClick={onClick} aria-label="Back"
+    <button type="button" onClick={onClick} aria-label={t("Back")}
       className="grid h-12 w-14 shrink-0 cursor-pointer place-items-center rounded-xl border border-[#d9dde5] text-muted transition hover:text-fg">
       <IconArrowLeft size={18} />
     </button>
@@ -390,6 +421,7 @@ function BackButton({ onClick }: { onClick: () => void }) {
 
 /** Also used by Settings → Profile, so the empty track is a theme token, not a light grey. */
 export function StrengthMeter({ score, label }: { score: number; label: string }) {
+  const t = useT();
   const colors = ["#d9dde5", "#d93f45", "#c97a10", "#1f9e91", "#1f9e91"];
   return (
     <div className="flex items-center gap-3">
@@ -399,7 +431,7 @@ export function StrengthMeter({ score, label }: { score: number; label: string }
             style={{ background: score >= i ? colors[score] : "var(--color-subtle)" }} />
         ))}
       </div>
-      <span className="w-40 text-right">{label}</span>
+      <span className="w-40 text-right">{t(label, { n: PASSWORD_MIN })}</span>
     </div>
   );
 }
@@ -412,10 +444,11 @@ function tokenFromHash(): string {
 }
 
 export function InviteScreen() {
+  const t = useT();
   const { status, acceptInvitation, signOut } = useAuth();
   const [token] = useState(tokenFromHash);
   const [info, setInfo] = useState<InvitationInfo | null>(null);
-  const [lookupError, setLookupError] = useState<string | null>(token ? null : "This invitation link is incomplete.");
+  const [lookupError, setLookupError] = useState<string | null>(token ? null : t("This invitation link is incomplete."));
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -454,9 +487,9 @@ export function InviteScreen() {
   }
 
   const panel = (
-    <BrandPanel title={<>Welcome to<br /><Gradient>{info?.org_name ?? "Silk Pilot"}.</Gradient></>}>
+    <BrandPanel title={<Rich text={t("Welcome to<br><em>{org}.</em>")} vars={{ org: info?.org_name ?? "Silk Pilot" }} />}>
       <p className="mt-4 max-w-[440px] text-[15px] text-white/65">
-        Create your account to join your team on Silk Pilot.
+        {t("Create your account to join your team on Silk Pilot.")}
       </p>
     </BrandPanel>
   );
@@ -464,14 +497,14 @@ export function InviteScreen() {
   if (status.kind === "signed-in") {
     return (
       <Shell panel={panel}>
-        <h1 className="text-[24px] font-extrabold tracking-[-0.025em]">You are already signed in</h1>
+        <h1 className="text-[24px] font-extrabold tracking-[-0.025em]">{t("You are already signed in")}</h1>
         <p className="mt-1.5 mb-6 text-muted">
-          This browser is signed in as <b className="text-fg">{status.me.user.email}</b>. To accept
-          this invitation as someone else, sign out first.
+          <Rich text={t("This browser is signed in as <b>{email}</b>. To accept this invitation as someone else, sign out first.")}
+            vars={{ email: status.me.user.email }} />
         </p>
-        <PrimaryButton onClick={() => void signOut()}>Sign out and continue</PrimaryButton>
+        <PrimaryButton onClick={() => void signOut()}>{t("Sign out and continue")}</PrimaryButton>
         <a href="/" className="mt-4 block text-center text-[13px] font-bold text-accent hover:underline">
-          Stay signed in and go to the app
+          {t("Stay signed in and go to the app")}
         </a>
       </Shell>
     );
@@ -483,10 +516,10 @@ export function InviteScreen() {
         <span className="mb-5 grid size-12 place-items-center rounded-xl bg-[#fdecec] text-danger">
           <IconAlertCircle size={24} />
         </span>
-        <h1 className="text-[24px] font-extrabold tracking-[-0.025em]">This link does not work</h1>
+        <h1 className="text-[24px] font-extrabold tracking-[-0.025em]">{t("This link does not work")}</h1>
         <p className="mt-1.5 mb-6 text-muted">{lookupError}</p>
         <a href="/" className="flex h-12 w-full items-center justify-center rounded-xl border border-[#d9dde5] text-[14px] font-bold">
-          Go to sign in
+          {t("Go to sign in")}
         </a>
       </Shell>
     );
@@ -495,40 +528,41 @@ export function InviteScreen() {
   if (!info) {
     return (
       <Shell panel={panel}>
-        <div className="flex items-center gap-3 text-muted"><IconLoader2 size={18} className="animate-spin" />Checking your invitation…</div>
+        <div className="flex items-center gap-3 text-muted"><IconLoader2 size={18} className="animate-spin" />{t("Checking your invitation…")}</div>
       </Shell>
     );
   }
 
   return (
     <Shell panel={panel}>
-      <h1 className="text-[24px] font-extrabold tracking-[-0.025em]">Join {info.org_name}</h1>
+      <h1 className="text-[24px] font-extrabold tracking-[-0.025em]">{t("Join {org}", { org: info.org_name })}</h1>
       <p className="mt-1.5 mb-5 text-muted">
-        {info.invited_by ? <>{info.invited_by} invited you</> : "You were invited"} as{" "}
-        <b className="text-fg">{role?.label ?? info.role}</b>.
+        {info.invited_by
+          ? <Rich text={t("{name} invited you as <b>{role}</b>.")} vars={{ name: info.invited_by, role: role ? t(role.label) : info.role }} />
+          : <Rich text={t("You were invited as <b>{role}</b>.")} vars={{ role: role ? t(role.label) : info.role }} />}
       </p>
       {role && (
-        <div className="mb-6 rounded-xl bg-bg px-3.5 py-3 text-[13px] text-muted">{role.summary}</div>
+        <div className="mb-6 rounded-xl bg-bg px-3.5 py-3 text-[13px] text-muted">{t(role.summary)}</div>
       )}
       {error && <ErrorNote text={error} shakeKey={tries} />}
       <form onSubmit={submit} noValidate>
-        <Field label="Work email" icon={<IconMail size={18} />} value={info.email} readOnly
+        <Field label={t("Work email")} icon={<IconMail size={18} />} value={info.email} readOnly
           className="text-muted" autoComplete="username" />
-        <Field label="Full name" icon={<IconUser size={18} />} autoFocus required autoComplete="name"
+        <Field label={t("Full name")} icon={<IconUser size={18} />} autoFocus required autoComplete="name"
           maxLength={120} value={name} onChange={(e) => setName(e.target.value)} />
-        <PasswordField label="Password" icon={<IconLock size={18} />} autoComplete="new-password" required
+        <PasswordField label={t("Password")} icon={<IconLock size={18} />} autoComplete="new-password" required
           value={password} onChange={(e) => setPassword(e.target.value)}
-          hint={<StrengthMeter score={strength.score} label={password ? strength.label : `At least ${PASSWORD_MIN} characters`} />} />
-        <PasswordField label="Confirm password" icon={<IconLock size={18} />} autoComplete="new-password" required
+          hint={<StrengthMeter score={strength.score} label={strength.label} />} />
+        <PasswordField label={t("Confirm password")} icon={<IconLock size={18} />} autoComplete="new-password" required
           value={confirm} onChange={(e) => setConfirm(e.target.value)}
-          hint={confirm && confirm !== password ? <span className="text-danger">The passwords do not match</span> : null} />
+          hint={confirm && confirm !== password ? <span className="text-danger">{t("The passwords do not match")}</span> : null} />
         <label className="mt-1 mb-6 flex cursor-pointer items-center gap-2.5 text-[13px] text-muted select-none">
           <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)}
             className="size-4 accent-[#0f1623]" />
-          Keep me signed in on this device for 30 days
+          {t("Keep me signed in on this device for 30 days")}
         </label>
         <PrimaryButton type="submit" busy={busy} disabled={!ok}>
-          {busy ? "Creating your account…" : "Create account and join"}
+          {busy ? t("Creating your account…") : t("Create account and join")}
         </PrimaryButton>
       </form>
     </Shell>
@@ -539,10 +573,11 @@ export function InviteScreen() {
 // Setting a new password through a reset link
 // --------------------------------------------------------------------------- //
 export function ResetPasswordScreen() {
+  const t = useT();
   const { completePasswordReset } = useAuth();
   const [token] = useState(tokenFromHash);
   const [info, setInfo] = useState<ResetInfo | null>(null);
-  const [lookupError, setLookupError] = useState<string | null>(token ? null : "This reset link is incomplete.");
+  const [lookupError, setLookupError] = useState<string | null>(token ? null : t("This reset link is incomplete."));
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [remember, setRemember] = useState(true);
@@ -579,9 +614,9 @@ export function ResetPasswordScreen() {
   }
 
   const panel = (
-    <BrandPanel title={<>Back in,<br /><Gradient>in a moment.</Gradient></>}>
+    <BrandPanel title={<Rich text={t("Back in,<br><em>in a moment.</em>")} />}>
       <p className="mt-4 max-w-[440px] text-[15px] text-white/65">
-        Choose a new password. Every other device signed in to your account is signed out.
+        {t("Choose a new password. Every other device signed in to your account is signed out.")}
       </p>
     </BrandPanel>
   );
@@ -592,10 +627,10 @@ export function ResetPasswordScreen() {
         <span className="mb-5 grid size-12 place-items-center rounded-xl bg-[#fdecec] text-danger">
           <IconAlertCircle size={24} />
         </span>
-        <h1 className="text-[24px] font-extrabold tracking-[-0.025em]">This link does not work</h1>
+        <h1 className="text-[24px] font-extrabold tracking-[-0.025em]">{t("This link does not work")}</h1>
         <p className="mt-1.5 mb-6 text-muted">{lookupError}</p>
         <a href="/" className="flex h-12 w-full items-center justify-center rounded-xl border border-[#d9dde5] text-[14px] font-bold">
-          Go to sign in
+          {t("Go to sign in")}
         </a>
       </Shell>
     );
@@ -604,33 +639,33 @@ export function ResetPasswordScreen() {
   if (!info) {
     return (
       <Shell panel={panel}>
-        <div className="flex items-center gap-3 text-muted"><IconLoader2 size={18} className="animate-spin" />Checking your link…</div>
+        <div className="flex items-center gap-3 text-muted"><IconLoader2 size={18} className="animate-spin" />{t("Checking your link…")}</div>
       </Shell>
     );
   }
 
   return (
     <Shell panel={panel}>
-      <h1 className="text-[24px] font-extrabold tracking-[-0.025em]">Set a new password</h1>
+      <h1 className="text-[24px] font-extrabold tracking-[-0.025em]">{t("Set a new password")}</h1>
       <p className="mt-1.5 mb-6 text-muted">
-        For <b className="text-fg">{info.email}</b> at {info.org_name}.
+        <Rich text={t("For <b>{email}</b> at {org}.")} vars={{ email: info.email, org: info.org_name }} />
       </p>
       {error && <ErrorNote text={error} shakeKey={tries} />}
       <form onSubmit={submit} noValidate>
         <input type="email" value={info.email} autoComplete="username" readOnly hidden />
-        <PasswordField label="New password" icon={<IconLock size={18} />} autoComplete="new-password" autoFocus required
+        <PasswordField label={t("New password")} icon={<IconLock size={18} />} autoComplete="new-password" autoFocus required
           value={password} onChange={(e) => setPassword(e.target.value)}
-          hint={<StrengthMeter score={strength.score} label={password ? strength.label : `At least ${PASSWORD_MIN} characters`} />} />
-        <PasswordField label="Confirm password" icon={<IconLock size={18} />} autoComplete="new-password" required
+          hint={<StrengthMeter score={strength.score} label={strength.label} />} />
+        <PasswordField label={t("Confirm password")} icon={<IconLock size={18} />} autoComplete="new-password" required
           value={confirm} onChange={(e) => setConfirm(e.target.value)}
-          hint={confirm && confirm !== password ? <span className="text-danger">The passwords do not match</span> : null} />
+          hint={confirm && confirm !== password ? <span className="text-danger">{t("The passwords do not match")}</span> : null} />
         <label className="mt-1 mb-6 flex cursor-pointer items-center gap-2.5 text-[13px] text-muted select-none">
           <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)}
             className="size-4 accent-[#0f1623]" />
-          Keep me signed in on this device for 30 days
+          {t("Keep me signed in on this device for 30 days")}
         </label>
         <PrimaryButton type="submit" busy={busy} disabled={!ok}>
-          {busy ? "Saving…" : "Save and sign in"}
+          {busy ? t("Saving…") : t("Save and sign in")}
         </PrimaryButton>
       </form>
     </Shell>
@@ -649,18 +684,20 @@ export function AuthLoading() {
 }
 
 export function AuthUnreachable() {
+  const t = useT();
   const { retry } = useAuth();
   return (
-    <div className="theme-light grid min-h-dvh place-items-center px-6">
+    <div className="theme-light relative grid min-h-dvh place-items-center px-6">
+      <div className="fixed top-5 right-5 z-20"><LanguagePicker className="shadow-card" /></div>
       <div className="max-w-sm animate-rise text-center">
         <span className="mx-auto mb-5 grid size-14 place-items-center rounded-2xl bg-[#fdecec] text-danger">
           <IconPlugConnectedX size={28} />
         </span>
-        <h1 className="text-[22px] font-extrabold">Can't reach the Pilot server</h1>
-        <p className="mt-2 mb-6 text-muted">The page loaded, but the server behind it did not answer. It may be restarting.</p>
+        <h1 className="text-[22px] font-extrabold">{t("Can't reach the Pilot server")}</h1>
+        <p className="mt-2 mb-6 text-muted">{t("The page loaded, but the server behind it did not answer. It may be restarting.")}</p>
         <button onClick={retry}
           className="mx-auto flex cursor-pointer items-center gap-2 rounded-xl bg-fg px-5 py-3 text-[14px] font-bold text-white">
-          <IconRefresh size={18} />Try again
+          <IconRefresh size={18} />{t("Try again")}
         </button>
       </div>
     </div>

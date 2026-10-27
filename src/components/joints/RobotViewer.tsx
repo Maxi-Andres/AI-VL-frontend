@@ -22,6 +22,7 @@ import URDFLoader, { type URDFJoint, type URDFRobot } from "urdf-loader";
 import { JOINTS, JOINT_BY_URDF, readJoint, tempLevel, type JointFrame } from "../../lib/g1Joints";
 import { liveStalls, type StallAlert } from "../../lib/jointControl";
 import { StatusText } from "../ui/StatusText";
+import { msg, useT } from "../../i18n";
 
 /**
  * The G1 in 3D, posed from the robot's own joint readings. Presentational: the page owns the
@@ -88,29 +89,31 @@ interface WarmJoint {
   level: string;
 }
 
+type Translate = ReturnType<typeof useT>;
+
 /** "left arm · elbow": how both corner lists name a joint. */
-function jointName(urdf: string): string {
+function jointName(urdf: string, t: Translate): string {
   const j = JOINT_BY_URDF.get(urdf);
-  return j ? `${j.group.toLowerCase()} · ${j.label}` : urdf.replace(/_joint$/, "").replace(/_/g, " ");
+  return j ? `${t(j.group).toLowerCase()} · ${t(j.label)}` : urdf.replace(/_joint$/, "").replace(/_/g, " ");
 }
 
 /** Joints over the normal band, hottest first. */
-function warmJoints(frame: JointFrame | null): WarmJoint[] {
+function warmJoints(frame: JointFrame | null, t: Translate): WarmJoint[] {
   const out: WarmJoint[] = [];
   for (const j of JOINTS) {
-    const t = readJoint(frame, j)?.temp ?? null;
-    const level = tempLevel(t);
-    if (t === null || level === "normal") continue;
-    out.push({ urdf: j.urdf, name: jointName(j.urdf), temp: t, level });
+    const temp = readJoint(frame, j)?.temp ?? null;
+    const level = tempLevel(temp);
+    if (temp === null || level === "normal") continue;
+    out.push({ urdf: j.urdf, name: jointName(j.urdf, t), temp, level });
   }
   return out.sort((a, b) => b.temp - a.temp);
 }
 
 type View = "robot" | "left" | "right";
 const VIEWS: { id: View; label: string }[] = [
-  { id: "robot", label: "Whole robot" },
-  { id: "left", label: "Robot's left hand" },
-  { id: "right", label: "Robot's right hand" },
+  { id: "robot", label: msg("Whole robot") },
+  { id: "left", label: msg("Robot's left hand") },
+  { id: "right", label: msg("Robot's right hand") },
 ];
 const HOME = { camera: new Vector3(2.3, 1.2, 1.3), target: new Vector3(0, 0.75, 0) };
 /** How far the camera sits from a hand it is looking at, metres. */
@@ -164,9 +167,11 @@ function owningJoint(obj: Object3D | null): string | null {
 export function RobotViewer({
   frame, selected, hovered, onHover, onSelect, colorByTemp, showTilt, onLimits, ghost, stalls,
 }: Props) {
+  const t = useT();
   const hostRef = useRef<HTMLDivElement>(null);
   const modelRef = useRef<Model | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  // What failed, not the sentence: the scene is built once, the words follow the language.
+  const [loadError, setLoadError] = useState<{ path: string } | { error: string } | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [view, setView] = useState<View>("robot");
   const viewRef = useRef<View>("robot");
@@ -313,7 +318,7 @@ export function RobotViewer({
         },
         undefined,
         (err) => {
-          setLoadError(`Could not load ${path}`);
+          setLoadError({ path });
           done(new Group(), err as Error);
           pending -= 1;
           finish();
@@ -328,7 +333,7 @@ export function RobotViewer({
         finish();
       },
       undefined,
-      (e) => setLoadError(`Could not load the robot model: ${e}`),
+      (e) => setLoadError({ error: String(e) }),
     );
 
     // ---- picking: hover on move, select on a click that was not a drag ----
@@ -478,7 +483,7 @@ export function RobotViewer({
     }
   }, [frame, selected, hovered, colorByTemp, loaded]);
 
-  const warm = warmJoints(frame);
+  const warm = warmJoints(frame, t);
   // Re-rendered with every joint frame (~30 Hz live), so "s ago" and the expiry keep up.
   const now = Date.now();
   const stopped = liveStalls(stalls ?? [], now);
@@ -487,12 +492,17 @@ export function RobotViewer({
       <div ref={hostRef} className="absolute inset-0" />
       {!loaded && !loadError && (
         <div className="absolute inset-0 grid place-items-center text-sm text-muted">
-          <StatusText status={{ tone: "busy", text: "Loading the G1 model…" }} />
+          <StatusText status={{ tone: "busy", text: t("Loading the G1 model…") }} />
         </div>
       )}
       {loadError && (
         <div className="absolute inset-0 grid place-items-center p-4 text-sm text-bad-fg">
-          <StatusText status={{ tone: "error", text: loadError }} />
+          <StatusText status={{
+            tone: "error",
+            text: "path" in loadError
+              ? t("Could not load {path}", { path: loadError.path })
+              : t("Could not load the robot model: {error}", { error: loadError.error }),
+          }} />
         </div>
       )}
       {loaded && (stopped.length > 0 || warm.length > 0) && (
@@ -500,7 +510,7 @@ export function RobotViewer({
           {stopped.length > 0 && (
             <div className="min-h-0 overflow-y-auto rounded-xl border border-[#f97316]/50 bg-panel/90 px-3 py-2 shadow-card backdrop-blur">
               <p className="m-0 mb-1 text-[11px] font-semibold uppercase tracking-wider text-[#f97316]">
-                Stopped against something
+                {t("Stopped against something")}
               </p>
               <ul className="m-0 grid list-none gap-0.5 p-0">
                 {stopped.map((s) => (
@@ -513,11 +523,11 @@ export function RobotViewer({
                       className="flex w-full cursor-pointer items-baseline justify-between gap-3 text-left text-xs"
                     >
                       <span className={`capitalize ${s.urdf === selected ? "text-fg" : "text-muted"}`}>
-                        {jointName(s.urdf)}
+                        {jointName(s.urdf, t)}
                       </span>
                       <span className="font-mono tabular-nums text-[#f97316]">
                         {s.count > 1 ? `×${s.count} · ` : ""}
-                        {Math.max(0, Math.round((now - s.at) / 1000))} s ago
+                        {t("{n} s ago", { n: Math.max(0, Math.round((now - s.at) / 1000)) })}
                       </span>
                     </button>
                   </li>
@@ -528,7 +538,7 @@ export function RobotViewer({
           {warm.length > 0 && (
             <div className="min-h-0 overflow-y-auto rounded-xl border border-line bg-panel/90 px-3 py-2 shadow-card backdrop-blur">
               <p className="m-0 mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted">
-                Warm joints
+                {t("Warm joints")}
               </p>
               <ul className="m-0 grid list-none gap-0.5 p-0">
                 {warm.map((w) => (
@@ -570,13 +580,13 @@ export function RobotViewer({
                 view === v.id ? "bg-fg text-bg" : "text-muted hover:text-fg"
               }`}
             >
-              {v.label}
+              {t(v.label)}
             </button>
           ))}
         </div>
       )}
       <p className="pointer-events-none absolute bottom-3 left-3 m-0 rounded-lg bg-panel/85 px-2.5 py-1 text-[11.5px] font-semibold text-muted shadow-card backdrop-blur">
-        Drag to orbit · scroll to zoom · click a part to inspect its joint
+        {t("Drag to orbit · scroll to zoom · click a part to inspect its joint")}
       </p>
     </div>
   );

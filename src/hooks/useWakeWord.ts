@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { t } from "../i18n";
 
 /**
  * Always-on wake-word listener, "Alexa" style: it keeps the browser's built-in
@@ -92,7 +93,7 @@ export function useWakeWord({ phrase = "robot", lang, onWake }: Options) {
     rec.onerror = (ev) => {
       // "no-speech"/"aborted" are routine; only surface real problems.
       if (ev.error === "not-allowed" || ev.error === "service-not-allowed") {
-        setError("Microphone permission denied for the wake word.");
+        setError(t("Microphone permission denied for the wake word."));
         desiredRef.current = false;
       }
     };

@@ -9,12 +9,16 @@ import { UserMenu } from "./UserMenu";
 import { SystemStatus } from "./SystemStatus";
 import { NotificationBell } from "./NotificationBell";
 import { SearchPalette } from "./SearchPalette";
+import { useT } from "../../i18n";
 
 function HeaderWithStatus() {
+  const t = useT();
   const { connected, voicePhase } = useStatus();
   const { va } = useVoiceAssistantContext();
-  const wakeWords = [va.voiceMode && "“robot”", va.robotMic && va.robotEar && "“Bender”"]
-    .filter(Boolean).join(" or ");
+  // The wake words are what is said aloud, the same in every language; only the "or" is ours.
+  const local = va.voiceMode ? "“robot”" : "";
+  const robot = va.robotMic && va.robotEar ? "“Bender”" : "";
+  const wakeWords = local && robot ? t("{a} or {b}", { a: local, b: robot }) : local || robot;
   return (
     <Header>
       <VoiceStatusBadge phase={voicePhase} wakeWords={wakeWords} />

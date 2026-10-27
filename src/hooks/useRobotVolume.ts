@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getRobotVolume, setRobotVolume } from "../api/backend";
+import { t } from "../i18n";
 
 /**
  * The robot speaker's volume, as the robot reports it, on the robot's own scale (Go2 0-10,
@@ -22,7 +23,7 @@ export function useRobotVolume(robot: string, enabled = true) {
         if (r.ok && typeof r.volume === "number") {
           setVolume(r.volume);
           if (typeof r.max === "number") setMax(r.max);
-        } else if (!ctl.signal.aborted) setError(r.error ?? "no volume");
+        } else if (!ctl.signal.aborted) setError(r.error ?? t("no volume"));
       })
       .catch(() => {
         /* aborted, or the backend is down: the slider just stays empty */
@@ -39,7 +40,7 @@ export function useRobotVolume(robot: string, enabled = true) {
       window.clearTimeout(commitTimer.current);
       commitTimer.current = window.setTimeout(async () => {
         const r = await setRobotVolume(robot, level).catch(() => null);
-        setError(r?.ok ? null : r?.error ?? "volume not set");
+        setError(r?.ok ? null : r?.error ?? t("volume not set"));
       }, 250);
     },
     [robot],

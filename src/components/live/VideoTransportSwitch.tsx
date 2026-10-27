@@ -1,6 +1,7 @@
 import { StatusText } from "../ui/StatusText";
 import { useVideoTransport } from "../layout/VideoTransportContext";
 import { Segmented } from "../ui/Segmented";
+import { useT } from "../../i18n";
 
 /**
  * Pick the path the picture takes. Renders nothing where there is nothing to switch to.
@@ -10,6 +11,7 @@ import { Segmented } from "../ui/Segmented";
  * thing, and that comparison has to be repeated on cable, on LTE and on Starlink.
  */
 export function VideoTransportSwitch() {
+  const t = useT();
   const { transport, setTransport, available, detail, lastError, whepUrl, mjpegRetired } =
     useVideoTransport();
   if (!available) return null;
@@ -17,15 +19,15 @@ export function VideoTransportSwitch() {
     {
       id: "mjpeg", label: "MJPEG", off: mjpegRetired,
       title: mjpegRetired
-        ? "Retired for this robot: H.264 intra arrives as early with fewer bytes (measured 2026-10-07)"
-        : "A JPEG per frame through this server: lowest delay on a healthy link",
+        ? t("Retired for this robot: H.264 intra arrives as early with fewer bytes (measured 2026-10-07)")
+        : t("A JPEG per frame through this server: lowest delay on a healthy link"),
     },
-    { id: "h264", label: "H.264", title: "WebRTC from the video server: holds up on a lossy link" },
-    { id: "intra", label: "H.264 intra", title: "All-intra H.264 from the robot, decoded here. Half the bytes of MJPEG, no jitter buffer." },
+    { id: "h264", label: "H.264", title: t("WebRTC from the video server: holds up on a lossy link") },
+    { id: "intra", label: "H.264 intra", title: t("All-intra H.264 from the robot, decoded here. Half the bytes of MJPEG, no jitter buffer.") },
   ];
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Segmented role="radiogroup" aria-label="Video transport" title={detail || undefined}
+      <Segmented role="radiogroup" aria-label={t("Video transport")} title={detail || undefined}
         className="flex rounded-[10px] bg-subtle p-[3px]">
         {options.map((o) => (
           <button key={o.id} type="button" role="radio" aria-checked={transport === o.id} data-on={transport === o.id}
@@ -55,7 +57,7 @@ export function VideoTransportSwitch() {
           <StatusText
             status={{
               tone: "warn",
-              text: "Open this once and accept the certificate to enable H.264",
+              text: t("Open this once and accept the certificate to enable H.264"),
             }}
           />
         </a>

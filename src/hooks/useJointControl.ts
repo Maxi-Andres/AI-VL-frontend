@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { WS_JOINT_CONTROL_URL } from "../config";
+import { t } from "../i18n";
 import {
   DEFAULT_LIMITS,
   controlMessage,
@@ -123,7 +124,7 @@ export function useJointControl(): JointControl {
     if (stalled) setState((s) => ({ ...s, stalls: noteStall(s.stalls, stalled, Date.now()) }));
     const event = r.event ? describeEvent(r.event) : null;
     if (r.op === "take" && !r.ok) {
-      update({ ...OFF, message: r.reply ?? r.error ?? "The robot refused", messageTone: "error" });
+      update({ ...OFF, message: r.reply ?? r.error ?? t("The robot refused"), messageTone: "error" });
       close();
       return;
     }
@@ -131,8 +132,8 @@ export function useJointControl(): JointControl {
     if (next === "off" || (r.status === 409 && r.error === "no control session")) {
       update({
         ...OFF,
-        message: event ?? "Released.",
-        messageTone: event && event !== "Released." ? "warn" : "ok",
+        message: event ?? t("Released."),
+        messageTone: event && event !== t("Released.") ? "warn" : "ok",
       });
       close();
       return;
@@ -149,7 +150,7 @@ export function useJointControl(): JointControl {
       patch.message = null;
     }
     if (!r.ok && r.op !== "keepalive") {
-      patch.message = r.reply ?? r.error ?? "Refused";
+      patch.message = r.reply ?? r.error ?? t("Refused");
       patch.messageTone = "error";
     } else if (event && next === "down" && !r.event?.startsWith("stall ")) {
       patch.message = event;
@@ -178,7 +179,7 @@ export function useJointControl(): JointControl {
       if (phase.current !== "off") {
         update({
           ...OFF,
-          message: "Control link lost: the robot is taking the arm back by itself.",
+          message: t("Control link lost: the robot is taking the arm back by itself."),
           messageTone: "warn",
         });
       }

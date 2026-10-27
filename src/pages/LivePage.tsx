@@ -54,12 +54,14 @@ import type {
   YoloConfig,
 } from "../types";
 import { Segmented } from "../components/ui/Segmented";
+import { useT } from "../i18n";
 
 // VLM overlay boxes are drawn one flat color (they aren't YOLO classes). YOLO
 // boxes are colored per-class by the palette in draw.ts (no override).
 const BLUE = "#60a5fa";
 
 export function LivePage() {
+  const t = useT();
   const { options, error: optionsError } = useOptions();
   const { setConnected } = useStatus();
   const { videoRef, active, facing, error: cameraError, start, stop, flip } =
@@ -358,7 +360,7 @@ export function LivePage() {
   const chooseRobotCamera = useCallback(async () => {
     handleStop();
     setSource("robot");
-    setRobotCamStatus({ tone: "busy", text: "Starting robot camera…" });
+    setRobotCamStatus({ tone: "busy", text: t("Starting robot camera…") });
     try {
       const r = await setRobotCamera("start");
       setRobotCamStatus(r.error ? { tone: "error", text: r.error } : null);
@@ -368,7 +370,7 @@ export function LivePage() {
         text: e instanceof Error ? e.message : String(e),
       });
     }
-  }, [handleStop]);
+  }, [handleStop, t]);
 
   // Opening on the robot camera starts it, as choosing it does.
   const opened = useRef(false);
@@ -435,18 +437,17 @@ export function LivePage() {
     const ac = new AbortController();
     vlmAbortRef.current = ac;
     setVlmBusy(true);
-    setVlmStatus("Asking the VLM… (this can take several seconds)");
+    setVlmStatus(t("Asking the VLM… (this can take several seconds)"));
     setVlmOutput("");
     try {
       const res = await askVlm({ image, model: vlmModel, scope, variant }, ac.signal);
       if (res.error) {
-        setVlmStatus(`Error: ${res.error}`);
+        setVlmStatus(t("Error: {error}", { error: res.error }));
         return;
       }
       setVlmStatus(
-        `${res.model} · ${fmtMs(res.elapsed_ms)} · ${
-          res.did_think ? "reasoned" : "no reasoning"
-        }${res.ok ? "" : " · (invalid JSON)"}`,
+        [res.model, fmtMs(res.elapsed_ms), res.did_think ? t("reasoned") : t("no reasoning"),
+          ...(res.ok ? [] : [t("(invalid JSON)")])].join(" · "),
       );
       setVlmOutput(JSON.stringify(res.parsed, null, 2));
       // Overlay the VLM boxes (blue) on top of the still frame.
@@ -456,11 +457,11 @@ export function LivePage() {
       }
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") return;
-      setVlmStatus(`Request failed: ${e instanceof Error ? e.message : e}`);
+      setVlmStatus(t("Request failed: {error}", { error: e instanceof Error ? e.message : String(e) }));
     } finally {
       setVlmBusy(false);
     }
-  }, [getCurrentFrame, vlmModel, scope, variant]);
+  }, [getCurrentFrame, vlmModel, scope, variant, t]);
 
   // Free-form question about the current frame, STREAMED. `onDelta` receives each
   // text chunk as the model generates it (shown live + spoken sentence by
@@ -479,7 +480,7 @@ export function LivePage() {
       const ac = new AbortController();
       vlmAbortRef.current = ac;
       setVlmBusy(true);
-      setVlmStatus("Asking the VLM…");
+      setVlmStatus(t("Asking the VLM…"));
       setVlmOutput("");
       const t0 = performance.now();
       let tFirst: number | null = null;
@@ -497,19 +498,19 @@ export function LivePage() {
         );
         const total = performance.now() - t0;
         const firstMs = tFirst !== null ? tFirst - t0 : total;
-        setVlmStatus(`${fmtMs(total)} · first reply ${fmtMs(firstMs)}`);
-        const text = answer.trim() || "(no answer)";
+        setVlmStatus(t("{total} · first reply {first}", { total: fmtMs(total), first: fmtMs(firstMs) }));
+        const text = answer.trim() || t("(no answer)");
         setVlmOutput(text);
         return text;
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") return null;
-        setVlmStatus(`Request failed: ${e instanceof Error ? e.message : e}`);
+        setVlmStatus(t("Request failed: {error}", { error: e instanceof Error ? e.message : String(e) }));
         return null;
       } finally {
         setVlmBusy(false);
       }
     },
-    [getCurrentFrame, vlmModel, cmdRobot],
+    [getCurrentFrame, vlmModel, cmdRobot, t],
   );
 
   // Hands-free voice: say "robot", speak the question, it auto-submits and (in
@@ -560,63 +561,63 @@ export function LivePage() {
   const executeResult = useCallback(async (res: CommandResponse | null) => {
     if (!res || res.skill === "unknown") return;
     setExecuting(true);
-    setExecuteStatus({ tone: "busy", text: "Sending to the robot…" });
+    setExecuteStatus({ tone: "busy", text: t("Sending to the robot…") });
     try {
       const r = await executeCommand(
         res.robot, res.skill, res.params, safeModeRef.current);
       if (r.ok) {
+        const detail = r.detail ?? t("sent");
         setExecuteStatus({
           tone: "ok",
-          text: `${r.detail ?? "sent"}${r.dry_run ? " (dry-run, not moved)" : ""}`,
+          text: r.dry_run ? t("{detail} (dry-run, not moved)", { detail }) : detail,
         });
       } else if (r.blocked) {
-        setExecuteStatus({ tone: "blocked", text: r.error ?? "blocked by SAFE_MODE" });
+        setExecuteStatus({ tone: "blocked", text: r.error ?? t("blocked by SAFE_MODE") });
       } else {
-        setExecuteStatus({ tone: "error", text: r.error ?? r.detail ?? "failed" });
+        setExecuteStatus({ tone: "error", text: r.error ?? r.detail ?? t("failed") });
       }
     } catch (e) {
       setExecuteStatus({
         tone: "error",
-        text: `Request failed: ${e instanceof Error ? e.message : String(e)}`,
+        text: t("Request failed: {error}", { error: e instanceof Error ? e.message : String(e) }),
       });
     } finally {
       setExecuting(false);
     }
-  }, []);
+  }, [t]);
 
   // --- Robot command interpreter (verification) ---
   // Send a command text to the interpreter and show the chosen skill + JSON.
   const runInterpret = useCallback(
     async (text: string) => {
-      const t = text.trim();
-      if (!t) return;
+      const said = text.trim();
+      if (!said) return;
       cmdAbortRef.current?.abort();
       const ac = new AbortController();
       cmdAbortRef.current = ac;
       setCmdBusy(true);
-      setCmdStatus("Interpreting…");
+      setCmdStatus(t("Interpreting…"));
       try {
-        const res = await interpretCommand(t, cmdModel, cmdRobot, ac.signal);
+        const res = await interpretCommand(said, cmdModel, cmdRobot, ac.signal);
         if (res.error) {
-          setCmdStatus(`Error: ${res.error}`);
+          setCmdStatus(t("Error: {error}", { error: res.error }));
           return;
         }
         setCmdResult(res);
         setCmdStatus(
-          `${res.model} · ${fmtMs(res.elapsed_ms)}${
-            res.ok ? "" : " · (invalid JSON — fell back to unknown)"
-          }`,
+          [res.model, fmtMs(res.elapsed_ms),
+            ...(res.ok ? [] : [t("(invalid JSON — fell back to unknown)")])].join(" · "),
         );
         // Auto-run: fire immediately when armed + auto (no button needed).
         if (execEnabledRef.current && autoRunRef.current) void executeResult(res);
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") return;
-        setCmdStatus(`Request failed: ${e instanceof Error ? e.message : e}`);
+        setCmdStatus(t("Request failed: {error}", { error: e instanceof Error ? e.message : String(e) }));
       } finally {
         setCmdBusy(false);
       }
     },
-    [cmdModel, cmdRobot, executeResult],
+    [cmdModel, cmdRobot, executeResult, t],
   );
 
   const handleInterpret = useCallback(
@@ -629,28 +630,28 @@ export function LivePage() {
   const handleRecordCommand = useCallback(async () => {
     if (cmdBusy || cmdRecorder.recording) return;
     setCmdBusy(true);
-    setCmdStatus("Listening… speak a command");
+    setCmdStatus(t("Listening… speak a command"));
     try {
       const blob = await cmdRecorder.recordUtterance();
       if (!blob) {
-        setCmdStatus("Didn't catch that — try again");
+        setCmdStatus(t("Didn't catch that — try again"));
         return;
       }
-      setCmdStatus("Transcribing…");
+      setCmdStatus(t("Transcribing…"));
       const res = await transcribeAudio(blob);
       const text = res.text?.trim();
       if (res.error || !text) {
-        setCmdStatus(res.error ? `Error: ${res.error}` : "Nothing recognized");
+        setCmdStatus(res.error ? t("Error: {error}", { error: res.error }) : t("Nothing recognized"));
         return;
       }
       setCmdText(text);
       await runInterpret(text); // manages its own busy/status from here
     } catch (e) {
-      setCmdStatus(`Voice error: ${e instanceof Error ? e.message : String(e)}`);
+      setCmdStatus(t("Voice error: {error}", { error: e instanceof Error ? e.message : String(e) }));
     } finally {
       setCmdBusy(false);
     }
-  }, [cmdBusy, cmdRecorder, runInterpret]);
+  }, [cmdBusy, cmdRecorder, runInterpret, t]);
 
   // Manual trigger: send the current interpreted skill to the robot.
   const handleExecuteOnRobot = useCallback(
@@ -661,43 +662,44 @@ export function LivePage() {
   // (stop is never blocked). Named *Robot to avoid the camera's handleStop.
   const handleStopRobot = useCallback(async () => {
     setExecuting(true);
-    setExecuteStatus({ tone: "busy", text: "Stopping the robot…" });
+    setExecuteStatus({ tone: "busy", text: t("Stopping the robot…") });
     try {
       const r = await executeCommand(cmdRobot, "stop", {}, false);
       setExecuteStatus(r.ok
-        ? { tone: "stopped", text: "Stopped" }
-        : { tone: "error", text: r.error ?? "stop failed" });
+        ? { tone: "stopped", text: t("Stopped") }
+        : { tone: "error", text: r.error ?? t("stop failed") });
     } catch (e) {
       setExecuteStatus({
         tone: "error",
-        text: `Stop failed: ${e instanceof Error ? e.message : String(e)}`,
+        text: t("Stop failed: {error}", { error: e instanceof Error ? e.message : String(e) }),
       });
     } finally {
       setExecuting(false);
     }
-  }, [cmdRobot]);
+  }, [cmdRobot, t]);
 
   if (optionsError) {
     return (
       <main className="p-4 text-bad-fg">
-        Could not reach the backend at its configured URL: {optionsError}. Check
-        that the backend is running and that <code>BACKEND_URL</code> in{" "}
-        <code>public/config.js</code> is correct.
+        {t("Could not reach the backend at its configured URL: {error}.", { error: optionsError })}{" "}
+        {t("Check that the backend is running and that {setting} in {file} is correct.", {
+          setting: "BACKEND_URL", file: "public/config.js",
+        })}
       </main>
     );
   }
 
   if (!options) {
-    return <main className="p-4 text-muted">Loading options…</main>;
+    return <main className="p-4 text-muted">{t("Loading options…")}</main>;
   }
 
   const variants = options.scopes[scope]?.variants ?? [];
   const live = source === "own" ? active : robotViewConnected;
   const sourceText = source === "own"
-    ? `My camera · ${facing === "environment" ? "rear" : "front"}`
+    ? facing === "environment" ? t("My camera · rear") : t("My camera · front")
     : source === "robot"
-      ? `Robot camera${videoDetail ? ` · ${videoDetail}` : ""}`
-      : "View only · mirroring the session";
+      ? videoDetail ? t("Robot camera · {detail}", { detail: videoDetail }) : t("Robot camera")
+      : t("View only · mirroring the session");
   // Boxes on screen, counted per class, for the strip under the video.
   const perClass = Object.values(objects.reduce<Record<string, { label: string; n: number; color: string }>>((acc, o) => {
     const k = o.type;
@@ -712,13 +714,13 @@ export function LivePage() {
       <div className="absolute top-3 left-3 z-10 flex max-w-[70%] flex-wrap items-center gap-2">
         <span className="on-video flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11.5px] font-extrabold tracking-wider">
           <span className={`size-2 rounded-full ${live ? "animate-pulse bg-[#ff5a5f]" : "bg-dim"}`} />
-          {live ? "LIVE" : source === "own" ? "CAMERA OFF" : "CONNECTING"}
+          {live ? t("LIVE") : source === "own" ? t("CAMERA OFF") : t("CONNECTING")}
         </span>
         <span className="on-video truncate rounded-lg px-2.5 py-1 text-[11.5px] font-semibold">{sourceText}</span>
       </div>
       <div className="absolute top-3 right-14 z-10">
         <button type="button" disabled={!mayAnalyze} onClick={() => setYoloEnabled(!yoloEnabled)}
-          title={mayAnalyze ? "Live detection on/off — off keeps the GPU idle" : "Live detection"}
+          title={mayAnalyze ? t("Live detection on/off — off keeps the GPU idle") : t("Live detection")}
           className={`on-video flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-extrabold transition enabled:cursor-pointer ${
             yoloEnabled ? "" : "on-video-muted"}`}>
           <span className={`size-2 rounded-full ${yoloEnabled ? "bg-[#2fc1b1] shadow-[0_0_0_3px_rgba(47,193,177,0.25)]" : "bg-dim"}`} />
@@ -731,16 +733,16 @@ export function LivePage() {
           <div className="flex items-center gap-1 rounded-2xl bg-white/90 p-1.5 shadow-lift backdrop-blur dark:bg-[#171922]/90">
             <button type="button" onClick={handleStart} disabled={active}
               className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-[#0f1623] px-3 py-2 text-[12.5px] font-bold text-white transition disabled:cursor-default disabled:opacity-40 dark:bg-white dark:text-[#0f1623]">
-              <IconPlayerPlayFilled size={14} />Start camera
+              <IconPlayerPlayFilled size={14} />{t("Start camera")}
             </button>
             <button type="button" onClick={handleStop} disabled={!active}
               className="flex cursor-pointer items-center gap-1.5 rounded-xl px-3 py-2 text-[12.5px] font-bold text-muted transition hover:bg-subtle hover:text-fg disabled:cursor-default disabled:opacity-40">
-              <IconPlayerStopFilled size={14} />Stop
+              <IconPlayerStopFilled size={14} />{t("Stop")}
             </button>
             <span className="h-5 w-px bg-line" />
-            <button type="button" onClick={flip} title="Switch front/rear camera"
+            <button type="button" onClick={flip} title={t("Switch front/rear camera")}
               className="flex cursor-pointer items-center gap-1.5 rounded-xl px-3 py-2 text-[12.5px] font-bold text-muted transition hover:bg-subtle hover:text-fg">
-              <IconCameraRotate size={16} />{facing === "environment" ? "Rear" : "Front"}
+              <IconCameraRotate size={16} />{facing === "environment" ? t("Rear") : t("Front")}
             </button>
           </div>
         </div>
@@ -748,7 +750,7 @@ export function LivePage() {
       {source === "view" && (
         <div className="pointer-events-none absolute inset-x-0 bottom-4 z-10 flex justify-center">
           <span className="on-video flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold">
-            <IconEye size={15} className="text-[#5fe3d4]" />Read-only mirror of what this session is showing
+            <IconEye size={15} className="text-[#5fe3d4]" />{t("Read-only mirror of what this session is showing")}
           </span>
         </div>
       )}
@@ -777,9 +779,9 @@ export function LivePage() {
         <div className="flex flex-wrap items-center gap-2.5">
           <Segmented className="flex rounded-xl bg-subtle p-1">
             {([
-              ["own", "My camera", IconDeviceLaptop, mayAnalyze, chooseOwnCamera],
-              ["robot", "Robot camera", IconVideo, mayOperate, chooseRobotCamera],
-              ["view", "View only", IconEye, mayMirror, chooseMirror],
+              ["own", t("My camera"), IconDeviceLaptop, mayAnalyze, chooseOwnCamera],
+              ["robot", t("Robot camera"), IconVideo, mayOperate, chooseRobotCamera],
+              ["view", t("View only"), IconEye, mayMirror, chooseMirror],
             ] as const).filter((b) => b[3]).map(([id, label, Icon, , go]) => (
               <button key={id} type="button" onClick={() => void go()} data-on={source === id}
                 className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-bold transition-colors ${
@@ -820,11 +822,11 @@ export function LivePage() {
 
         {/* Readings + what is on screen */}
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl border border-line bg-panel px-4 py-2.5 shadow-card">
-          <Reading label="Frame rate" value={frameRate ?? "—"} unit={frameRate ? "fps" : undefined} />
-          {source !== "own" && camRes && <Reading label="Resolution" value={camRes} />}
-          <Reading label="YOLO inference" value={yoloEnabled && inferMs ? inferMs : "—"} unit={yoloEnabled && inferMs ? "ms" : undefined} />
-          <Reading label="Objects" value={yoloEnabled ? String(objects.length) : "—"} />
-          <Reading label="Model" value={yoloEnabled ? `${yoloModel.replace(/\.pt$/, "")} · ${imgsz}px` : "Detection off"} />
+          <Reading label={t("Frame rate")} value={frameRate ?? "—"} unit={frameRate ? "fps" : undefined} />
+          {source !== "own" && camRes && <Reading label={t("Resolution")} value={camRes} />}
+          <Reading label={t("YOLO inference")} value={yoloEnabled && inferMs ? inferMs : "—"} unit={yoloEnabled && inferMs ? "ms" : undefined} />
+          <Reading label={t("Objects")} value={yoloEnabled ? String(objects.length) : "—"} />
+          <Reading label={t("Model")} value={yoloEnabled ? `${yoloModel.replace(/\.pt$/, "")} · ${imgsz}px` : t("Detection off")} />
           <span className="flex-1" />
           <div className="flex flex-wrap gap-1.5">
             {perClass.map((c) => (
@@ -842,9 +844,9 @@ export function LivePage() {
         <aside className="flex min-h-[480px] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-card">
           <Segmented className="m-3 mb-0 flex gap-0.5 rounded-xl bg-subtle p-1">
             {([
-              ["vlm", "Ask VLM", IconSparkles],
-              ["yolo", "Detection", IconScan],
-              ["command", "Command", IconTerminal2],
+              ["vlm", t("Ask VLM"), IconSparkles],
+              ["yolo", t("Detection"), IconScan],
+              ["command", t("Command"), IconTerminal2],
             ] as const).map(([id, label, Icon]) => (
               <button key={id} type="button" onClick={() => setPanel(id)} data-on={panel === id}
                 className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg py-1.5 text-[12.5px] font-bold transition-colors ${

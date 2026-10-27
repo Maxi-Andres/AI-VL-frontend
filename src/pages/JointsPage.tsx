@@ -15,6 +15,7 @@ import { STALE_AGE_MS, useJointSource, type JointSourceKind } from "../hooks/use
 import { JOINTS, JOINT_BY_URDF, readJoint } from "../lib/g1Joints";
 import { GHOST_MIN_RAD } from "../lib/jointControl";
 import { Segmented } from "../components/ui/Segmented";
+import { msg, useT } from "../i18n";
 
 /**
  * Joints — the G1 in 3D, posed live from its own joint readings, and (steps J2-J3 of
@@ -29,6 +30,7 @@ import { Segmented } from "../components/ui/Segmented";
  * G1 only: the Go2 has neither stream (the relay serves them on the G1 alone).
  */
 export function JointsPage() {
+  const t = useT();
   // /joints#replay opens straight on the recording: the link to share when the robot is off.
   const [kind, setKind] = useState<JointSourceKind>(() =>
     location.hash === "#replay" ? "replay" : "live",
@@ -100,11 +102,11 @@ export function JointsPage() {
   const fresh = !!source.frame && source.frame.ageMs >= 0 && source.frame.ageMs < STALE_AGE_MS;
   const can = useCan();
   const cannotTakeWhy = !can("operate")
-    ? "Your role can watch the robot, not move it."
+    ? t("Your role can watch the robot, not move it.")
     : kind !== "live"
-    ? "Switch the source to Live robot to move it."
+    ? t("Switch the source to Live robot to move it.")
     : source.link !== "live" || !fresh
-      ? "Waiting for live joint readings from the robot."
+      ? t("Waiting for live joint readings from the robot.")
       : null;
 
   // Clicking a part of the robot opens its details — except while steering, when the Control
@@ -115,10 +117,10 @@ export function JointsPage() {
   };
 
   const TABS = [
-    ["control", "Control", IconHandFinger],
-    ["joint", "Joint", IconTarget],
-    ["health", "Health", IconActivityHeartbeat],
-    ["all", "All joints", IconList],
+    ["control", msg("Control"), IconHandFinger],
+    ["joint", msg("Joint"), IconTarget],
+    ["health", msg("Health"), IconActivityHeartbeat],
+    ["all", msg("All joints"), IconList],
   ] as const;
 
   return (
@@ -148,7 +150,7 @@ export function JointsPage() {
             <button key={id} type="button" onClick={() => setTab(id)} aria-pressed={tab === id} data-on={tab === id}
               className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-lg py-1.5 text-[12px] font-bold whitespace-nowrap transition-colors ${
                 tab === id ? "text-fg" : "text-muted hover:text-fg"}`}>
-              <Icon size={15} className="shrink-0" />{label}
+              <Icon size={15} className="shrink-0" />{t(label)}
             </button>
           ))}
         </Segmented>

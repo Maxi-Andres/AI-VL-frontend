@@ -4,6 +4,9 @@
 import { describe, expect, it } from "vitest";
 import { ES } from "./es";
 
+// Each dictionary on its own, to check that a key lives in exactly one of them.
+const DICTIONARIES = import.meta.glob(["./es/*.ts", "!./es/index.ts"], { eager: true }) as Record<string, Record<string, Record<string, string>>>;
+
 // The app's own source, as text (Vite reads it; no Node APIs needed).
 const SOURCES = import.meta.glob(["../**/*.ts", "../**/*.tsx", "!../**/*.test.ts", "!../i18n/**"], {
   query: "?raw", import: "default", eager: true,
@@ -30,6 +33,18 @@ describe("translations", () => {
   it("has Spanish for every marked text", () => {
     const missing = [...keys()].filter(([k]) => !(k in ES)).map(([k, f]) => `${f}: ${k}`);
     expect(missing).toEqual([]);
+  });
+
+  it("keeps each key in one dictionary (shared words go to common.ts)", () => {
+    const seen = new Map<string, string>();
+    const twice: string[] = [];
+    for (const [file, mod] of Object.entries(DICTIONARIES)) {
+      for (const key of Object.keys(Object.values(mod)[0])) {
+        if (seen.has(key)) twice.push(`${key}: ${seen.get(key)} and ${file}`);
+        else seen.set(key, file);
+      }
+    }
+    expect(twice).toEqual([]);
   });
 
   it("keeps every placeholder in the Spanish", () => {

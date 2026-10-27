@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { t } from "../i18n";
 
 /**
  * Microphone capture for dictating the VLM prompt. Two modes:
@@ -66,7 +67,7 @@ export function useAudioRecorder() {
       recorder.start();
       setRecording(true);
     } catch (e) {
-      setError(`Microphone error: ${e instanceof Error ? e.message : String(e)}`);
+      setError(t("Microphone error: {error}", { error: e instanceof Error ? e.message : String(e) }));
       throw e;
     }
   }, []);
@@ -82,7 +83,7 @@ export function useAudioRecorder() {
       recorder.onstop = () => {
         const type = recorder.mimeType || "audio/webm";
         const blob = new Blob(chunksRef.current, { type });
-        streamRef.current?.getTracks().forEach((t) => t.stop());
+        streamRef.current?.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
         recorderRef.current = null;
         setRecording(false);
@@ -116,7 +117,7 @@ export function useAudioRecorder() {
             stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           } catch (e) {
             setError(
-              `Microphone error: ${e instanceof Error ? e.message : String(e)}`,
+              t("Microphone error: {error}", { error: e instanceof Error ? e.message : String(e) }),
             );
             reject(e);
             return;
@@ -162,7 +163,7 @@ export function useAudioRecorder() {
               source.disconnect();
               void audioCtx.close();
               if (audioCtxRef.current === audioCtx) audioCtxRef.current = null;
-              stream.getTracks().forEach((t) => t.stop());
+              stream.getTracks().forEach((track) => track.stop());
               streamRef.current = null;
               recorderRef.current = null;
               setRecording(false);
@@ -208,7 +209,7 @@ export function useAudioRecorder() {
             // wiring) threw: tear down what we opened and reject so the caller
             // doesn't await forever.
             try {
-              stream.getTracks().forEach((t) => t.stop());
+              stream.getTracks().forEach((track) => track.stop());
             } catch {
               /* already stopped */
             }
@@ -220,7 +221,7 @@ export function useAudioRecorder() {
             recorderRef.current = null;
             setRecording(false);
             setError(
-              `Microphone error: ${e instanceof Error ? e.message : String(e)}`,
+              t("Microphone error: {error}", { error: e instanceof Error ? e.message : String(e) }),
             );
             reject(e);
           }
@@ -239,7 +240,7 @@ export function useAudioRecorder() {
       } catch {
         /* already stopped */
       }
-      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
       recorderRef.current = null;
       if (audioCtxRef.current) {

@@ -1,5 +1,6 @@
 import { IconArrowBackUp, IconHandStop, IconMinus, IconPlus } from "@tabler/icons-react";
 import type { JointControl } from "../../hooks/useJointControl";
+import { useT } from "../../i18n";
 import {
   GROUPS,
   HAND_JOINTS,
@@ -28,18 +29,19 @@ import type { JointLimits } from "./RobotViewer";
  */
 const NUDGE_RAD = (5 * Math.PI) / 180;
 
-function phaseStatus(c: JointControl): Status {
+function phaseStatus(c: JointControl, t: ReturnType<typeof useT>): Status {
+  const pct = Math.round(c.weight * 100);
   switch (c.phase) {
     case "off":
-      return { tone: "stopped", text: "The robot's controller has the arms" };
+      return { tone: "stopped", text: t("The robot's controller has the arms") };
     case "taking":
-      return { tone: "busy", text: "Asking the robot…" };
+      return { tone: "busy", text: t("Asking the robot…") };
     case "up":
-      return { tone: "busy", text: `Taking the arms over · ${Math.round(c.weight * 100)}%` };
+      return { tone: "busy", text: t("Taking the arms over · {pct}%", { pct }) };
     case "active":
-      return { tone: "ok", text: "This page holds the arms" };
+      return { tone: "ok", text: t("This page holds the arms") };
     case "down":
-      return { tone: "busy", text: `Handing the arms back · ${Math.round(c.weight * 100)}%` };
+      return { tone: "busy", text: t("Handing the arms back · {pct}%", { pct }) };
   }
 }
 
@@ -65,8 +67,9 @@ function JointRow({
   onGoal: (urdf: string, rad: number) => void;
   onSelect: (urdf: string) => void;
 }) {
+  const t = useT();
   const ref = JOINT_BY_URDF.get(urdf);
-  const label = ref?.label ?? urdf;
+  const label = ref ? t(ref.label) : urdf;
   const measured = ref ? readJoint(frame, ref)?.q ?? null : null;
   const finger = isFinger(urdf);
   // A finger uses its whole travel (the hand limits itself); an arm joint the robot's limits.
@@ -76,7 +79,6 @@ function JointRow({
     finger ? `${Math.round((rad / fingerUpper(urdf)) * 100)}%` : fmt(rad);
   // ± steps: 5° for an arm joint, a tenth of the travel for a finger.
   const step = finger ? fingerUpper(urdf) / 10 : NUDGE_RAD;
-  const stepText = finger ? "10%" : "5 degrees";
   const set = (rad: number) => onGoal(urdf, Math.min(range.upper, Math.max(range.lower, rad)));
   const btn = "cursor-pointer rounded bg-subtle p-0.5 text-fg disabled:opacity-40";
   return (
@@ -90,11 +92,15 @@ function JointRow({
         </span>
         <span className="font-mono tabular-nums">
           <span className="text-fg">{show(goal)}</span>
-          <span className="text-muted"> · now {measured !== null ? show(measured) : "—"}</span>
+          <span className="text-muted">
+            {" · "}{t("now {value}", { value: measured !== null ? show(measured) : "—" })}
+          </span>
         </span>
       </div>
       <div className="flex items-center gap-1.5">
-        <button type="button" aria-label={`${label}: decrease by ${stepText}`}
+        <button type="button"
+          aria-label={finger ? t("{joint}: decrease by 10%", { joint: label })
+            : t("{joint}: decrease by 5 degrees", { joint: label })}
           disabled={!steering} onClick={() => set(goal - step)} className={btn}>
           <IconMinus size={12} />
         </button>
@@ -107,9 +113,11 @@ function JointRow({
           value={goal}
           disabled={!steering}
           onChange={(e) => set(Number(e.target.value))}
-          aria-label={`${label} target`}
+          aria-label={t("{joint} target", { joint: label })}
         />
-        <button type="button" aria-label={`${label}: increase by ${stepText}`}
+        <button type="button"
+          aria-label={finger ? t("{joint}: increase by 10%", { joint: label })
+            : t("{joint}: increase by 5 degrees", { joint: label })}
           disabled={!steering} onClick={() => set(goal + step)} className={btn}>
           <IconPlus size={12} />
         </button>
@@ -138,6 +146,7 @@ export function ControlPanel({
   /** Every joint's target back to where it was when control was taken. */
   onBackToStart: () => void;
 }) {
+  const t = useT();
   const inSession = control.phase !== "off" && control.phase !== "taking";
   const steering = control.phase === "up" || control.phase === "active";
   const rows = joints.filter((j) => goals[j] !== undefined && origin[j] !== undefined);
@@ -151,8 +160,8 @@ export function ControlPanel({
   };
 
   return (
-    <Section title="Move">
-      <StatusText wrap status={phaseStatus(control)} className="text-xs text-muted" />
+    <Section title={t("Move")}>
+      <StatusText wrap status={phaseStatus(control, t)} className="text-xs text-muted" />
       {control.message && (
         <StatusText
           wrap
@@ -169,10 +178,7 @@ export function ControlPanel({
       {!inSession ? (
         <>
           <p className="m-0 mt-2 text-xs text-muted">
-            Moves the arms and the waist through the robot's arm channel while its own
-            controller keeps it balanced. The robot must be standing still in Walk. Keep the
-            remote in hand: an arm can reach the body, and the robot backs a joint off if it
-            pushes against something. Releasing also sends each hand back to where it was.
+            {t("Moves the arms and the waist through the robot's arm channel while its own controller keeps it balanced. The robot must be standing still in Walk. Keep the remote in hand: an arm can reach the body, and the robot backs a joint off if it pushes against something. Releasing also sends each hand back to where it was.")}
           </p>
           <Button
             type="button"
@@ -181,7 +187,7 @@ export function ControlPanel({
             disabled={!canTake || control.phase === "taking"}
             onClick={control.take}
           >
-            Take control
+            {t("Take control")}
           </Button>
           {cannotTakeWhy && <p className="m-0 mt-1 text-xs text-muted">{cannotTakeWhy}</p>}
         </>
@@ -197,15 +203,15 @@ export function ControlPanel({
                 return (
                   <div key={g}>
                     <div className="mb-0.5 flex items-center justify-between">
-                      <h3 className="m-0 text-xs font-semibold text-muted">{g}</h3>
+                      <h3 className="m-0 text-xs font-semibold text-muted">{t(g)}</h3>
                       {hand && (
                         <span className="flex gap-1">
                           <button type="button" className={quick}
-                            onClick={() => setHand(inGroup, "open")}>Open</button>
+                            onClick={() => setHand(inGroup, "open")}>{t("Open")}</button>
                           <button type="button" className={quick}
-                            onClick={() => setHand(inGroup, "relax")}>Relax</button>
+                            onClick={() => setHand(inGroup, "relax")}>{t("Relax")}</button>
                           <button type="button" className={quick}
-                            onClick={() => setHand(inGroup, "close")}>Close</button>
+                            onClick={() => setHand(inGroup, "close")}>{t("Close")}</button>
                         </span>
                       )}
                     </div>
@@ -235,7 +241,7 @@ export function ControlPanel({
                 className="flex cursor-pointer items-center gap-1 justify-self-start text-xs text-accent2 underline-offset-2 hover:underline"
               >
                 <IconArrowBackUp size={14} />
-                Everything back to where it started
+                {t("Everything back to where it started")}
               </button>
             </div>
           )}
@@ -247,7 +253,7 @@ export function ControlPanel({
             onClick={control.release}
           >
             <IconHandStop size={16} />
-            Release — give the arms back
+            {t("Release — give the arms back")}
           </Button>
         </>
       )}

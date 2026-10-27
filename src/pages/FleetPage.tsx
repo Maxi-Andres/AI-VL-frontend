@@ -43,6 +43,7 @@ import {
 } from "../components/fleet/FleetDialogs";
 import type { Presence } from "../types";
 import { Segmented } from "../components/ui/Segmented";
+import { msg, useT, type Vars } from "../i18n";
 
 // Fleet — home. The company at a glance: how many robots answer, its sites, its people, the
 // live video; every robot as a card (with its live picture when it is the one streaming);
@@ -50,13 +51,16 @@ import { Segmented } from "../components/ui/Segmented";
 // Admins also build it here. Theme tokens only, so it reads right in light and dark.
 
 // How commands reach a robot, in words: the agent on the robot, or DDS on the same network.
+// Both are names, the same in every language.
 const LINK: Record<string, string> = { relay: "Relay", dds: "LAN" };
-const KIND: Record<string, string> = { go2: "Quadruped", g1: "Humanoid" };
+const KIND: Record<string, string> = { go2: msg("Quadruped"), g1: msg("Humanoid") };
 
-function greeting(name: string): string {
+function greeting(name: string, t: ReturnType<typeof useT>): string {
   const h = new Date().getHours();
-  const part = h < 12 ? "morning" : h < 19 ? "afternoon" : "evening";
-  return `Good ${part}, ${name.split(" ")[0]}`;
+  const first = name.split(" ")[0];
+  return h < 12 ? t("Good morning, {name}", { name: first })
+    : h < 19 ? t("Good afternoon, {name}", { name: first })
+      : t("Good evening, {name}", { name: first });
 }
 
 function siteTime(tz: string, now: Date): string {
@@ -75,6 +79,7 @@ function streaming(p: Presence | null, slot: string, net: TransportMap | null): 
 }
 
 export function FleetPage() {
+  const t = useT();
   const me = useMe();
   const can = useCan();
   const mayConfigure = can("configure");
@@ -85,7 +90,9 @@ export function FleetPage() {
   const [team, setTeam] = useState<Team | null>(null);
   const [people, setPeople] = useState<Online | null>(null);
   const [activity, setActivity] = useState<ActivityEvent[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Kept untranslated (msg) and translated when shown: loading the fleet must not depend on the
+  // language, or switching it would load everything again.
+  const [error, setError] = useState<{ text: string; vars?: Vars } | null>(null);
   const [siteIdx, setSiteIdx] = useState(0);
   const [editingSite, setEditingSite] = useState<Site | "new" | null>(null);
   const [editingRobot, setEditingRobot] = useState<{ robot: FleetRobot | null; siteId: string | null } | null>(null);
@@ -105,8 +112,8 @@ export function FleetPage() {
       setFleet({ sites: [], robots: [], slots: [], satellite: null });
       // 404 here means the server predates Fleet: it was updated but not restarted.
       setError(e instanceof AuthError && e.status === 404
-        ? "This server is running an older version of Pilot. Restart it to finish the update."
-        : `Could not load the fleet: ${errorText(e)}`);
+        ? { text: msg("This server is running an older version of Pilot. Restart it to finish the update.") }
+        : { text: msg("Could not load the fleet: {error}"), vars: { error: errorText(e) } });
     }
   }, [mayManage, mayConfigure]);
 
@@ -135,9 +142,9 @@ export function FleetPage() {
 
   const steps: { done: boolean; label: string; hint: string; go?: () => void; href?: string }[] =
     fleet && mayConfigure ? [
-      { done: sites.length > 0, label: "Add your first site", hint: "Where your robots work: a name, its location and a floor plan.", go: () => setEditingSite("new") },
-      { done: robots.length > 0, label: "Register your robots", hint: "Give each robot a name and the site it works at.", go: () => setEditingRobot({ robot: null, siteId: sites[0]?.id ?? null }) },
-      ...(team ? [{ done: team.members.length + team.invitations.length > 1, label: "Invite your team", hint: "Operators drive, viewers watch — each with their own account.", href: "/settings#team" }] : []),
+      { done: sites.length > 0, label: t("Add your first site"), hint: t("Where your robots work: a name, its location and a floor plan."), go: () => setEditingSite("new") },
+      { done: robots.length > 0, label: t("Register your robots"), hint: t("Give each robot a name and the site it works at."), go: () => setEditingRobot({ robot: null, siteId: sites[0]?.id ?? null }) },
+      ...(team ? [{ done: team.members.length + team.invitations.length > 1, label: t("Invite your team"), hint: t("Operators drive, viewers watch — each with their own account."), href: "/settings#team" }] : []),
     ] : [];
   const onboarding = steps.some((s) => !s.done);
 
@@ -152,12 +159,15 @@ export function FleetPage() {
       {/* Greeting */}
       <div className="mb-6 flex flex-wrap items-end gap-4">
         <div className="animate-rise">
-          <h1 className="m-0 text-[26px] font-extrabold tracking-[-0.025em]">{greeting(me.user.name)}</h1>
+          <h1 className="m-0 text-[26px] font-extrabold tracking-[-0.025em]">{greeting(me.user.name, t)}</h1>
           <p className="m-0 mt-1 text-muted">
             {fleet
               ? robots.length
-                ? `${online} of ${robots.length} robot${robots.length === 1 ? "" : "s"} online${sites.length ? ` · ${sites.map((s) => s.name).join(", ")}` : ""}`
-                : `${me.org.name} — let's get your fleet set up.`
+                ? (robots.length === 1
+                  ? t("{online} of {total} robot online", { online, total: robots.length })
+                  : t("{online} of {total} robots online", { online, total: robots.length }))
+                  + (sites.length ? ` · ${sites.map((s) => s.name).join(", ")}` : "")
+                : t("{org} — let's get your fleet set up.", { org: me.org.name })
               : " "}
           </p>
         </div>
@@ -174,44 +184,48 @@ export function FleetPage() {
                   </span>
                 ))}
               </div>
-              {here.length === 1 && here[0].id === me.user.id ? "Only you online" : `${here.length} online`}
+              {here.length === 1 && here[0].id === me.user.id ? t("Only you online") : t("{n} online", { n: here.length })}
             </div>
           )}
           {mayManage && (
             <Link to="/settings#team" className="flex items-center gap-2 rounded-xl border border-line bg-panel px-3.5 py-2 text-[13px] font-bold transition hover:border-dim hover:bg-subtle">
-              <IconUserPlus size={16} />Invite
+              <IconUserPlus size={16} />{t("Invite")}
             </Link>
           )}
           <Link to="/live" className="flex items-center gap-2 rounded-xl bg-fg px-3.5 py-2 text-[13px] font-bold text-bg transition hover:-translate-y-px hover:shadow-lift">
-            <IconVideo size={16} />Go live
+            <IconVideo size={16} />{t("Go live")}
           </Link>
         </div>
       </div>
 
-      {error && <Banner onClose={() => setError(null)}>{error}</Banner>}
+      {error && <Banner onClose={() => setError(null)}>{t(error.text, error.vars)}</Banner>}
 
       {/* KPIs */}
       <div className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi delay={0} icon={<IconRobot size={17} />} tint="good" label="Robots online"
-          value={fleet ? online : "—"} unit={robots.length ? `of ${robots.length}` : undefined}
+        <Kpi delay={0} icon={<IconRobot size={17} />} tint="good" label={t("Robots online")}
+          value={fleet ? online : "—"} unit={robots.length ? t("of {n}", { n: robots.length }) : undefined}
           fill={robots.length ? online / robots.length : 0} />
-        <Kpi delay={60} icon={<IconBuildingWarehouse size={17} />} tint="info" label="Sites"
-          value={fleet ? sites.length : "—"} unit={sites.length ? `${withPlan} with a floor plan` : undefined}
+        <Kpi delay={60} icon={<IconBuildingWarehouse size={17} />} tint="info" label={t("Sites")}
+          value={fleet ? sites.length : "—"} unit={sites.length ? t("{n} with a floor plan", { n: withPlan }) : undefined}
           fill={sites.length ? withPlan / sites.length : 0} />
         {/* Who has Pilot open, out of the whole team: a full bar is everyone here. */}
-        <Kpi delay={120} icon={<IconUsers size={17} />} tint="warn" label="Team online"
+        <Kpi delay={120} icon={<IconUsers size={17} />} tint="warn" label={t("Team online")}
           value={people ? here.length : "—"}
-          unit={people ? `of ${people.members}${team?.invitations.length ? ` · +${team.invitations.length} invited` : ""}` : undefined}
+          unit={people
+            ? team?.invitations.length
+              ? t("of {n} · +{invited} invited", { n: people.members, invited: team.invitations.length })
+              : t("of {n}", { n: people.members })
+            : undefined}
           fill={people?.members ? here.length / people.members : 0} />
-        <Kpi delay={180} icon={<IconVideo size={17} />} tint="bad" label="Live video"
-          value={cam?.live ? `${cam.fps ? Math.round(cam.fps) : "—"}` : "Off"} unit={cam?.live ? "fps" : undefined}
+        <Kpi delay={180} icon={<IconVideo size={17} />} tint="bad" label={t("Live video")}
+          value={cam?.live ? `${cam.fps ? Math.round(cam.fps) : "—"}` : t("Off")} unit={cam?.live ? "fps" : undefined}
           fill={cam?.live && cam.fps ? Math.min(1, cam.fps / 15) : 0} />
       </div>
 
       {onboarding && (
         <section className="mb-4 animate-rise rounded-2xl border border-line bg-panel p-5 shadow-card">
-          <h2 className="m-0 text-[15px] font-extrabold">Get {me.org.name} ready</h2>
-          <p className="m-0 mt-0.5 mb-4 text-[13px] text-muted">A few steps and your team can start operating.</p>
+          <h2 className="m-0 text-[15px] font-extrabold">{t("Get {org} ready", { org: me.org.name })}</h2>
+          <p className="m-0 mt-0.5 mb-4 text-[13px] text-muted">{t("A few steps and your team can start operating.")}</p>
           <ol className="m-0 grid list-none gap-3 p-0 md:grid-cols-3">
             {steps.map((s, i) => (
               <li key={s.label} className={`rounded-xl border p-3.5 ${s.done ? "border-accent/30 bg-good-bg" : "border-line bg-bg"}`}>
@@ -223,8 +237,8 @@ export function FleetPage() {
                 </div>
                 <p className="m-0 mt-2 text-xs text-muted">{s.hint}</p>
                 {!s.done && (s.href
-                  ? <Link to={s.href} className="mt-3 inline-block text-xs font-bold text-accent hover:underline">Open Team</Link>
-                  : <button onClick={s.go} className="mt-3 cursor-pointer text-xs font-bold text-accent hover:underline">Start</button>)}
+                  ? <Link to={s.href} className="mt-3 inline-block text-xs font-bold text-accent hover:underline">{t("Open Team")}</Link>
+                  : <button onClick={s.go} className="mt-3 cursor-pointer text-xs font-bold text-accent hover:underline">{t("Start")}</button>)}
               </li>
             ))}
           </ol>
@@ -237,10 +251,10 @@ export function FleetPage() {
           {/* Robots */}
           <section className="animate-rise rounded-2xl border border-line bg-panel shadow-card [animation-delay:120ms]">
             <header className="flex items-center gap-2.5 border-b border-line px-5 py-3.5">
-              <h2 className="m-0 text-[15px] font-extrabold">Robots</h2>
+              <h2 className="m-0 text-[15px] font-extrabold">{t("Robots")}</h2>
               {robots.length > 0 && (
                 <span className="flex items-center gap-1.5 rounded-full bg-good-bg px-2.5 py-0.5 text-xs font-bold text-good-fg">
-                  <span className="size-1.5 rounded-full bg-current" />{online} online
+                  <span className="size-1.5 rounded-full bg-current" />{t("{n} online", { n: online })}
                 </span>
               )}
             </header>
@@ -260,23 +274,23 @@ export function FleetPage() {
                       <span className="mx-auto mb-3 grid size-11 place-items-center rounded-2xl bg-subtle text-muted transition group-hover:bg-accent group-hover:text-on-accent">
                         <IconPlus size={22} />
                       </span>
-                      <b className="block text-sm">Add a robot</b>
-                      <span className="mt-1 block text-[13px] text-muted">A Go2 or a G1 — it shows up here, live.</span>
+                      <b className="block text-sm">{t("Add a robot")}</b>
+                      <span className="mt-1 block text-[13px] text-muted">{t("A Go2 or a G1 — it shows up here, live.")}</span>
                     </span>
                   </button>
                 )}
               </div>
             ) : (
-              <Empty icon={<IconRobot size={26} />} title="No robots yet"
-                text={mayConfigure ? "Register your Go2 or G1 to see it here, live." : `An admin of ${me.org.name} registers the robots.`}
-                action={mayConfigure ? { label: "Register a robot", go: () => setEditingRobot({ robot: null, siteId: site?.id ?? null }) } : undefined} />
+              <Empty icon={<IconRobot size={26} />} title={t("No robots yet")}
+                text={mayConfigure ? t("Register your Go2 or G1 to see it here, live.") : t("An admin of {org} registers the robots.", { org: me.org.name })}
+                action={mayConfigure ? { label: t("Register a robot"), go: () => setEditingRobot({ robot: null, siteId: site?.id ?? null }) } : undefined} />
             )}
           </section>
 
           {/* Site */}
           <section className="animate-rise overflow-hidden rounded-2xl border border-line bg-panel shadow-card [animation-delay:180ms] xl:sticky xl:top-[72px]">
             <header className="flex flex-wrap items-center gap-2.5 border-b border-line px-5 py-3">
-              <h2 className="m-0 text-[15px] font-extrabold">{site ? site.name : "Sites"}</h2>
+              <h2 className="m-0 text-[15px] font-extrabold">{site ? site.name : t("Sites")}</h2>
               {site && (
                 <span className="flex items-center gap-1 text-xs text-muted" title={site.timezone}>
                   <IconClock size={13} />{siteTime(site.timezone, now)}
@@ -294,10 +308,10 @@ export function FleetPage() {
                   </Segmented>
                 )}
                 {mayConfigure && site && (
-                  <IconButton title="Edit site" onClick={() => setEditingSite(site)}><IconPencil size={16} /></IconButton>
+                  <IconButton title={t("Edit site")} onClick={() => setEditingSite(site)}><IconPencil size={16} /></IconButton>
                 )}
                 {mayConfigure && (
-                  <IconButton title="Add a site" onClick={() => setEditingSite("new")}><IconMapPinPlus size={16} /></IconButton>
+                  <IconButton title={t("Add a site")} onClick={() => setEditingSite("new")}><IconMapPinPlus size={16} /></IconButton>
                 )}
               </div>
             </header>
@@ -305,21 +319,21 @@ export function FleetPage() {
               <>
                 <div className="relative h-[300px] bg-bg">
                   {site.has_plan ? (
-                    <img src={planUrl(site, planVersion)} alt={`Floor plan of ${site.name}`} className="absolute inset-0 size-full object-contain p-3" />
+                    <img src={planUrl(site, planVersion)} alt={t("Floor plan of {name}", { name: site.name })} className="absolute inset-0 size-full object-contain p-3" />
                   ) : site.lat !== null && site.lon !== null ? (
                     <SiteMap lat={site.lat} lon={site.lon} satellite={fleet?.satellite} className="absolute inset-0" />
                   ) : (
-                    <Empty fill icon={<IconMapPin size={24} />} title="No map yet"
-                      text={mayConfigure ? "Add the floor plan or the location." : "An admin can add the floor plan."}
-                      action={mayConfigure ? { label: "Edit site", go: () => setEditingSite(site) } : undefined} />
+                    <Empty fill icon={<IconMapPin size={24} />} title={t("No map yet")}
+                      text={mayConfigure ? t("Add the floor plan or the location.") : t("An admin can add the floor plan.")}
+                      action={mayConfigure ? { label: t("Edit site"), go: () => setEditingSite(site) } : undefined} />
                   )}
                 </div>
                 {site.address && <div className="border-t border-line px-5 py-2.5 text-xs text-muted">{site.address}</div>}
               </>
             ) : (
-              <Empty icon={<IconBuildingWarehouse size={26} />} title="No sites yet"
-                text={mayConfigure ? "A warehouse, a plant, a lab — where your robots work." : "An admin adds the company's sites."}
-                action={mayConfigure ? { label: "Add a site", go: () => setEditingSite("new") } : undefined} />
+              <Empty icon={<IconBuildingWarehouse size={26} />} title={t("No sites yet")}
+                text={mayConfigure ? t("A warehouse, a plant, a lab — where your robots work.") : t("An admin adds the company's sites.")}
+                action={mayConfigure ? { label: t("Add a site"), go: () => setEditingSite("new") } : undefined} />
             )}
           </section>
 
@@ -332,10 +346,10 @@ export function FleetPage() {
         {activity && (
           <section className="animate-rise rounded-2xl border border-line bg-panel shadow-card [animation-delay:300ms]">
             <header className="flex items-center gap-2.5 border-b border-line px-5 py-3">
-              <h2 className="m-0 text-[15px] font-extrabold">Activity</h2>
+              <h2 className="m-0 text-[15px] font-extrabold">{t("Activity")}</h2>
               <Link to="/settings#activity"
                 className="ml-auto rounded-[10px] border border-line px-3 py-1.5 text-[13px] font-bold transition hover:bg-subtle">
-                View all
+                {t("View all")}
               </Link>
             </header>
             {activity.length ? (
@@ -343,7 +357,7 @@ export function FleetPage() {
                 {activity.slice(0, 5).map((ev, i) => <ActivityRow key={`${ev.at}-${i}`} ev={ev} />)}
               </ul>
             ) : (
-              <p className="m-0 px-5 py-6 text-center text-sm text-muted">Nothing yet.</p>
+              <p className="m-0 px-5 py-6 text-center text-sm text-muted">{t("Nothing yet.")}</p>
             )}
           </section>
         )}
@@ -401,6 +415,7 @@ function Kpi({ icon, tint, label, value, unit, fill, delay }: {
 
 /** The services behind the robots (systemRows), as tiles. All of it from /api/presence. */
 function SystemPanel({ presence, wide }: { presence: Presence | null; wide: boolean }) {
+  const t = useT();
   const p = presence;
   const rows = p ? systemRows(p) : [];
   const issues = rows.filter((r) => r.tone === "bad" || r.tone === "warn").length;
@@ -408,11 +423,13 @@ function SystemPanel({ presence, wide }: { presence: Presence | null; wide: bool
   return (
     <section className={`animate-rise rounded-2xl border border-line bg-panel shadow-card [animation-delay:240ms] ${wide ? "xl:col-span-2" : ""}`}>
       <header className="flex items-center gap-2.5 border-b border-line px-5 py-3.5">
-        <h2 className="m-0 text-[15px] font-extrabold">System</h2>
+        <h2 className="m-0 text-[15px] font-extrabold">{t("System")}</h2>
         {p && (
           <span className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold ${PILL[issues ? "warn" : "good"]}`}>
             <span className="size-1.5 rounded-full bg-current" />
-            {issues ? `${issues} need${issues === 1 ? "s" : ""} attention` : "All systems normal"}
+            {issues
+              ? issues === 1 ? t("{n} needs attention", { n: issues }) : t("{n} need attention", { n: issues })
+              : t("All systems normal")}
           </span>
         )}
       </header>
@@ -432,7 +449,7 @@ function SystemPanel({ presence, wide }: { presence: Presence | null; wide: bool
           ))}
         </div>
       ) : (
-        <p className="m-0 px-5 py-6 text-center text-sm text-muted">Checking…</p>
+        <p className="m-0 px-5 py-6 text-center text-sm text-muted">{t("Checking…")}</p>
       )}
     </section>
   );
@@ -442,6 +459,7 @@ function RobotCard({ robot, site, presence, net, editable, onEdit }: {
   robot: FleetRobot; site: string | null; presence: Presence | null; net: TransportMap | null;
   editable: boolean; onEdit: () => void;
 }) {
+  const t = useT();
   const { setRobot } = useRobot();
   const can = useCan();
   const navigate = useNavigate();
@@ -454,8 +472,8 @@ function RobotCard({ robot, site, presence, net, editable, onEdit }: {
   const [frameOk, setFrameOk] = useState(true);
   useEffect(() => {
     if (!live) return;
-    const t = window.setInterval(() => setFrame((n) => n + 1), 2500);
-    return () => window.clearInterval(t);
+    const timer = window.setInterval(() => setFrame((n) => n + 1), 2500);
+    return () => window.clearInterval(timer);
   }, [live]);
   const open = (path: string) => {
     setRobot(robot.slot);
@@ -467,18 +485,19 @@ function RobotCard({ robot, site, presence, net, editable, onEdit }: {
   const tone = state && state.tone !== "idle" ? state.tone : st.online === true ? "good" : st.online === false ? "bad" : "idle";
   const badge = { good: "text-good-fg", warn: "text-warn-fg", bad: "text-bad-fg", idle: "text-muted" }[tone];
   const offline = tone === "bad";
+  // robotState's tones are good, bad or idle ("unknown"): past the first two, nothing was measured.
   const label = offline
-    ? `Offline${st.online === false && st.since ? ` · ${span(st.since)}` : ""}`
-    : tone === "good" ? "Online" : state?.text && state.text !== "unknown" ? state.text : "Not measured";
+    ? st.online === false && st.since ? t("Offline · {since}", { since: span(st.since) }) : t("Offline")
+    : tone === "good" ? t("Online") : state && state.tone !== "idle" ? state.text : t("Not measured");
   const freshBattery = typeof battery?.percent === "number" && !battery.stale ? battery.percent : null;
   const lastBattery = freshBattery ?? st.battery_pct;
 
   return (
     <article className="group overflow-hidden rounded-xl border border-line bg-panel transition duration-200 hover:-translate-y-0.5 hover:border-dim hover:shadow-lift">
-      <button onClick={() => open("/live")} aria-label={`Open ${robot.name} live`}
+      <button onClick={() => open("/live")} aria-label={t("Open {name} live", { name: robot.name })}
         className={`relative block h-[120px] w-full cursor-pointer overflow-hidden bg-gradient-to-br from-[#123f3a] via-[#1b2a33] to-[#2a2a14] text-left transition ${offline ? "opacity-80 grayscale" : ""}`}>
         {live && frameOk ? (
-          <img src={`${BACKEND_URL}/api/robot-frame?t=${frame}`} alt={`${robot.name}, live`} onError={() => setFrameOk(false)}
+          <img src={`${BACKEND_URL}/api/robot-frame?t=${frame}`} alt={t("{name}, live", { name: robot.name })} onError={() => setFrameOk(false)}
             className="absolute inset-0 size-full object-cover" />
         ) : (
           <Icon size={64} stroke={1.2} className="absolute right-4 bottom-2 text-white/15 transition duration-300 group-hover:scale-105" />
@@ -490,7 +509,7 @@ function RobotCard({ robot, site, presence, net, editable, onEdit }: {
         </span>
         {live && (
           <span className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 text-[11.5px] font-bold text-white">
-            <span className="size-1.5 animate-pulse rounded-full bg-[#ff5a5f]" />LIVE
+            <span className="size-1.5 animate-pulse rounded-full bg-[#ff5a5f]" />{t("LIVE")}
           </span>
         )}
       </button>
@@ -498,10 +517,10 @@ function RobotCard({ robot, site, presence, net, editable, onEdit }: {
         <div className="flex items-center gap-2">
           <RobotIcon slot={robot.slot} color={robot.color} id={robot.id} size={26} />
           <b className="min-w-0 truncate text-[14.5px]">{robot.name}</b>
-          <span className="ml-auto shrink-0 text-xs text-dim" title={robot.model}>{KIND[robot.slot] ?? robot.model}</span>
+          <span className="ml-auto shrink-0 text-xs text-dim" title={robot.model}>{KIND[robot.slot] ? t(KIND[robot.slot]) : robot.model}</span>
           {/* Always visible: an edit that only shows on hover is one nobody finds. */}
           {editable && (
-            <button onClick={onEdit} title="Edit name, model, serial and site" aria-label={`Edit ${robot.name}`}
+            <button onClick={onEdit} title={t("Edit name, model, serial and site")} aria-label={t("Edit {name}", { name: robot.name })}
               className="-mr-1 grid size-7 shrink-0 cursor-pointer place-items-center rounded-lg text-muted transition hover:bg-good-bg hover:text-good-fg">
               <IconPencil size={16} />
             </button>
@@ -511,17 +530,17 @@ function RobotCard({ robot, site, presence, net, editable, onEdit }: {
           {[robot.model.replace(/^Unitree /, ""), site, st.link ? LINK[st.link] ?? st.link : null].filter(Boolean).join(" · ")}
         </div>
         <div className="mt-3 grid grid-cols-3 gap-2 border-t border-dashed border-line pt-3">
-          <Stat label="Battery" value={lastBattery !== null ? `${Math.round(lastBattery)}%` : "—"}
+          <Stat label={t("Battery")} value={lastBattery !== null ? `${Math.round(lastBattery)}%` : "—"}
             dim={freshBattery === null && lastBattery !== null}
-            title={freshBattery === null && st.battery_at ? `Last reading, ${ago(st.battery_at)}` : undefined} />
-          <Stat label="Latency" mono value={!offline && st.latency_ms !== null ? `${Math.max(1, Math.round(st.latency_ms))} ms` : "—"}
-            title="Round trip from this server to the robot" />
-          <Stat label="Seen" value={tone === "good" ? "Now" : st.last_seen_at ? ago(st.last_seen_at) : "Never"}
+            title={freshBattery === null && st.battery_at ? t("Last reading, {ago}", { ago: ago(st.battery_at) }) : undefined} />
+          <Stat label={t("Latency")} mono value={!offline && st.latency_ms !== null ? `${Math.max(1, Math.round(st.latency_ms))} ms` : "—"}
+            title={t("Round trip from this server to the robot")} />
+          <Stat label={t("Seen")} value={tone === "good" ? t("Now") : st.last_seen_at ? ago(st.last_seen_at) : t("Never")}
             title={st.last_seen_at ? new Date(st.last_seen_at).toLocaleString() : undefined} />
         </div>
         <div className="mt-3 flex gap-2">
-          <SmallButton onClick={() => open("/live")}><IconVideo size={14} />Live</SmallButton>
-          {can("operate") && <SmallButton onClick={() => open("/drive")}><IconSteeringWheel size={14} />Drive</SmallButton>}
+          <SmallButton onClick={() => open("/live")}><IconVideo size={14} />{t("Live")}</SmallButton>
+          {can("operate") && <SmallButton onClick={() => open("/drive")}><IconSteeringWheel size={14} />{t("Drive")}</SmallButton>}
         </div>
       </div>
     </article>

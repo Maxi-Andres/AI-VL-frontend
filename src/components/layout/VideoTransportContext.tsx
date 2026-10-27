@@ -4,6 +4,7 @@ import { useH264FrameStream } from "../../hooks/useH264FrameStream";
 import { whepUrlFor } from "../../robotStreams";
 import { useRobot } from "./RobotContext";
 import { useWhepStream, type WhepStats } from "../../hooks/useWhepStream";
+import { useT } from "../../i18n";
 
 /**
  * The three paths a picture can take here, and they are not variations of one another:
@@ -81,6 +82,7 @@ const Ctx = createContext<VideoTransportValue | null>(null);
  * because it leaves the robot ONCE (1.4 Mbps) instead of once per viewer (8.9 Mbps each).
  */
 export function VideoTransportProvider({ children }: { children: ReactNode }) {
+  const t = useT();
   const [transport, setTransportState] = useState<VideoTransport>("mjpeg");
   const available = Boolean(WHEP_URL);
   // The selected robot's own mediamtx path: picking the G1 must not keep showing the Go2.
@@ -88,10 +90,10 @@ export function VideoTransportProvider({ children }: { children: ReactNode }) {
   const mjpegRetired = MJPEG_RETIRED_FOR.has(robot);
   // Where a dead path falls back to, and what the robot starts on.
   const fallback: VideoTransport = mjpegRetired ? "intra" : "mjpeg";
-  const setTransport = (t: VideoTransport) => setTransportState(t === "mjpeg" ? fallback : t);
+  const setTransport = (next: VideoTransport) => setTransportState(next === "mjpeg" ? fallback : next);
   // Picking a robot that retired MJPEG while on it moves the view to the all-intra branch.
   useEffect(() => {
-    if (mjpegRetired) setTransportState((t) => (t === "mjpeg" ? "intra" : t));
+    if (mjpegRetired) setTransportState((cur) => (cur === "mjpeg" ? "intra" : cur));
   }, [mjpegRetired]);
   const whepUrl = whepUrlFor(WHEP_URL, robot);
   const { stream, connected, stats, error } = useWhepStream(
@@ -134,18 +136,20 @@ export function VideoTransportProvider({ children }: { children: ReactNode }) {
   const detail =
     transport === "intra"
       ? intra.error
-        ? `H.264 all-intra · ${intra.error}`
+        ? t("H.264 all-intra · {error}", { error: intra.error })
         : intra.stats
-          ? `H.264 all-intra ${intra.stats.fps.toFixed(1)} fps · ` +
-            `${Math.round(intra.stats.kbps)} kbps · ${intra.stats.errors} errors`
-          : "H.264 all-intra · connecting"
+          ? t("H.264 all-intra {fps} fps · {kbps} kbps · {errors} errors", {
+            fps: intra.stats.fps.toFixed(1), kbps: Math.round(intra.stats.kbps), errors: intra.stats.errors,
+          })
+          : t("H.264 all-intra · connecting")
       : transport === "mjpeg"
-      ? "MJPEG over the backend"
+      ? t("MJPEG over the backend")
       : stats
-        ? `H.264/WebRTC ${stats.fps.toFixed(1)} fps · ${Math.round(stats.kbps)} kbps · ` +
-          `${stats.freezes} freezes (${stats.freezeSeconds.toFixed(1)}s) · ` +
-          `jitter ${stats.jitterBufferMs} ms · lost ${stats.packetsLost}`
-        : "H.264/WebRTC · connecting";
+        ? t("H.264/WebRTC {fps} fps · {kbps} kbps · {freezes} freezes ({seconds}s) · jitter {jitter} ms · lost {lost}", {
+          fps: stats.fps.toFixed(1), kbps: Math.round(stats.kbps), freezes: stats.freezes,
+          seconds: stats.freezeSeconds.toFixed(1), jitter: stats.jitterBufferMs, lost: stats.packetsLost,
+        })
+        : t("H.264/WebRTC · connecting");
 
   return (
     <Ctx.Provider

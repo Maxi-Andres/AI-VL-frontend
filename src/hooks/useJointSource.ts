@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { WS_JOINTS_URL } from "../config";
+import { t } from "../i18n";
 import { BODY_JOINTS, parseStreamMessage, type JointFrame } from "../lib/g1Joints";
 
 /**
@@ -59,7 +60,7 @@ export function useJointSource(kind: JointSourceKind): JointSourceState {
     if (kind !== "replay") return;
     let cancelled = false;
     let timer: number | undefined;
-    setState({ frame: null, link: "replay", error: null, hz: 0, note: "Loading recording…" });
+    setState({ frame: null, link: "replay", error: null, hz: 0, note: t("Loading recording…") });
     fetch(`${import.meta.env.BASE_URL}g1/sample-walk.json`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -79,13 +80,17 @@ export function useJointSource(kind: JointSourceKind): JointSourceState {
             link: "replay",
             error: null,
             hz: sample.rate_hz,
-            note: `${sample.source}. No hands, torque or temperature in this recording.`,
+            note: t("{source}. No hands, torque or temperature in this recording.", {
+              source: sample.source,
+            }),
           });
         }, 1000 / sample.rate_hz);
       })
       .catch((e: unknown) => {
         if (!cancelled)
-          setState((s) => ({ ...s, link: "error", error: `Recording not available: ${e}` }));
+          setState((s) => ({
+            ...s, link: "error", error: t("Recording not available: {error}", { error: String(e) }),
+          }));
       });
     return () => {
       cancelled = true;
@@ -134,7 +139,7 @@ export function useJointSource(kind: JointSourceKind): JointSourceState {
         setState((s) => ({
           ...s,
           link: "error",
-          error: lastError ?? "Connection to the backend closed",
+          error: lastError ?? t("Connection to the backend closed"),
           hz: 0,
         }));
         retry = window.setTimeout(connect, backoff);

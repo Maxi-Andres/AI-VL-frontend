@@ -3,6 +3,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { rememberPref } from "../../lib/prefs";
 import { MAP_TILES, SATELLITE_ATTRIBUTION } from "../../config";
+import { useT } from "../../i18n";
 
 // A site's location on a street map. Read-only by default; with `onPick`, a click moves the
 // pin (the site editor). Leaflet is driven directly — one small component does not need a
@@ -40,6 +41,7 @@ export function SiteMap({ lat, lon, onPick, focus = 0, satellite = null, classNa
   /** Must position the box (relative, absolute…): the layer switch sits inside it. */
   className?: string;
 }) {
+  const t = useT();
   const [layer, setLayer] = useState<Layer>(savedLayer);
   const tiles = useRef<L.TileLayer | null>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -134,7 +136,7 @@ export function SiteMap({ lat, lon, onPick, focus = 0, satellite = null, classNa
           {(["satellite", "street"] as const).map((l) => (
             <button key={l} type="button" onClick={() => pick(l)} aria-pressed={shown === l}
               className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-bold ${shown === l ? "bg-fg text-bg" : "text-muted hover:text-fg"}`}>
-              {l === "satellite" ? "Satellite" : "Map"}
+              {l === "satellite" ? t("Satellite") : t("Map")}
             </button>
           ))}
         </div>

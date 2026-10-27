@@ -2,8 +2,16 @@
 // (db.COLORS in the backend) and picks one at random on creation; the shades live here.
 // Pastel gradients with a dark ink of the same hue read on both themes; the solid tone is the
 // robot icon and the picker swatch.
+import { msg } from "../i18n";
+
 export const COLORS = ["teal", "indigo", "amber", "rose", "green", "violet", "sky", "slate"] as const;
 export type ColorName = (typeof COLORS)[number];
+
+/** Each colour's name as people read it (the picker's tooltip); translate with t() where shown. */
+export const COLOR_LABEL: Record<ColorName, string> = {
+  teal: msg("teal"), indigo: msg("indigo"), amber: msg("amber"), rose: msg("rose"),
+  green: msg("green"), violet: msg("violet"), sky: msg("sky"), slate: msg("slate"),
+};
 
 const AVATAR: Record<ColorName, string> = {
   teal: "from-[#d6f1ed] to-[#f4efc4] text-[#0f5a52]",

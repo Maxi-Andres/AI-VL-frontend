@@ -2,6 +2,7 @@
 import { BACKEND_URL } from "../config";
 import { backendFetch } from "./backend";
 import { AuthError } from "./auth";
+import { msg, t } from "../i18n";
 
 export interface Site {
   id: string;
@@ -48,14 +49,14 @@ export interface Fleet {
 
 /** Said when the server does not know a route this page uses: the app was updated and the
  * server not restarted, so the page is newer than the server behind it. */
-export const OUTDATED_SERVER = "This server is running an older version of Pilot. Restart it to finish the update.";
+export const OUTDATED_SERVER = msg("This server is running an older version of Pilot. Restart it to finish the update.");
 
 /** A failed response as an error the person can read (the backend writes `detail` for people).
  * A route the server has never heard of — 405, or FastAPI's bare "Not Found" (ours always say
  * what was not found) — means an outdated server, and says so instead of an HTTP phrase. */
 export async function check(r: Response): Promise<Response> {
   if (r.ok) return r;
-  let message = `Something went wrong (${r.status}).`;
+  let message: string | null = null;
   try {
     const body = (await r.json()) as { detail?: unknown };
     if (typeof body.detail === "string") message = body.detail;
@@ -64,7 +65,9 @@ export async function check(r: Response): Promise<Response> {
     /* keep the generic message */
   }
   if (r.status === 405 || (r.status === 404 && message === "Not Found")) message = OUTDATED_SERVER;
-  throw new AuthError(r.status, message);
+  // Translated as the error is made. The server writes its texts in English and they match the
+  // SERVER dictionary (i18n/es/server.ts) exactly; one it does not list stays as it came.
+  throw new AuthError(r.status, message === null ? t("Something went wrong ({status}).", { status: r.status }) : t(message));
 }
 
 export const json = (method: string, body: unknown): RequestInit => ({

@@ -3,15 +3,16 @@ import type { ReactNode } from "react";
 import { IconCheck, IconScan, IconSearch, IconX } from "@tabler/icons-react";
 import { Switch } from "../ui/Switch";
 import { Segmented } from "../ui/Segmented";
+import { msg, useT } from "../../i18n";
 
 const IMG_SIZES = [320, 640, 960, 1280];
 const FPS_CAPS = [1, 2, 5, 10, 15, 30, 0]; // 0 = unlimited
 
 // One-tap class sets, offered when the model knows them (COCO's names).
 const PRESETS: { label: string; classes: string[] }[] = [
-  { label: "People", classes: ["person"] },
-  { label: "Vehicles", classes: ["bicycle", "car", "motorcycle", "bus", "truck"] },
-  { label: "Animals", classes: ["bird", "cat", "dog", "horse"] },
+  { label: msg("People"), classes: ["person"] },
+  { label: msg("Vehicles"), classes: ["bicycle", "car", "motorcycle", "bus", "truck"] },
+  { label: msg("Animals"), classes: ["bird", "cat", "dog", "horse"] },
 ];
 
 /** What detection is seeing right now, measured on the page from the replies. */
@@ -67,6 +68,7 @@ export function YoloPanel({
   onClassesChange,
   onMaxFpsChange,
 }: Props) {
+  const t = useT();
   const [q, setQ] = useState("");
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -87,12 +89,14 @@ export function YoloPanel({
           <IconScan size={19} />
         </span>
         <div className="min-w-0 flex-1">
-          <b className="block text-[13.5px]">Live detection</b>
+          <b className="block text-[13.5px]">{t("Live detection")}</b>
           <small className="block text-xs text-muted">
-            {enabled ? `Running ${model.replace(/\.pt$/, "")} at ${imgsz}px on the server` : "Off — nothing is detected and the GPU stays idle"}
+            {enabled
+              ? t("Running {model} at {size}px on the server", { model: model.replace(/\.pt$/, ""), size: imgsz })
+              : t("Off — nothing is detected and the GPU stays idle")}
           </small>
         </div>
-        <Switch on={enabled} onChange={onEnabledChange} label="Live detection" />
+        <Switch on={enabled} onChange={onEnabledChange} label={t("Live detection")} />
       </div>
 
       {/* What it sees right now */}
@@ -100,9 +104,9 @@ export function YoloPanel({
         <div className="min-h-0 overflow-hidden">
           <div className="mt-2 rounded-2xl border border-line p-3">
             <div className="grid grid-cols-3 gap-2">
-              <Stat label="In view" value={String(now.objects)} />
-              <Stat label="Inference" value={now.inferMs ?? "—"} unit={now.inferMs ? "ms" : undefined} />
-              <Stat label="Processed" value={now.fps ?? "—"} unit={now.fps ? "fps" : undefined} />
+              <Stat label={t("In view")} value={String(now.objects)} />
+              <Stat label={t("Inference")} value={now.inferMs ?? "—"} unit={now.inferMs ? "ms" : undefined} />
+              <Stat label={t("Processed")} value={now.fps ?? "—"} unit={now.fps ? "fps" : undefined} />
             </div>
             <div className="mt-2.5 flex min-h-[26px] flex-wrap gap-1.5">
               {now.perClass.length ? now.perClass.map((c) => (
@@ -110,15 +114,15 @@ export function YoloPanel({
                   <span className="size-2 rounded-sm" style={{ background: c.color }} />
                   {c.label}<span className="text-muted">×{c.n}</span>
                 </span>
-              )) : <span className="self-center text-xs text-dim">Nothing in view{classes.length ? " of the chosen classes" : ""}.</span>}
+              )) : <span className="self-center text-xs text-dim">{classes.length ? t("Nothing in view of the chosen classes.") : t("Nothing in view.")}</span>}
             </div>
           </div>
         </div>
       </div>
 
       <div className={`transition-opacity ${enabled ? "" : "opacity-70"}`}>
-        <Row label="Model" hint="Bigger models see more, and cost more GPU">
-          <select value={model} onChange={(e) => onModelChange(e.target.value)} aria-label="Model"
+        <Row label={t("Model")} hint={t("Bigger models see more, and cost more GPU")}>
+          <select value={model} onChange={(e) => onModelChange(e.target.value)} aria-label={t("Model")}
             className="w-40 rounded-lg border border-line bg-bg px-2 py-1.5 text-xs font-semibold text-fg focus:border-accent focus:outline-none">
             {models.map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
@@ -126,43 +130,43 @@ export function YoloPanel({
 
         <div className="border-b border-line py-3">
           <div className="flex items-baseline justify-between">
-            <b className="text-[13px]">Confidence</b>
+            <b className="text-[13px]">{t("Confidence")}</b>
             <b className="font-mono text-[12.5px]">{conf.toFixed(2)}</b>
           </div>
-          <input type="range" min={0.05} max={0.9} step={0.05} value={conf} aria-label="Confidence"
+          <input type="range" min={0.05} max={0.9} step={0.05} value={conf} aria-label={t("Confidence")}
             onChange={(e) => onConfChange(parseFloat(e.target.value))}
             className="mt-2 w-full accent-[var(--color-accent)]" />
           <div className="flex justify-between text-[11px] text-dim">
-            <span>More boxes, more mistakes</span><span>Fewer, surer</span>
+            <span>{t("More boxes, more mistakes")}</span><span>{t("Fewer, surer")}</span>
           </div>
         </div>
 
-        <Row label="Image size" hint="Bigger finds smaller objects, costs GPU">
+        <Row label={t("Image size")} hint={t("Bigger finds smaller objects, costs GPU")}>
           <Segs options={IMG_SIZES.map((n) => [n, String(n)])} value={imgsz} onChange={onImgszChange} />
         </Row>
 
-        <Row label="Max FPS" hint="Frames sent per second: CPU and bandwidth">
+        <Row label={t("Max FPS")} hint={t("Frames sent per second: CPU and bandwidth")}>
           <Segs options={FPS_CAPS.map((n) => [n, n ? String(n) : "∞"])} value={maxFps} onChange={onMaxFpsChange} />
         </Row>
 
         <div className="mt-4 mb-1.5 flex items-center text-[11px] font-extrabold tracking-[.08em] text-dim uppercase">
-          Classes
+          {t("Classes")}
           <span className="ml-auto text-[11.5px] font-semibold tracking-normal normal-case">
-            {classes.length ? `${classes.length} chosen` : "Empty = detect everything"}
+            {classes.length ? t("{n} chosen", { n: classes.length }) : t("Empty = detect everything")}
           </span>
         </div>
         <div className="mb-2 flex flex-wrap gap-1.5">
-          <Preset on={classes.length === 0} onClick={() => onClassesChange([])}>Everything</Preset>
+          <Preset on={classes.length === 0} onClick={() => onClassesChange([])}>{t("Everything")}</Preset>
           {presets.map((p) => (
-            <Preset key={p.label} on={same(classes, p.classes)} onClick={() => onClassesChange(p.classes)}>{p.label}</Preset>
+            <Preset key={p.label} on={same(classes, p.classes)} onClick={() => onClassesChange(p.classes)}>{t(p.label)}</Preset>
           ))}
         </div>
         <label className="mb-2.5 flex h-9 items-center gap-2 rounded-lg border border-line bg-bg px-2.5 focus-within:border-accent">
           <IconSearch size={15} className="text-muted" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Filter ${classOptions.length} classes…`}
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Filter {n} classes…", { n: classOptions.length })}
             className="min-w-0 flex-1 bg-transparent text-[13px] text-fg outline-none placeholder:text-dim" />
           {q && (
-            <button type="button" onClick={() => setQ("")} aria-label="Clear the filter" className="cursor-pointer text-dim hover:text-fg">
+            <button type="button" onClick={() => setQ("")} aria-label={t("Clear the filter")} className="cursor-pointer text-dim hover:text-fg">
               <IconX size={14} />
             </button>
           )}
@@ -179,7 +183,7 @@ export function YoloPanel({
               </button>
             );
           })}
-          {!shown.length && <span className="text-xs text-dim">No class matches “{q}”.</span>}
+          {!shown.length && <span className="text-xs text-dim">{t("No class matches “{q}”.", { q })}</span>}
         </div>
       </div>
     </div>

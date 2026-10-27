@@ -9,7 +9,8 @@ import { passwordStrength } from "../../lib/password";
 import { Avatar } from "../ui/Avatar";
 import { ColorPicker } from "../ui/ColorPicker";
 import { colorOf, type ColorName } from "../../lib/colors";
-import { ThemePicker } from "../layout/UserMenu";
+import { LanguagePicker, ThemePicker } from "../layout/UserMenu";
+import { msg, useT } from "../../i18n";
 
 // Settings → Profile: what is about you — how you appear to the team, how the app looks for
 // you, your password. Everyone has it, whatever the role.
@@ -29,6 +30,7 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
 }
 
 export function ProfileSettings() {
+  const t = useT();
   const me = useMe();
   const { setMe } = useAuth();
   const [name, setName] = useState(me.user.name);
@@ -43,7 +45,7 @@ export function ProfileSettings() {
     try {
       setMe(await updateProfile({ color: c }));
     } catch (err) {
-      setColorError(err instanceof Error ? err.message : "Could not save the colour.");
+      setColorError(err instanceof Error ? err.message : t("Could not save the colour."));
     }
   }
 
@@ -56,45 +58,48 @@ export function ProfileSettings() {
       setSaved(true);
       setTimeout(() => setSaved(false), 1800);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save your name.");
+      setError(err instanceof Error ? err.message : t("Could not save your name."));
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <section id="profile" data-nav="Profile" className="scroll-mt-4">
-      <h2 className="m-0 mb-1 text-lg font-extrabold tracking-[-0.015em]">Profile</h2>
-      <p className="m-0 mb-3.5 text-[13px] text-muted">How you appear to your team, and how Pilot looks for you.</p>
+    <section id="profile" data-nav={msg("Profile")} className="scroll-mt-4">
+      <h2 className="m-0 mb-1 text-lg font-extrabold tracking-[-0.015em]">{t("Profile")}</h2>
+      <p className="m-0 mb-3.5 text-[13px] text-muted">{t("How you appear to your team, and how Pilot looks for you.")}</p>
       <div className="rounded-2xl border border-line bg-panel shadow-card">
-        <Row label="You" hint="How your circle looks to the team.">
+        <Row label={t("You")} hint={t("How your circle looks to the team.")}>
           <div className="flex items-center gap-3.5">
             <Avatar id={me.user.id} name={me.user.name || me.user.email} color={me.user.color} size={52} />
             <div className="min-w-0 text-[13px]">
               <div className="truncate font-bold">{me.user.email}</div>
-              <div className="text-muted">{ROLE_LABEL[me.role]} · {me.org.name}</div>
+              <div className="text-muted">{t(ROLE_LABEL[me.role])} · {me.org.name}</div>
             </div>
           </div>
         </Row>
-        <Row label="Name" hint="Shown in the team list and the activity.">
+        <Row label={t("Name")} hint={t("Shown in the team list and the activity.")}>
           <form onSubmit={saveName} className="flex max-w-md gap-2">
-            <input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} required className={input} aria-label="Your name" />
+            <input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} required className={input} aria-label={t("Your name")} />
             <button type="submit" disabled={saving || !name.trim() || name.trim() === me.user.name}
               className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-fg px-3.5 text-[13px] font-bold text-bg disabled:cursor-default disabled:opacity-40">
               {saving ? <IconLoader2 size={15} className="animate-spin" /> : saved ? <IconCheck size={15} /> : null}
-              {saved ? "Saved" : "Save"}
+              {saved ? t("Saved") : t("Save")}
             </button>
           </form>
           {error && <p role="alert" className="m-0 mt-2 text-[13px] text-danger">{error}</p>}
         </Row>
-        <Row label="Colour" hint="Picked at random when you joined. Yours to change.">
+        <Row label={t("Colour")} hint={t("Picked at random when you joined. Yours to change.")}>
           <ColorPicker value={colorOf(me.user.color, me.user.id)} onChange={pickColor} />
           {colorError && <p role="alert" className="m-0 mt-2 text-[13px] text-danger">{colorError}</p>}
         </Row>
-        <Row label="Appearance" hint="Light, dark or follow the system. Per browser.">
+        <Row label={t("Appearance")} hint={t("Light, dark or follow the system. Per browser.")}>
           <ThemePicker className="w-max" />
         </Row>
-        <Row label="Password" hint="Changing it signs you out everywhere else.">
+        <Row label={t("Language")} hint={t("English or Spanish, everywhere in Pilot.")}>
+          <LanguagePicker className="w-max" />
+        </Row>
+        <Row label={t("Password")} hint={t("Changing it signs you out everywhere else.")}>
           <PasswordForm email={me.user.email} />
         </Row>
       </div>
@@ -103,6 +108,7 @@ export function ProfileSettings() {
 }
 
 function PasswordForm({ email }: { email: string }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -119,15 +125,17 @@ function PasswordForm({ email }: { email: string }) {
     setError(null);
     try {
       const r = await changePassword(current, next);
-      setDone(r.signed_out
-        ? `Password changed. ${r.signed_out} other session${r.signed_out === 1 ? " was" : "s were"} signed out.`
-        : "Password changed.");
+      setDone(!r.signed_out
+        ? t("Password changed.")
+        : r.signed_out === 1
+          ? t("Password changed. {n} other session was signed out.", { n: r.signed_out })
+          : t("Password changed. {n} other sessions were signed out.", { n: r.signed_out }));
       setOpen(false);
       setCurrent("");
       setNext("");
       setAgain("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not change the password.");
+      setError(err instanceof Error ? err.message : t("Could not change the password."));
     } finally {
       setBusy(false);
     }
@@ -138,7 +146,7 @@ function PasswordForm({ email }: { email: string }) {
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" onClick={() => { setOpen(true); setDone(null); }}
           className="flex cursor-pointer items-center gap-2 rounded-lg border border-line px-3.5 py-2 text-[13px] font-bold transition hover:bg-subtle">
-          <IconLock size={15} />Change password
+          <IconLock size={15} />{t("Change password")}
         </button>
         {done && <span className="flex items-center gap-1.5 text-[13px] text-good-fg"><IconCheck size={15} />{done}</span>}
       </div>
@@ -146,22 +154,22 @@ function PasswordForm({ email }: { email: string }) {
   }
   return (
     <form onSubmit={submit} className="grid max-w-md gap-2.5">
-      <input type="password" autoComplete="current-password" placeholder="Current password" required autoFocus
+      <input type="password" autoComplete="current-password" placeholder={t("Current password")} required autoFocus
         value={current} onChange={(e) => setCurrent(e.target.value)} className={input} />
-      <input type="password" autoComplete="new-password" placeholder="New password" required
+      <input type="password" autoComplete="new-password" placeholder={t("New password")} required
         value={next} onChange={(e) => setNext(e.target.value)} className={input} />
       {next && <div className="text-xs text-muted"><StrengthMeter score={strength.score} label={strength.label} /></div>}
-      <input type="password" autoComplete="new-password" placeholder="New password, again" required
+      <input type="password" autoComplete="new-password" placeholder={t("New password, again")} required
         value={again} onChange={(e) => setAgain(e.target.value)} className={input} />
-      {mismatch && <p className="m-0 text-xs text-danger">The two new passwords differ.</p>}
+      {mismatch && <p className="m-0 text-xs text-danger">{t("The two new passwords differ.")}</p>}
       {error && <p role="alert" className="m-0 text-[13px] text-danger">{error}</p>}
       <div className="flex justify-end gap-2">
         <button type="button" onClick={() => { setOpen(false); setError(null); }}
-          className="cursor-pointer rounded-lg px-3.5 py-2 text-[13px] text-muted hover:text-fg">Cancel</button>
+          className="cursor-pointer rounded-lg px-3.5 py-2 text-[13px] text-muted hover:text-fg">{t("Cancel")}</button>
         <button type="submit" disabled={busy || !current || strength.score === 0 || next !== again}
           className="flex cursor-pointer items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-[13px] font-bold text-on-accent disabled:cursor-default disabled:opacity-50">
           {busy && <IconLoader2 size={15} className="animate-spin" />}
-          Change password
+          {t("Change password")}
         </button>
       </div>
     </form>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { addMessage, deleteChat, getChat, listChats } from "../api/chats";
 import { rememberPref } from "../lib/prefs";
 import type { ChatMessage, ChatSummary, NewMessage } from "../api/chats";
+import { t } from "../i18n";
 
 const LAST = "pilot.chat"; // the conversation this browser had open last
 
@@ -49,7 +50,7 @@ export function useChats(enabled: boolean) {
     } catch (e) {
       if (signal?.aborted) return;
       setHistory([]);
-      setError(e instanceof Error ? e.message : "Could not open the conversation.");
+      setError(e instanceof Error ? e.message : t("Could not open the conversation."));
     }
     setVersion((v) => v + 1);
   }, []);
@@ -89,7 +90,7 @@ export function useChats(enabled: boolean) {
         setError(null);
         await refresh();
       } catch (e) {
-        setError(e instanceof Error ? `Not saved: ${e.message}` : "Not saved.");
+        setError(e instanceof Error ? t("Not saved: {error}", { error: e.message }) : t("Not saved."));
       }
     });
   }, [refresh]);
@@ -100,7 +101,7 @@ export function useChats(enabled: boolean) {
       const list = await refresh();
       if (currentRef.current === id) await open(list[0]?.id ?? null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not delete it.");
+      setError(e instanceof Error ? e.message : t("Could not delete it."));
     }
   }, [refresh, open]);
 

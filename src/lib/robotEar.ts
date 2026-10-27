@@ -3,6 +3,7 @@
 // The G1's own microphone is listened to on the server (backend -> iacore's ear, see
 // AI-VL-core/src/ear_common.py): the page never gets audio, only these events. It answers the
 // "command" ones like a spoken question, says "¿Sí?" on a bare "wake", and shows the rest.
+import { t } from "../i18n";
 
 export type EarState = "off" | "connecting" | "listening" | "hearing" | "error";
 
@@ -54,14 +55,14 @@ export function earStatus(view: EarView): string {
     case "off":
       return "";
     case "connecting":
-      return "Robot mic: turning on…";
+      return t("Robot mic: turning on…");
     case "hearing":
-      return "Robot mic: hearing someone…";
+      return t("Robot mic: hearing someone…");
     case "listening":
       return view.heard
-        ? `Robot mic heard: “${view.heard}” — say “Bender, …”`
-        : "Robot mic: listening for “Bender”";
+        ? t("Robot mic heard: “{text}” — say “Bender, …”", { text: view.heard })
+        : t("Robot mic: listening for “Bender”");
     case "error":
-      return `Robot mic off: ${view.error ?? "the connection closed"}`;
+      return t("Robot mic off: {error}", { error: view.error ?? t("the connection closed") });
   }
 }

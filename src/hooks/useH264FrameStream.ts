@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { t } from "../i18n";
 
 /** What the drive branch is doing right now, for the caption under the video. */
 export interface H264FrameStats {
@@ -49,7 +50,7 @@ export function useH264FrameStream(
       // a plain-HTTP deployment — and it bites silently, which is why it is said out loud.
       setState({
         connected: false, stats: null,
-        error: "This browser has no VideoDecoder (WebCodecs needs HTTPS or localhost)",
+        error: t("This browser has no VideoDecoder (WebCodecs needs HTTPS or localhost)"),
       });
       return;
     }
@@ -101,7 +102,7 @@ export function useH264FrameStream(
     ws.onopen = () => !cancelled && setState((s) => ({ ...s, connected: true, error: null }));
     ws.onclose = () => !cancelled && setState((s) => ({ ...s, connected: false }));
     ws.onerror = () =>
-      !cancelled && setState((s) => ({ ...s, connected: false, error: "socket failed" }));
+      !cancelled && setState((s) => ({ ...s, connected: false, error: t("socket failed") }));
 
     ws.onmessage = (ev) => {
       if (cancelled || typeof ev.data === "string") return;

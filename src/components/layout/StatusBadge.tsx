@@ -1,5 +1,6 @@
 import { IconVideo } from "@tabler/icons-react";
 import { Pill } from "../ui/Pill";
+import { useT } from "../../i18n";
 
 interface Props {
   connected: boolean;
@@ -12,17 +13,18 @@ interface Props {
  * normal resting state, not a failure.
  */
 export function StatusBadge({ connected }: Props) {
+  const t = useT();
   return (
     <Pill
       tone={connected ? "good" : "idle"}
       icon={<IconVideo size={13} stroke={2} />}
       title={
         connected
-          ? "This browser's live-stream socket to the gateway is open"
-          : "This browser is not streaming or watching (start the camera)"
+          ? t("This browser's live-stream socket to the gateway is open")
+          : t("This browser is not streaming or watching (start the camera)")
       }
     >
-      {connected ? "stream live" : "stream off"}
+      {connected ? t("stream live") : t("stream off")}
     </Pill>
   );
 }

@@ -5,6 +5,7 @@ import {
   IconVolume,
 } from "@tabler/icons-react";
 import type { VoicePhase } from "../../types";
+import { useT } from "../../i18n";
 
 /** Pill in the header showing what the hands-free voice assistant is doing. */
 export function VoiceStatusBadge({
@@ -15,6 +16,7 @@ export function VoiceStatusBadge({
   /** What it is listening for: "“robot”" (this device), "“Bender”" (the robot's mic), or both. */
   wakeWords?: string;
 }) {
+  const t = useT();
   if (phase === "off") return null;
 
   const map: Record<
@@ -23,27 +25,27 @@ export function VoiceStatusBadge({
   > = {
     listening: {
       icon: <IconMicrophone size={13} stroke={2} />,
-      label: `Listening for ${wakeWords || "“robot”"}`,
+      label: t("Listening for {words}", { words: wakeWords || "“robot”" }),
       cls: "bg-good-bg text-good-fg",
     },
     recording: {
       icon: <IconMicrophoneFilled size={13} />,
-      label: "Recording…",
+      label: t("Recording…"),
       cls: "bg-bad-bg text-bad-fg",
     },
     transcribing: {
       icon: <IconLoader2 size={13} className="animate-spin" />,
-      label: "Transcribing…",
+      label: t("Transcribing…"),
       cls: "bg-subtle text-fg",
     },
     thinking: {
       icon: <IconLoader2 size={13} className="animate-spin" />,
-      label: "Thinking…",
+      label: t("Thinking…"),
       cls: "bg-subtle text-fg",
     },
     speaking: {
       icon: <IconVolume size={13} stroke={2} />,
-      label: "Speaking…",
+      label: t("Speaking…"),
       cls: "bg-info-bg text-info-fg",
     },
   };

@@ -44,9 +44,10 @@ export function ThemePicker({ className = "" }: { className?: string }) {
 
 /** English / Español: the whole app's language (the menu, Settings → Profile, sign-in). */
 export function LanguagePicker({ className = "" }: { className?: string }) {
+  const t = useT();
   const lang = useLanguage();
   return (
-    <Segmented className={`grid grid-cols-2 gap-1 rounded-lg bg-subtle p-1 ${className}`} aria-label="Language">
+    <Segmented className={`grid grid-cols-2 gap-1 rounded-lg bg-subtle p-1 ${className}`} aria-label={t("Language")}>
       {LANGUAGES.map(({ id, label }) => (
         <button key={id} type="button" onClick={() => setLanguage(id)} aria-pressed={lang === id} data-on={lang === id}
           className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors ${

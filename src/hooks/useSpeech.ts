@@ -11,6 +11,7 @@ import { effectiveVoice, useVoiceChoice, voiceLabel } from "../lib/voiceChoice";
 import { speechVolume } from "../lib/speechVolume";
 import { rememberPref } from "../lib/prefs";
 import { SpeechQueue, type Player } from "../lib/speechQueue";
+import { t } from "../i18n";
 
 /**
  * Text-to-speech with two back-ends:
@@ -140,7 +141,7 @@ export function useSpeech() {
             sayOnRobot(robotRef.current, text, voice)
               .then((r) => {
                 if (!r.ok) {
-                  setRobotError(r.error ?? "the robot did not take the audio");
+                  setRobotError(r.error ?? t("the robot did not take the audio"));
                   res();
                   return;
                 }
@@ -148,7 +149,7 @@ export function useSpeech() {
                 timer = window.setTimeout(res, (r.seconds ?? 0) * 1000);
               })
               .catch((e) => {
-                setRobotError(`backend unreachable: ${String(e)}`);
+                setRobotError(t("backend unreachable: {error}", { error: String(e) }));
                 res();
               });
           }),

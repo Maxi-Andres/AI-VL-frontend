@@ -22,7 +22,7 @@ export function VideoStage({ videoRef, objects, overrideColor, overlay }: Props)
     <section className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div
         ref={wrapRef}
-        className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-black shadow-lift lg:aspect-auto lg:min-h-[260px] lg:flex-1"
+        className="video-stage relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-black shadow-lift lg:aspect-auto lg:min-h-[260px] lg:flex-1"
       >
         <video
           ref={videoRef}

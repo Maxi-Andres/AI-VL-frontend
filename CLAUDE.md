@@ -57,6 +57,14 @@ The frontend knows exactly one URL: the backend's, resolved in **`src/config.ts`
   `text-muted`, `bg-good-bg`/`text-good-fg`, `bg-subtle`, `shadow-card`…) — **never a raw hex
   for UI chrome**, or it breaks one of the two themes. `.theme-light` forces light (sign-in,
   setup). Font: Manrope, bundled (`@fontsource-variable/manrope`) — installs may have no internet.
+- **Languages (English and Spanish)**: every text a person sees goes through `t("…")` (`useT()` in
+  components, the plain `t` in modules) with the English text as the key; a text defined in a
+  list apart from where it is shown is marked `msg("…")` and translated with `t(label)` when drawn.
+  Values as `{placeholders}`, whole sentences (`rich()` in `src/i18n/rich.tsx` puts a `<b>`/`<code>`
+  inside a translated sentence). The Spanish goes in `src/i18n/es/<area>.ts` — one file per key,
+  shared words in `common.ts`. `src/i18n/coverage.test.ts` fails on a marked text without Spanish,
+  a lost placeholder or a key in two files. Not translated: data from the server or the robot,
+  product and protocol names, and what the robot's voice says (it is a Spanish voice).
 - **Container/presentational**: `LivePage` (and `MonitorPage`) own control state and
   wire the hooks; `components/live/*` and `components/ui/*` stay presentational.
 - **Detection socket discipline**: `useDetectionSocket` pumps frames over

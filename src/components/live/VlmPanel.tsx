@@ -25,6 +25,7 @@ import { DropMenu, useDropdown } from "../ui/DropMenu";
 import { Select } from "../ui/Select";
 import { StatusText } from "../ui/StatusText";
 import { Segmented } from "../ui/Segmented";
+import { msg, useT, type Vars } from "../../i18n";
 
 // Longer-side sizes (px) offered for the frame sent to the VLM; "Full" = native. Nothing
 // below 1152: the VLM server upscales every image to at least 1024 tokens of 32x32 px (~1 Mpx,
@@ -32,7 +33,7 @@ import { Segmented } from "../ui/Segmented";
 // and only loses detail. Measured 2026-10-19: 320-1152 px all ~1060-1100 tokens in 0.82 s, and
 // a nameplate read "Fluke" at 512, "Crauvin" at 768, "Chauvin Arnoux" from 1024 up; 1600 px
 // cost 1.1-1.5 s.
-export const VLM_IMG_SIZES = ["1152", "1600", "Full"];
+export const VLM_IMG_SIZES = ["1152", "1600", msg("Full")];
 export const VLM_IMG_DEFAULT = 1152;
 
 /** Hands-free voice controls, produced by useVoiceAssistant. */
@@ -157,6 +158,7 @@ function foundObjects(answer: string): Found[] | null {
   }
 }
 
+// The Spanish of both starts with "Error" too (i18n/es/live.ts), so this holds in either language.
 const failed = (status: string) => /^(Error|Request failed)/.test(status);
 
 /**
@@ -195,6 +197,7 @@ export function VlmPanel({
   onAskPrompt,
   voice,
 }: Props) {
+  const t = useT();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [settings, setSettings] = useState(false);
   // The mic is taking a question: recording it or turning it into text.
@@ -216,7 +219,7 @@ export function VlmPanel({
     if (busy && !wasBusy.current) {
       const kind = pending.current ?? "question";
       pending.current = null;
-      const question = kind === "analysis" ? `${scope} · ${variant}` : prompt.trim() || "(spoken question)";
+      const question = kind === "analysis" ? `${scope} · ${variant}` : prompt.trim() || t("(spoken question)");
       setTurns((t) => [...t, { id: nextId.current++, kind, question, answer: "", status: "", done: false }]);
       asked.current = { kind, question };
       if (kind === "question") onPromptChange("");
@@ -294,12 +297,12 @@ export function VlmPanel({
                 <span className="mx-auto mb-3 grid size-11 place-items-center rounded-2xl bg-good-bg text-good-fg">
                   <IconSparkles size={22} />
                 </span>
-                <b className="block text-sm">Ask about what the camera sees</b>
+                <b className="block text-sm">{t("Ask about what the camera sees")}</b>
                 <p className="m-0 mt-1 text-[12.5px] text-muted">
-                  Type a question, say “robot” and ask it, or use Find objects to list what is in the frame.
+                  {t("Type a question, say “robot” and ask it, or use Find objects to list what is in the frame.")}
                 </p>
                 <div className="mt-4 flex flex-wrap justify-center gap-1.5">
-                  {["What do you see?", "Is anyone in the frame?", "Read any text or gauges"].map((q) => (
+                  {[t("What do you see?"), t("Is anyone in the frame?"), t("Read any text or gauges")].map((q) => (
                     <button key={q} type="button" onClick={() => onPromptChange(q)}
                       className="cursor-pointer rounded-full border border-line px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent hover:text-fg">
                       {q}
@@ -310,14 +313,14 @@ export function VlmPanel({
             </div>
           ) : (
             <div className="grid grid-cols-[minmax(0,1fr)] gap-4 pb-1">
-              {turns.map((t, i) => {
+              {turns.map((turn, i) => {
                 const last = i === turns.length - 1;
-                const answer = last && live ? live.answer : t.answer;
-                const st = last && live ? live.status : t.status;
+                const answer = last && live ? live.answer : turn.answer;
+                const st = last && live ? live.status : turn.status;
                 return (
-                  <div key={t.id} className="grid min-w-0 animate-rise grid-cols-[minmax(0,1fr)] gap-2">
-                    <Asked turn={t} />
-                    <Answer turn={t} answer={answer} status={st} streaming={last && busy}
+                  <div key={turn.id} className="grid min-w-0 animate-rise grid-cols-[minmax(0,1fr)] gap-2">
+                    <Asked turn={turn} />
+                    <Answer turn={turn} answer={answer} status={st} streaming={last && busy}
                       voice={voice} />
                   </div>
                 );
@@ -330,8 +333,8 @@ export function VlmPanel({
       <div className="mt-3 grid gap-2">
         <button type="button" onClick={analyze} disabled={!canAsk || busy}
           className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-accent/40 bg-good-bg py-2 text-[13px] font-bold text-good-fg transition hover:border-accent active:scale-[.98] disabled:cursor-default disabled:opacity-50">
-          <IconScan size={17} />Find objects
-          <span className="font-semibold opacity-70" title="Scope · prompt variant (change them under the settings)">· {scope} · {variant}</span>
+          <IconScan size={17} />{t("Find objects")}
+          <span className="font-semibold opacity-70" title={t("Scope · prompt variant (change them under the settings)")}>· {scope} · {variant}</span>
         </button>
 
         <div className="rounded-xl border border-line bg-bg transition focus-within:border-accent">
@@ -342,13 +345,13 @@ export function VlmPanel({
                 send();
               }
             }}
-            placeholder="Ask anything about the frame — e.g. Is the reading within normal range?"
-            aria-label="Question about the frame"
+            placeholder={t("Ask anything about the frame — e.g. Is the reading within normal range?")}
+            aria-label={t("Question about the frame")}
             className="block max-h-32 min-h-[52px] w-full resize-none bg-transparent px-3 pt-2.5 text-[13px] text-fg outline-none [field-sizing:content] placeholder:text-dim" />
           <div className="flex items-center gap-1 px-2 pb-2">
             {voice.micSupported && (
               <button type="button" onClick={voice.onListenOnce} disabled={!canAsk || busy || hearing || voice.voiceMode}
-                title="Speak a question — it is sent when you stop talking" aria-label="Speak a question"
+                title={t("Speak a question — it is sent when you stop talking")} aria-label={t("Speak a question")}
                 className={`grid size-7 cursor-pointer place-items-center rounded-lg transition duration-200 active:scale-90 disabled:cursor-default ${
                   hearing && !voice.voiceMode ? "animate-pulse bg-bad-bg text-bad-fg" : "text-muted hover:bg-subtle hover:text-fg disabled:opacity-40 disabled:hover:bg-transparent"}`}>
                 <IconMicrophone size={15} />
@@ -356,27 +359,29 @@ export function VlmPanel({
             )}
             {voice.micSupported && (
               <Toggle on={voice.voiceMode} onClick={voice.onToggleVoiceMode}
-                title={`Hands-free ${voice.voiceMode ? "on" : "off"}: ${voice.listenMode === "wake" ? "say “robot”, then your question" : "just speak — each question is sent by itself"}`}
+                title={voice.listenMode === "wake"
+                  ? voice.voiceMode ? t("Hands-free on: say “robot”, then your question") : t("Hands-free off: say “robot”, then your question")
+                  : voice.voiceMode ? t("Hands-free on: just speak — each question is sent by itself") : t("Hands-free off: just speak — each question is sent by itself")}
                 icon={voice.voiceMode ? <IconHeadset size={15} /> : <IconHeadsetOff size={15} />} />
             )}
             {voice.robotMic && (
               <Toggle on={voice.robotEar} onClick={voice.onToggleRobotEar}
-                title={`The robot's own microphone ${voice.robotEar ? "on" : "off"}: say “Bender, …”`}
+                title={voice.robotEar ? t("The robot's own microphone on: say “Bender, …”") : t("The robot's own microphone off: say “Bender, …”")}
                 icon={voice.robotEar ? <IconMicrophone2 size={15} /> : <IconMicrophone2Off size={15} />} />
             )}
             {voice.speechSupported && (
               <Toggle on={voice.spokenMode} onClick={voice.onToggleSpokenMode}
-                title={`Speak answers ${voice.spokenMode ? "on" : "off"}`}
+                title={voice.spokenMode ? t("Speak answers on") : t("Speak answers off")}
                 icon={voice.spokenMode ? <IconVolume size={15} /> : <IconVolumeOff size={15} />} />
             )}
-            <button type="button" onClick={() => setSettings((s) => !s)} aria-expanded={settings} title="Voice and model settings"
+            <button type="button" onClick={() => setSettings((s) => !s)} aria-expanded={settings} title={t("Voice and model settings")}
               className={`grid size-7 cursor-pointer place-items-center rounded-lg transition active:scale-90 ${settings ? "bg-subtle text-fg" : "text-muted hover:bg-subtle hover:text-fg"}`}>
               <IconAdjustmentsHorizontal size={15} className={`transition-transform duration-300 ${settings ? "rotate-90" : ""}`} />
             </button>
-            <span className="ml-1 hidden truncate text-[11px] text-dim sm:inline">Enter to send</span>
-            <button type="button" onClick={send} disabled={!canAsk || busy || !prompt.trim()} aria-label="Ask"
+            <span className="ml-1 hidden truncate text-[11px] text-dim sm:inline">{t("Enter to send")}</span>
+            <button type="button" onClick={send} disabled={!canAsk || busy || !prompt.trim()} aria-label={t("Ask")}
               className="ml-auto flex cursor-pointer items-center gap-1 rounded-lg bg-fg px-3 py-1.5 text-[12.5px] font-bold text-bg transition active:scale-95 disabled:cursor-default disabled:opacity-35">
-              Ask<IconArrowUp size={14} />
+              {t("Ask")}<IconArrowUp size={14} />
             </button>
           </div>
         </div>
@@ -396,15 +401,15 @@ export function VlmPanel({
           className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out ${settings ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
           <div className="min-h-0 overflow-hidden">
             <div className="grid max-h-[46vh] gap-3 overflow-y-auto rounded-xl border border-line bg-panel p-3">
-              <SettingsGroup title="Voice">
+              <SettingsGroup title={t("Voice")}>
                 {voice.speechSupported && (
-                  <Row label="Volume" hint={voice.volume.where === "robot" ? "The robot's own speaker" : "On this device"}>
+                  <Row label={t("Volume")} hint={voice.volume.where === "robot" ? t("The robot's own speaker") : t("On this device")}>
                     <div className="flex w-40 items-center gap-2">
                       <IconVolume size={14} className="shrink-0 text-muted" />
                       <input type="range" min={0} max={voice.volume.max} step={voice.volume.max > 10 ? 5 : 1}
                         value={voice.volume.value ?? 0} disabled={voice.volume.value === null}
                         onChange={(e) => voice.volume.onChange(Number(e.target.value))}
-                        aria-label={voice.volume.where === "robot" ? "Robot speaker volume" : "Volume on this device"}
+                        aria-label={voice.volume.where === "robot" ? t("Robot speaker volume") : t("Volume on this device")}
                         className="min-w-0 flex-1 accent-[var(--color-accent)]" />
                       <span className="w-9 shrink-0 text-right text-[11px] text-muted tabular-nums">
                         {voice.volume.value === null ? "—" : voice.volume.where === "robot" ? `${voice.volume.value}/${voice.volume.max}` : `${voice.volume.value}%`}
@@ -413,9 +418,9 @@ export function VlmPanel({
                   </Row>
                 )}
                 {voice.micSupported && (
-                  <Row label="Hands-free listens" hint={voice.wakeSupported ? undefined : "This browser cannot hear a wake word"}>
+                  <Row label={t("Hands-free listens")} hint={voice.wakeSupported ? undefined : t("This browser cannot hear a wake word")}>
                     <Segmented className="flex rounded-lg bg-subtle p-0.5">
-                      {([["open", "Just speak"], ["wake", "Say “robot”"]] as const).map(([m, label]) => (
+                      {([["open", t("Just speak")], ["wake", t("Say “robot”")]] as const).map(([m, label]) => (
                         <button key={m} type="button" onClick={() => voice.onListenModeChange(m)} data-on={voice.listenMode === m}
                           disabled={m === "wake" && !voice.wakeSupported}
                           className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${voice.listenMode === m ? "text-fg" : "text-muted"}`}>
@@ -426,18 +431,18 @@ export function VlmPanel({
                   </Row>
                 )}
                 {voice.speechSupported && (
-                  <Row label="Filler" hint="A short word if the answer is slow to start">
-                    <Toggle on={voice.fillerMode} onClick={voice.onToggleFillerMode} title="Filler"
+                  <Row label={t("Filler")} hint={t("A short word if the answer is slow to start")}>
+                    <Toggle on={voice.fillerMode} onClick={voice.onToggleFillerMode} title={t("Filler")}
                       icon={voice.fillerMode ? <IconMessage size={15} /> : <IconMessageOff size={15} />} />
                   </Row>
                 )}
                 {voice.speechSupported && voice.robotSpeaker && (
-                  <Row label="Speak through" hint={voice.speechOutput === "robot" && voice.robotSpeakerError ? undefined : "The robot plays the same voice"}>
+                  <Row label={t("Speak through")} hint={voice.speechOutput === "robot" && voice.robotSpeakerError ? undefined : t("The robot plays the same voice")}>
                     <Segmented className="flex rounded-lg bg-subtle p-0.5">
                       {(["browser", "robot"] as const).map((o) => (
                         <button key={o} type="button" onClick={() => voice.onSpeechOutputChange(o)} data-on={voice.speechOutput === o}
                           className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-bold transition-colors ${voice.speechOutput === o ? "text-fg" : "text-muted"}`}>
-                          {o === "browser" ? "This device" : "Robot"}
+                          {o === "browser" ? t("This device") : t("Robot")}
                         </button>
                       ))}
                     </Segmented>
@@ -447,30 +452,30 @@ export function VlmPanel({
                   <StatusText status={{ tone: "warn", text: voice.robotSpeakerError }} className="text-xs text-muted" />
                 )}
                 {voice.speechSupported && voice.voices.length > 0 && (
-                  <Row label="Voice" hint="Made on the server; Drive uses it too">
+                  <Row label={t("Voice")} hint={t("Made on the server; Drive uses it too")}>
                     <select value={voice.voiceURI ?? ""} onChange={(e) => voice.onVoiceChange(e.target.value)}
                       className="w-40 rounded-md border border-line bg-bg p-1.5 text-xs text-fg focus:border-accent focus:outline-none">
-                      <option value="">Default</option>
+                      <option value="">{t("Default")}</option>
                       {voice.voices.map((v) => <option key={v.uri} value={v.uri}>{v.label}</option>)}
                     </select>
                   </Row>
                 )}
               </SettingsGroup>
-              <SettingsGroup title="Model">
-                <Row label="Model">
+              <SettingsGroup title={t("Model")}>
+                <Row label={t("Model")}>
                   <div className="w-40"><Select options={models} value={model} onChange={(e) => onModelChange(e.target.value)} className="text-xs" /></div>
                 </Row>
-                <Row label="Find objects in" hint="What “Find objects” looks for">
+                <Row label={t("Find objects in")} hint={t("What “Find objects” looks for")}>
                   <div className="w-40"><Select options={scopes} value={scope} onChange={(e) => onScopeChange(e.target.value)} className="text-xs" /></div>
                 </Row>
-                <Row label="Prompt variant">
+                <Row label={t("Prompt variant")}>
                   <div className="w-40"><Select options={variants} value={variant} onChange={(e) => onVariantChange(e.target.value)} className="text-xs" /></div>
                 </Row>
                 {imageMaxSize !== undefined && onImageMaxSizeChange && (
-                  <Row label="Image quality" hint="1152 costs nothing extra; bigger reads small print, slower">
+                  <Row label={t("Image quality")} hint={t("1152 costs nothing extra; bigger reads small print, slower")}>
                     <div className="w-40">
-                      <Select options={VLM_IMG_SIZES} value={imageMaxSize > 0 ? String(imageMaxSize) : "Full"} className="text-xs"
-                        onChange={(e) => onImageMaxSizeChange(e.target.value === "Full" ? 0 : parseInt(e.target.value, 10))} />
+                      <Select options={VLM_IMG_SIZES.map((s) => t(s))} value={imageMaxSize > 0 ? String(imageMaxSize) : t("Full")} className="text-xs"
+                        onChange={(e) => onImageMaxSizeChange(e.target.value === t("Full") ? 0 : parseInt(e.target.value, 10))} />
                     </div>
                   </Row>
                 )}
@@ -485,11 +490,12 @@ export function VlmPanel({
 
 /** What was sent: a question as a bubble, a scan as a tagged request — they look apart. */
 function Asked({ turn }: { turn: Turn }) {
+  const t = useT();
   if (turn.kind === "analysis") {
     return (
       <div className="flex justify-end">
         <span className="flex max-w-[85%] flex-wrap items-center gap-x-1.5 rounded-2xl rounded-br-md border border-accent/40 bg-good-bg px-3 py-1.5 text-[12.5px] font-bold text-good-fg">
-          <IconScan size={15} className="shrink-0" />Find objects
+          <IconScan size={15} className="shrink-0" />{t("Find objects")}
           <span className="font-semibold opacity-70">· {turn.question}</span>
         </span>
       </div>
@@ -505,6 +511,7 @@ function Asked({ turn }: { turn: Turn }) {
 function Answer({ turn, answer, status, streaming, voice }: {
   turn: Turn; answer: string; status: string; streaming: boolean; voice: VoiceControls;
 }) {
+  const t = useT();
   const bad = failed(status) && !answer;
   const found = turn.kind === "analysis" && answer ? foundObjects(answer) : null;
   return (
@@ -516,7 +523,7 @@ function Answer({ turn, answer, status, streaming, voice }: {
         {bad ? (
           status
         ) : !answer ? (
-          <span className="flex items-center gap-1 py-1" aria-label="Thinking">
+          <span className="flex items-center gap-1 py-1" aria-label={t("Thinking")}>
             {[0, 150, 300].map((d) => (
               <span key={d} className="size-1.5 animate-bounce rounded-full bg-muted" style={{ animationDelay: `${d}ms` }} />
             ))}
@@ -525,7 +532,7 @@ function Answer({ turn, answer, status, streaming, voice }: {
           <FoundList found={found} raw={answer} />
         ) : turn.kind === "analysis" ? (
           <>
-            <p className="m-0">The model answered, but not in a form Pilot can read out.</p>
+            <p className="m-0">{t("The model answered, but not in a form Pilot can read out.")}</p>
             <Raw text={answer} />
           </>
         ) : (
@@ -538,7 +545,7 @@ function Answer({ turn, answer, status, streaming, voice }: {
               <button type="button" onClick={() => (voice.speaking ? voice.onStopSpeak() : voice.onSpeak(answer))}
                 className="ml-auto flex shrink-0 cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 font-bold text-muted hover:bg-panel hover:text-fg">
                 {voice.speaking ? <IconPlayerStopFilled size={12} /> : <IconVolume size={13} />}
-                {voice.speaking ? "Stop" : "Read aloud"}
+                {voice.speaking ? t("Stop") : t("Read aloud")}
               </button>
             )}
           </div>
@@ -550,29 +557,31 @@ function Answer({ turn, answer, status, streaming, voice }: {
 
 /** The raw JSON, for whoever needs it (an integration, a bug report) — folded by default. */
 function Raw({ text }: { text: string }) {
+  const t = useT();
   return (
     <details className="mt-1.5 text-[11px] text-dim">
-      <summary className="cursor-pointer font-bold select-none hover:text-fg">Raw result</summary>
+      <summary className="cursor-pointer font-bold select-none hover:text-fg">{t("Raw result")}</summary>
       <pre className="m-0 mt-1 max-h-48 overflow-auto rounded-lg bg-panel p-2 font-mono whitespace-pre-wrap text-muted">{text}</pre>
     </details>
   );
 }
 
 function FoundList({ found, raw }: { found: Found[]; raw: string }) {
-  if (!found.length) return <><p className="m-0">Nothing found for this scope.</p><Raw text={raw} /></>;
+  const t = useT();
+  if (!found.length) return <><p className="m-0">{t("Nothing found for this scope.")}</p><Raw text={raw} /></>;
   return (
     <div>
       <p className="m-0 mb-1.5 font-bold">
-        Found {found.length} {found.length === 1 ? "thing" : "things"}
-        <span className="font-semibold text-muted"> · each one is outlined in blue on the video</span>
+        {found.length === 1 ? t("Found 1 thing") : t("Found {n} things", { n: found.length })}
+        <span className="font-semibold text-muted"> · {t("each one is outlined in blue on the video")}</span>
       </p>
       <ul className="m-0 grid list-none gap-1 p-0">
         {found.map((o, i) => (
           <li key={i} className="flex items-baseline gap-2 rounded-lg bg-panel px-2 py-1">
             <span className="min-w-0 flex-1">
-              <span className="line-clamp-2 block font-semibold break-words">{o.description || o.type || "Object"}</span>
+              <span className="line-clamp-2 block font-semibold break-words">{o.description || o.type || t("Object")}</span>
               {o.reading !== null && o.reading !== undefined && o.reading !== "" && (
-                <span className="block text-[11.5px] text-muted">Reads {String(o.reading)}</span>
+                <span className="block text-[11.5px] text-muted">{t("Reads {value}", { value: String(o.reading) })}</span>
               )}
             </span>
             {o.type && <span className="shrink-0 rounded-full bg-subtle px-2 py-px text-[10.5px] font-bold text-muted">{o.type}</span>}
@@ -619,19 +628,20 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
   );
 }
 
-function ago(iso: string): string {
+function ago(iso: string, t: (text: string, vars?: Vars) => string): string {
   const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m} min ago`;
-  if (m < 1440) return `${Math.floor(m / 60)} h ago`;
+  if (m < 1) return t("just now");
+  if (m < 60) return t("{n} min ago", { n: m });
+  if (m < 1440) return t("{n} h ago", { n: Math.floor(m / 60) });
   return new Date(iso).toLocaleDateString();
 }
 
 /** Which conversation is open, the others to switch to, a new one, and deleting. */
 function Conversations({ chat, busy }: { chat: ChatControls; busy: boolean }) {
+  const t = useT();
   const { open, setOpen, ref } = useDropdown();
   const [confirm, setConfirm] = useState<string | null>(null);
-  const title = chat.chats.find((c) => c.id === chat.current)?.title ?? "New conversation";
+  const title = chat.chats.find((c) => c.id === chat.current)?.title ?? t("New conversation");
   return (
     <div className="mb-2 flex items-center gap-1.5">
       <div ref={ref} className="relative min-w-0 flex-1">
@@ -643,22 +653,22 @@ function Conversations({ chat, busy }: { chat: ChatControls; busy: boolean }) {
           <IconChevronDown size={14} className={`ml-auto shrink-0 text-dim transition-transform ${open ? "rotate-180" : ""}`} />
         </button>
         <DropMenu open={open} className="top-9 right-auto left-0 w-full">
-          {chat.chats.length === 0 && <p className="m-0 px-2.5 py-3 text-center text-[12.5px] text-muted">No saved conversations yet.</p>}
+          {chat.chats.length === 0 && <p className="m-0 px-2.5 py-3 text-center text-[12.5px] text-muted">{t("No saved conversations yet.")}</p>}
           <ul className="m-0 max-h-[320px] list-none overflow-y-auto p-0">
             {chat.chats.map((c) => (
               <li key={c.id} className={`group flex items-center gap-1 rounded-[9px] ${c.id === chat.current ? "bg-subtle" : "hover:bg-subtle"}`}>
                 <button type="button" onClick={() => { chat.onOpen(c.id); setOpen(false); setConfirm(null); }}
                   className="min-w-0 flex-1 cursor-pointer px-2.5 py-2 text-left">
-                  <b className="block truncate text-[12.5px]">{c.title || "Untitled"}</b>
-                  <small className="block text-[11px] text-dim">{ago(c.updated_at)}{c.messages ? ` · ${c.messages} message${c.messages === 1 ? "" : "s"}` : ""}</small>
+                  <b className="block truncate text-[12.5px]">{c.title || t("Untitled")}</b>
+                  <small className="block text-[11px] text-dim">{ago(c.updated_at, t)}{c.messages ? ` · ${c.messages === 1 ? t("1 message") : t("{n} messages", { n: c.messages })}` : ""}</small>
                 </button>
                 {confirm === c.id ? (
                   <button type="button" onClick={() => { chat.onDelete(c.id); setConfirm(null); }}
                     className="mr-1.5 shrink-0 cursor-pointer rounded-md bg-bad-bg px-2 py-1 text-[11px] font-bold text-bad-fg">
-                    Delete
+                    {t("Delete")}
                   </button>
                 ) : (
-                  <button type="button" onClick={() => setConfirm(c.id)} aria-label={`Delete ${c.title}`} title="Delete this conversation"
+                  <button type="button" onClick={() => setConfirm(c.id)} aria-label={t("Delete {title}", { title: c.title })} title={t("Delete this conversation")}
                     className="mr-1 grid size-7 shrink-0 cursor-pointer place-items-center rounded-md text-dim opacity-60 transition group-hover:opacity-100 hover:bg-bad-bg hover:text-bad-fg">
                     <IconTrash size={14} />
                   </button>
@@ -668,9 +678,9 @@ function Conversations({ chat, busy }: { chat: ChatControls; busy: boolean }) {
           </ul>
         </DropMenu>
       </div>
-      <button type="button" onClick={() => chat.onOpen(null)} disabled={busy || chat.current === null} title="New conversation"
+      <button type="button" onClick={() => chat.onOpen(null)} disabled={busy || chat.current === null} title={t("New conversation")}
         className="flex shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-line px-2.5 py-1.5 text-[12px] font-bold transition hover:bg-subtle active:scale-95 disabled:cursor-default disabled:opacity-40">
-        <IconPlus size={14} />New
+        <IconPlus size={14} />{t("New")}
       </button>
       {chat.error && (
         <span role="alert" title={chat.error} className="max-w-[40%] shrink truncate text-[11px] font-semibold text-bad-fg">{chat.error}</span>

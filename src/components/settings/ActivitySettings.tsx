@@ -4,6 +4,7 @@ import { getActivity } from "../../api/fleet";
 import type { ActivityKind, ActivityPage } from "../../api/fleet";
 import { ActivityRow } from "../fleet/ActivityFeed";
 import { Segmented } from "../ui/Segmented";
+import { msg, useT } from "../../i18n";
 
 // Settings → Activity: everything notable that changed in the company, newest first, in
 // numbered pages — the server counts the total, so this holds whether the log has 40 events
@@ -12,11 +13,11 @@ import { Segmented } from "../ui/Segmented";
 const PAGE = 25;
 
 const KINDS: { id: ActivityKind | null; label: string }[] = [
-  { id: null, label: "All" },
-  { id: "robots", label: "Robots" },
-  { id: "sites", label: "Sites" },
-  { id: "people", label: "People" },
-  { id: "access", label: "Access" },
+  { id: null, label: msg("All") },
+  { id: "robots", label: msg("Robots") },
+  { id: "sites", label: msg("Sites") },
+  { id: "people", label: msg("People") },
+  { id: "access", label: msg("Access") },
 ];
 
 /** Page numbers to show: the first, the last, and a window around the current one. */
@@ -33,10 +34,13 @@ function pages(current: number, count: number): (number | "gap")[] {
 }
 
 export function ActivitySettings() {
+  const t = useT();
   const [kind, setKind] = useState<ActivityKind | null>(null);
   const [page, setPage] = useState(1);
   const [data, setData] = useState<ActivityPage | null>(null);
   const [busy, setBusy] = useState(false);
+  // Kept in English and translated where shown: the load runs in a hook that must not depend
+  // on the language. A message from the server has no entry and passes through unchanged.
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -47,7 +51,7 @@ export function ActivitySettings() {
         setData(d);
         setError(null);
       })
-      .catch((e) => !ctl.signal.aborted && setError(e instanceof Error ? e.message : "Could not load the activity."))
+      .catch((e) => !ctl.signal.aborted && setError(e instanceof Error ? e.message : msg("Could not load the activity.")))
       .finally(() => !ctl.signal.aborted && setBusy(false));
     return () => ctl.abort();
   }, [kind, page]);
@@ -67,11 +71,10 @@ export function ActivitySettings() {
   const btn = "grid h-8 min-w-8 cursor-pointer place-items-center rounded-lg px-2 text-[13px] font-bold transition disabled:cursor-default disabled:opacity-40";
 
   return (
-    <section id="activity" data-nav="Activity" className="scroll-mt-4">
-      <h2 className="m-0 mb-1 text-lg font-extrabold tracking-[-0.015em]">Activity</h2>
+    <section id="activity" data-nav={msg("Activity")} className="scroll-mt-4">
+      <h2 className="m-0 mb-1 text-lg font-extrabold tracking-[-0.015em]">{t("Activity")}</h2>
       <p className="m-0 mb-3.5 text-[13px] text-muted">
-        Who changed what: robots, sites, the team, access. Sign-ins are recorded but left out of
-        this list.
+        {t("Who changed what: robots, sites, the team, access. Sign-ins are recorded but left out of this list.")}
       </p>
       <div className="rounded-2xl border border-line bg-panel shadow-card">
         <div className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3">
@@ -80,16 +83,18 @@ export function ActivitySettings() {
               <button key={k.label} type="button" onClick={() => pick(k.id)} aria-pressed={kind === k.id} data-on={kind === k.id}
                 className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-bold transition-colors ${
                   kind === k.id ? "text-fg" : "text-muted hover:text-fg"}`}>
-                {k.label}
+                {t(k.label)}
               </button>
             ))}
           </Segmented>
           <span className="ml-auto flex items-center gap-2 text-xs text-muted">
             {busy && <IconLoader2 size={14} className="animate-spin" />}
-            {data && (data.total ? `${from.toLocaleString()}–${to.toLocaleString()} of ${data.total.toLocaleString()}` : "")}
+            {data && (data.total
+              ? t("{from}–{to} of {total}", { from: from.toLocaleString(), to: to.toLocaleString(), total: data.total.toLocaleString() })
+              : "")}
           </span>
         </div>
-        {error && <p role="alert" className="m-0 px-5 pt-3 text-[13px] text-danger">{error}</p>}
+        {error && <p role="alert" className="m-0 px-5 pt-3 text-[13px] text-danger">{t(error)}</p>}
         {data === null ? (
           <p className="m-0 px-5 py-8 text-center text-muted"><IconLoader2 size={18} className="inline animate-spin" /></p>
         ) : data.events.length ? (
@@ -97,11 +102,11 @@ export function ActivitySettings() {
             {data.events.map((ev) => <ActivityRow key={ev.id} ev={ev} />)}
           </ul>
         ) : (
-          <p className="m-0 px-5 py-8 text-center text-sm text-muted">Nothing here yet.</p>
+          <p className="m-0 px-5 py-8 text-center text-sm text-muted">{t("Nothing here yet.")}</p>
         )}
         {count > 1 && (
-          <nav aria-label="Activity pages" className="flex items-center justify-center gap-1 border-t border-line px-4 py-3">
-            <button type="button" disabled={page === 1} onClick={() => goTo(page - 1)} aria-label="Newer"
+          <nav aria-label={t("Activity pages")} className="flex items-center justify-center gap-1 border-t border-line px-4 py-3">
+            <button type="button" disabled={page === 1} onClick={() => goTo(page - 1)} aria-label={t("Newer")}
               className={`${btn} text-muted hover:bg-subtle hover:text-fg`}>
               <IconChevronLeft size={16} />
             </button>
@@ -115,7 +120,7 @@ export function ActivitySettings() {
                 </button>
               ),
             )}
-            <button type="button" disabled={page === count} onClick={() => goTo(page + 1)} aria-label="Older"
+            <button type="button" disabled={page === count} onClick={() => goTo(page + 1)} aria-label={t("Older")}
               className={`${btn} text-muted hover:bg-subtle hover:text-fg`}>
               <IconChevronRight size={16} />
             </button>

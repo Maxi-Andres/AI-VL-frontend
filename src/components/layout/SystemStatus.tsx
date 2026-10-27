@@ -14,6 +14,7 @@ import { BatteryPill, robotState } from "./PresencePills";
 import { useRobot } from "./RobotContext";
 import { StatusBadge } from "./StatusBadge";
 import { PILL, personActivity, systemRows } from "./systemRows";
+import { useT } from "../../i18n";
 
 const DOT = { good: "bg-good-fg", warn: "bg-warn-fg", bad: "bg-bad-fg", idle: "bg-dim" };
 const RING = {
@@ -35,6 +36,7 @@ const TEXT = { good: "text-good-fg", warn: "text-warn-fg", bad: "text-bad-fg", i
  * the other.
  */
 export function SystemStatus({ connected }: { connected: boolean }) {
+  const t = useT();
   const { robot, setRobot, robots } = useRobot();
   const me = useMe();
   const { presence, reachable } = usePresence();
@@ -76,10 +78,10 @@ export function SystemStatus({ connected }: { connected: boolean }) {
 
   return (
     <div ref={ref} className="relative">
-      <button onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-label="Robots and services"
+      <button onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-label={t("Robots and services")}
         className="flex cursor-pointer items-center gap-2 rounded-[10px] border border-line bg-panel py-[5px] pr-2.5 pl-1.5 text-[12.5px] font-bold transition hover:shadow-card">
         {active && (
-          <span className="flex items-center gap-1.5 border-r border-line pr-2" title={`Working with ${active.name}`}>
+          <span className="flex items-center gap-1.5 border-r border-line pr-2" title={t("Working with {name}", { name: active.name })}>
             <RobotIcon slot={active.id} color={active.color} size={22} />
             <span className="max-w-[120px] truncate">{active.name}</span>
             <BatteryPill net={net} robotId={active.id} />
@@ -88,12 +90,12 @@ export function SystemStatus({ connected }: { connected: boolean }) {
         <span className={`size-2 rounded-full ${DOT[tone]} ${RING[tone]}`} />
         {/* On a phone the dot alone says it; the words need the room the tabs use. */}
         <span className="hidden lg:inline">
-          {!reachable ? "Server offline" : presence ? `${up} of ${counted.length} up` : "Checking…"}
+          {!reachable ? t("Server offline") : presence ? t("{up} of {total} up", { up, total: counted.length }) : t("Checking…")}
         </span>
         <IconChevronDown size={14} className="text-dim" />
       </button>
       <DropMenu open={open} className="top-[46px] w-[330px]">
-        <div className="px-2.5 pt-2 pb-1 text-[11px] font-extrabold tracking-[.1em] text-dim uppercase">Robots</div>
+        <div className="px-2.5 pt-2 pb-1 text-[11px] font-extrabold tracking-[.1em] text-dim uppercase">{t("Robots")}</div>
         {robotRows.map((r) => (
           <button key={r.id} type="button" onClick={() => { setRobot(r.id); setOpen(false); }}
             title={r.st?.title}
@@ -101,14 +103,14 @@ export function SystemStatus({ connected }: { connected: boolean }) {
             <RobotIcon slot={r.id} color={r.color} size={26} />
             <span className="min-w-0 flex-1">
               <b className="block truncate">{r.name}</b>
-              <small className="block truncate text-[11.5px] text-dim">{r.id === robot ? "Live and Drive use this one" : r.label}</small>
+              <small className="block truncate text-[11.5px] text-dim">{r.id === robot ? t("Live and Drive use this one") : r.label}</small>
             </span>
             <span className={`text-[11.5px] font-bold ${TEXT[r.st?.tone ?? "idle"]}`}>{r.st?.text ?? "…"}</span>
             {r.id === robot ? <IconCheck size={16} className="text-accent" /> : <span className="w-4" />}
           </button>
         ))}
-        <div className="mt-1 border-t border-line px-2.5 pt-2.5 pb-1 text-[11px] font-extrabold tracking-[.1em] text-dim uppercase">Services</div>
-        {!reachable && <p className="m-0 px-2.5 py-2 text-[13px] text-muted">This server does not answer.</p>}
+        <div className="mt-1 border-t border-line px-2.5 pt-2.5 pb-1 text-[11px] font-extrabold tracking-[.1em] text-dim uppercase">{t("Services")}</div>
+        {!reachable && <p className="m-0 px-2.5 py-2 text-[13px] text-muted">{t("This server does not answer.")}</p>}
         {services.map((r) => (
           <div key={r.key} className="flex items-center gap-2.5 px-2.5 py-2 text-[13px] font-semibold" title={r.detail}>
             <r.icon size={17} className={TEXT[r.tone]} />
@@ -119,27 +121,27 @@ export function SystemStatus({ connected }: { connected: boolean }) {
         {reachable && (
           <>
             <div className="mt-1 flex items-center border-t border-line px-2.5 pt-2.5 pb-1 text-[11px] font-extrabold tracking-[.1em] text-dim uppercase">
-              People online
+              {t("People online")}
               <span className="ml-auto tracking-normal">{people.length}</span>
             </div>
-            {!people.length && <p className="m-0 px-2.5 py-2 text-[13px] text-muted">{here ? "No one else is here." : "Checking…"}</p>}
+            {!people.length && <p className="m-0 px-2.5 py-2 text-[13px] text-muted">{here ? t("No one else is here.") : t("Checking…")}</p>}
             {/* A busy session must not push "This browser" off the screen. */}
             <div className="max-h-[220px] overflow-y-auto">
               {people.map((u) => (
                 <div key={u.id} className="flex items-center gap-2.5 px-2.5 py-2 text-[13px]"
-                  title={u.live && u.live.sockets > 1 ? `${u.live.sockets} connections` : undefined}>
-                  <Avatar id={u.id} name={u.name || "Unnamed member"} color={u.color} size={26} />
+                  title={u.live && u.live.sockets > 1 ? t("{n} connections", { n: u.live.sockets }) : undefined}>
+                  <Avatar id={u.id} name={u.name || t("Unnamed member")} color={u.color} size={26} />
                   <span className="min-w-0 flex-1">
                     <b className="block truncate">
-                      {u.name || "Unnamed member"}
-                      {u.id === me.user.id && <span className="font-semibold text-dim"> (you)</span>}
+                      {u.name || t("Unnamed member")}
+                      {u.id === me.user.id && <span className="font-semibold text-dim"> {t("(you)")}</span>}
                     </b>
                     <small className="block truncate text-[11.5px] text-dim">
-                      {u.live && presence ? personActivity(u.live, presence) : "Using Pilot"}
+                      {u.live && presence ? personActivity(u.live, presence) : t("Using Pilot")}
                     </small>
                   </span>
                   <span className={`rounded-full px-2 py-0.5 text-[11.5px] font-bold ${PILL[u.live?.streaming ? "good" : u.live ? "warn" : "idle"]}`}>
-                    {u.live?.streaming ? "Streaming" : u.live ? "Watching" : "Online"}
+                    {u.live?.streaming ? t("Streaming") : u.live ? t("Watching") : t("Online")}
                   </span>
                 </div>
               ))}
@@ -147,7 +149,7 @@ export function SystemStatus({ connected }: { connected: boolean }) {
           </>
         )}
         <div className="mt-1 flex items-center gap-2.5 border-t border-line px-2.5 pt-2.5 pb-1.5 text-[13px] font-semibold">
-          This browser
+          {t("This browser")}
           <span className="ml-auto"><StatusBadge connected={connected} /></span>
         </div>
       </DropMenu>

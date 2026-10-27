@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { EAR_OFF, earEvent, type EarView } from "../lib/robotEar";
+import { t } from "../i18n";
 
 /**
  * The robot's own microphone, Alexa-style, over /ws/robot-ear (backend -> executor -> relay,
@@ -59,7 +60,7 @@ export function useRobotEar({
     ws.onclose = () => {
       if (closedHere) return;
       setView((v) => (v.state === "error" ? v : { ...v, state: "error",
-        error: "the connection closed" }));
+        error: t("the connection closed") }));
     };
     return () => {
       closedHere = true;
