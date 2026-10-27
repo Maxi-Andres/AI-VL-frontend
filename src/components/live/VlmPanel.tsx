@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   IconAdjustmentsHorizontal,
@@ -166,6 +166,10 @@ export function VlmPanel({
   const wasBusy = useRef(false);
   const nextId = useRef(1);
   const scroller = useRef<HTMLDivElement>(null);
+  const content = useRef<HTMLDivElement>(null);
+  // Follow the newest message — unless the person scrolled up to read an older one; sending
+  // something new brings the view back down.
+  const stick = useRef(true);
 
   // A request starting opens a turn; ending closes it with the final answer and its status.
   useEffect(() => {
@@ -186,72 +190,95 @@ export function VlmPanel({
   // While a turn is open, its answer is the stream as it arrives.
   const live = busy ? { answer: output, status } : null;
 
-  useLayoutEffect(() => {
+  // Watch the content, not the props: an answer grows token by token, a list of found objects
+  // replaces the dots, the settings fold out and shrink the view — each must keep the newest
+  // line in sight.
+  useEffect(() => {
     const el = scroller.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [turns.length, output]);
+    const inner = content.current;
+    if (!el || !inner) return;
+    const follow = () => {
+      if (stick.current) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    };
+    const ro = new ResizeObserver(follow);
+    ro.observe(inner);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
+  const toBottom = () => {
+    stick.current = true;
+    requestAnimationFrame(() => scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" }));
+  };
   const analyze = () => {
     pending.current = "analysis";
+    toBottom();
     onAsk();
   };
   const send = () => {
     const q = prompt.trim();
     if (!q || !canAsk || busy) return;
     pending.current = "question";
+    toBottom();
     onAskPrompt(q);
   };
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div ref={scroller} className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
-        {turns.length === 0 ? (
-          <div className="grid h-full place-items-center px-4 py-8 text-center">
-            <div>
-              <span className="mx-auto mb-3 grid size-11 place-items-center rounded-2xl bg-good-bg text-good-fg">
-                <IconSparkles size={22} />
-              </span>
-              <b className="block text-sm">Ask about what the camera sees</b>
-              <p className="m-0 mt-1 text-[12.5px] text-muted">
-                Type a question, say “robot” and ask it, or use Find objects to list what is in the frame.
-              </p>
-              <div className="mt-4 flex flex-wrap justify-center gap-1.5">
-                {["What do you see?", "Is anyone in the frame?", "Read any text or gauges"].map((q) => (
-                  <button key={q} type="button" onClick={() => onPromptChange(q)}
-                    className="cursor-pointer rounded-full border border-line px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent hover:text-fg">
-                    {q}
-                  </button>
-                ))}
+      <div ref={scroller} className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1"
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        }}>
+        <div ref={content} className={turns.length === 0 ? "h-full" : ""}>
+          {turns.length === 0 ? (
+            <div className="grid h-full place-items-center px-4 py-8 text-center">
+              <div>
+                <span className="mx-auto mb-3 grid size-11 place-items-center rounded-2xl bg-good-bg text-good-fg">
+                  <IconSparkles size={22} />
+                </span>
+                <b className="block text-sm">Ask about what the camera sees</b>
+                <p className="m-0 mt-1 text-[12.5px] text-muted">
+                  Type a question, say “robot” and ask it, or use Find objects to list what is in the frame.
+                </p>
+                <div className="mt-4 flex flex-wrap justify-center gap-1.5">
+                  {["What do you see?", "Is anyone in the frame?", "Read any text or gauges"].map((q) => (
+                    <button key={q} type="button" onClick={() => onPromptChange(q)}
+                      className="cursor-pointer rounded-full border border-line px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent hover:text-fg">
+                      {q}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-        ) : (
-          <div className="grid gap-4 pb-1">
-            <div className="flex justify-end">
-              <button type="button" onClick={() => setTurns([])} disabled={busy}
-                className="flex cursor-pointer items-center gap-1 text-[11.5px] font-bold text-dim hover:text-fg disabled:opacity-40">
-                <IconTrash size={13} />Clear
-              </button>
+          ) : (
+            <div className="grid gap-4 pb-1">
+              <div className="flex justify-end">
+                <button type="button" onClick={() => setTurns([])} disabled={busy}
+                  className="flex cursor-pointer items-center gap-1 text-[11.5px] font-bold text-dim hover:text-fg disabled:opacity-40">
+                  <IconTrash size={13} />Clear
+                </button>
+              </div>
+              {turns.map((t, i) => {
+                const last = i === turns.length - 1;
+                const answer = last && live ? live.answer : t.answer;
+                const st = last && live ? live.status : t.status;
+                return (
+                  <div key={t.id} className="grid animate-rise gap-2">
+                    <Asked turn={t} />
+                    <Answer turn={t} answer={answer} status={st} streaming={last && busy}
+                      voice={voice} />
+                  </div>
+                );
+              })}
             </div>
-            {turns.map((t, i) => {
-              const last = i === turns.length - 1;
-              const answer = last && live ? live.answer : t.answer;
-              const st = last && live ? live.status : t.status;
-              return (
-                <div key={t.id} className="grid gap-2">
-                  <Asked turn={t} />
-                  <Answer turn={t} answer={answer} status={st} streaming={last && busy}
-                    voice={voice} />
-                </div>
-              );
-            })}
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <div className="mt-3 grid gap-2">
         <button type="button" onClick={analyze} disabled={!canAsk || busy}
-          className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-accent/40 bg-good-bg py-2 text-[13px] font-bold text-good-fg transition hover:border-accent disabled:cursor-default disabled:opacity-50">
+          className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-accent/40 bg-good-bg py-2 text-[13px] font-bold text-good-fg transition hover:border-accent active:scale-[.98] disabled:cursor-default disabled:opacity-50">
           <IconScan size={17} />Find objects
           <span className="font-semibold opacity-70">· {scope}</span>
         </button>
@@ -284,12 +311,12 @@ export function VlmPanel({
                 icon={voice.spokenMode ? <IconVolume size={15} /> : <IconVolumeOff size={15} />} />
             )}
             <button type="button" onClick={() => setSettings((s) => !s)} aria-expanded={settings} title="Voice and model settings"
-              className={`grid size-7 cursor-pointer place-items-center rounded-lg transition ${settings ? "bg-subtle text-fg" : "text-muted hover:bg-subtle hover:text-fg"}`}>
-              <IconAdjustmentsHorizontal size={15} />
+              className={`grid size-7 cursor-pointer place-items-center rounded-lg transition active:scale-90 ${settings ? "bg-subtle text-fg" : "text-muted hover:bg-subtle hover:text-fg"}`}>
+              <IconAdjustmentsHorizontal size={15} className={`transition-transform duration-300 ${settings ? "rotate-90" : ""}`} />
             </button>
             <span className="ml-1 hidden truncate text-[11px] text-dim sm:inline">Enter to send</span>
             <button type="button" onClick={send} disabled={!canAsk || busy || !prompt.trim()} aria-label="Ask"
-              className="ml-auto flex cursor-pointer items-center gap-1 rounded-lg bg-fg px-3 py-1.5 text-[12.5px] font-bold text-bg transition disabled:cursor-default disabled:opacity-35">
+              className="ml-auto flex cursor-pointer items-center gap-1 rounded-lg bg-fg px-3 py-1.5 text-[12.5px] font-bold text-bg transition active:scale-95 disabled:cursor-default disabled:opacity-35">
               Ask<IconArrowUp size={14} />
             </button>
           </div>
@@ -300,61 +327,66 @@ export function VlmPanel({
           </p>
         )}
 
-        {settings && (
-          <div className="grid max-h-[46vh] gap-3 overflow-y-auto rounded-xl border border-line bg-panel p-3">
-            <SettingsGroup title="Voice">
-              {voice.speechSupported && (
-                <Row label="Filler" hint="A short word if the answer is slow to start">
-                  <Toggle on={voice.fillerMode} onClick={voice.onToggleFillerMode} title="Filler"
-                    icon={voice.fillerMode ? <IconMessage size={15} /> : <IconMessageOff size={15} />} />
+        {/* Folds open and shut (grid rows 0fr ↔ 1fr animate the height); kept mounted so
+            closing animates too, and `inert` keeps a closed one out of the tab order. */}
+        <div inert={!settings}
+          className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out ${settings ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
+          <div className="min-h-0 overflow-hidden">
+            <div className="grid max-h-[46vh] gap-3 overflow-y-auto rounded-xl border border-line bg-panel p-3">
+              <SettingsGroup title="Voice">
+                {voice.speechSupported && (
+                  <Row label="Filler" hint="A short word if the answer is slow to start">
+                    <Toggle on={voice.fillerMode} onClick={voice.onToggleFillerMode} title="Filler"
+                      icon={voice.fillerMode ? <IconMessage size={15} /> : <IconMessageOff size={15} />} />
+                  </Row>
+                )}
+                {voice.speechSupported && voice.robotSpeaker && (
+                  <Row label="Speak through" hint={voice.speechOutput === "robot" && voice.robotSpeakerError ? undefined : "The robot plays the same voice"}>
+                    <div className="flex rounded-lg bg-subtle p-0.5">
+                      {(["browser", "robot"] as const).map((o) => (
+                        <button key={o} type="button" onClick={() => voice.onSpeechOutputChange(o)}
+                          className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-bold ${voice.speechOutput === o ? "bg-panel text-fg shadow-card" : "text-muted"}`}>
+                          {o === "browser" ? "This device" : "Robot"}
+                        </button>
+                      ))}
+                    </div>
+                  </Row>
+                )}
+                {voice.speechOutput === "robot" && voice.robotSpeakerError && (
+                  <StatusText status={{ tone: "warn", text: voice.robotSpeakerError }} className="text-xs text-muted" />
+                )}
+                {voice.speechSupported && voice.voices.length > 0 && (
+                  <Row label="Voice" hint="Made on the server; Drive uses it too">
+                    <select value={voice.voiceURI ?? ""} onChange={(e) => voice.onVoiceChange(e.target.value)}
+                      className="w-40 rounded-md border border-line bg-bg p-1.5 text-xs text-fg focus:border-accent focus:outline-none">
+                      <option value="">Default</option>
+                      {voice.voices.map((v) => <option key={v.uri} value={v.uri}>{v.label}</option>)}
+                    </select>
+                  </Row>
+                )}
+              </SettingsGroup>
+              <SettingsGroup title="Model">
+                <Row label="Model">
+                  <div className="w-40"><Select options={models} value={model} onChange={(e) => onModelChange(e.target.value)} className="text-xs" /></div>
                 </Row>
-              )}
-              {voice.speechSupported && voice.robotSpeaker && (
-                <Row label="Speak through" hint={voice.speechOutput === "robot" && voice.robotSpeakerError ? undefined : "The robot plays the same voice"}>
-                  <div className="flex rounded-lg bg-subtle p-0.5">
-                    {(["browser", "robot"] as const).map((o) => (
-                      <button key={o} type="button" onClick={() => voice.onSpeechOutputChange(o)}
-                        className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-bold ${voice.speechOutput === o ? "bg-panel text-fg shadow-card" : "text-muted"}`}>
-                        {o === "browser" ? "This device" : "Robot"}
-                      </button>
-                    ))}
-                  </div>
+                <Row label="Find objects in" hint="What “Find objects” looks for">
+                  <div className="w-40"><Select options={scopes} value={scope} onChange={(e) => onScopeChange(e.target.value)} className="text-xs" /></div>
                 </Row>
-              )}
-              {voice.speechOutput === "robot" && voice.robotSpeakerError && (
-                <StatusText status={{ tone: "warn", text: voice.robotSpeakerError }} className="text-xs text-muted" />
-              )}
-              {voice.speechSupported && voice.voices.length > 0 && (
-                <Row label="Voice" hint="Made on the server; Drive uses it too">
-                  <select value={voice.voiceURI ?? ""} onChange={(e) => voice.onVoiceChange(e.target.value)}
-                    className="w-40 rounded-md border border-line bg-bg p-1.5 text-xs text-fg focus:border-accent focus:outline-none">
-                    <option value="">Default</option>
-                    {voice.voices.map((v) => <option key={v.uri} value={v.uri}>{v.label}</option>)}
-                  </select>
+                <Row label="Prompt variant">
+                  <div className="w-40"><Select options={variants} value={variant} onChange={(e) => onVariantChange(e.target.value)} className="text-xs" /></div>
                 </Row>
-              )}
-            </SettingsGroup>
-            <SettingsGroup title="Model">
-              <Row label="Model">
-                <div className="w-40"><Select options={models} value={model} onChange={(e) => onModelChange(e.target.value)} className="text-xs" /></div>
-              </Row>
-              <Row label="Find objects in" hint="What “Find objects” looks for">
-                <div className="w-40"><Select options={scopes} value={scope} onChange={(e) => onScopeChange(e.target.value)} className="text-xs" /></div>
-              </Row>
-              <Row label="Prompt variant">
-                <div className="w-40"><Select options={variants} value={variant} onChange={(e) => onVariantChange(e.target.value)} className="text-xs" /></div>
-              </Row>
-              {imageMaxSize !== undefined && onImageMaxSizeChange && (
-                <Row label="Image quality" hint="1152 costs nothing extra; bigger reads small print, slower">
-                  <div className="w-40">
-                    <Select options={VLM_IMG_SIZES} value={imageMaxSize > 0 ? String(imageMaxSize) : "Full"} className="text-xs"
-                      onChange={(e) => onImageMaxSizeChange(e.target.value === "Full" ? 0 : parseInt(e.target.value, 10))} />
-                  </div>
-                </Row>
-              )}
-            </SettingsGroup>
+                {imageMaxSize !== undefined && onImageMaxSizeChange && (
+                  <Row label="Image quality" hint="1152 costs nothing extra; bigger reads small print, slower">
+                    <div className="w-40">
+                      <Select options={VLM_IMG_SIZES} value={imageMaxSize > 0 ? String(imageMaxSize) : "Full"} className="text-xs"
+                        onChange={(e) => onImageMaxSizeChange(e.target.value === "Full" ? 0 : parseInt(e.target.value, 10))} />
+                    </div>
+                  </Row>
+                )}
+              </SettingsGroup>
+            </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
@@ -464,7 +496,7 @@ function FoundList({ found, raw }: { found: Found[]; raw: string }) {
 function Toggle({ on, onClick, title, icon }: { on: boolean; onClick: () => void; title: string; icon: ReactNode }) {
   return (
     <button type="button" onClick={onClick} aria-pressed={on} title={title} aria-label={title}
-      className={`grid size-7 cursor-pointer place-items-center rounded-lg transition ${on ? "bg-good-bg text-good-fg" : "text-muted hover:bg-subtle hover:text-fg"}`}>
+      className={`grid size-7 cursor-pointer place-items-center rounded-lg transition duration-200 active:scale-90 ${on ? "bg-good-bg text-good-fg" : "text-muted hover:bg-subtle hover:text-fg"}`}>
       {icon}
     </button>
   );
