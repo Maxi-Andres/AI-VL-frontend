@@ -383,4 +383,8 @@ export const SETTINGS: Record<string, string> = {
     "Copia el Id. de aplicación (cliente) y el Id. de directorio (inquilino) desde su Información general.",
   "Create a client secret and paste its Value here, then turn this on and save: Pilot checks with Microsoft before saving.":
     "Crea un secreto de cliente y pega su Valor aquí; después actívalo y guarda: Pilot lo comprueba con Microsoft antes de guardar.",
+  "Passwords from the internet": "Contraseñas desde internet",
+  "Allow passwords from the internet": "Permitir contraseñas desde internet",
+  "Off: from outside the company network people sign in with their work account (and its second factor); a password works only from the office, VPN or Tailscale.":
+    "Apagado: desde fuera de la red de la empresa se entra con la cuenta de trabajo (y su segundo factor); la contraseña sirve solo desde la oficina, la VPN o Tailscale.",
 };

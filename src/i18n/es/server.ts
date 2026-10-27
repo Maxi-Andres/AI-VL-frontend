@@ -66,4 +66,6 @@ export const SERVER: Record<string, string> = {
   "Turning it on needs the client ID and a client secret.": "Para activarlo hacen falta el Id. de cliente y un secreto de cliente.",
   "The identity provider did not answer for that tenant or issuer. Check it and try again.":
     "El proveedor de identidad no respondió para ese inquilino o emisor. Revísalo y vuelve a intentarlo.",
+  "From outside the company network, sign in with your work account.":
+    "Desde fuera de la red de la empresa, inicia sesión con tu cuenta de trabajo.",
 };

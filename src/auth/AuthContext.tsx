@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { getAuthState, getMe, setUp, signIn, signOut } from "../api/auth";
+import { getAuthState, getMe, setUp, signIn, signOut, type SsoOption } from "../api/auth";
 import { acceptInvitation, completePasswordReset } from "../api/team";
 import type { Me, SetupInput } from "../api/auth";
 import { onSignedOut } from "./signedOut";
@@ -38,6 +38,9 @@ export type AuthStatus =
 
 interface AuthApi {
   status: AuthStatus;
+  /** The company's single sign-on button, read with the rest of the sign-in state before any
+   * screen shows — so the sign-in page never flips from the password form to the button. */
+  sso: SsoOption | null;
   signIn: (email: string, password: string, remember: boolean) => Promise<void>;
   setUp: (input: SetupInput) => Promise<void>;
   acceptInvitation: (token: string, name: string, password: string, remember: boolean) => Promise<void>;
@@ -52,6 +55,7 @@ const AuthContext = createContext<AuthApi | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>({ kind: "loading" });
+  const [sso, setSso] = useState<SsoOption | null>(null);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
@@ -59,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         const state = await getAuthState(ctl.signal);
+        setSso(state.sso ?? null);
         if (state.setup_required) return setStatus({ kind: "setup" });
         const me = await getMe(ctl.signal);
         if (me) await arrive(me);
@@ -132,10 +137,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const api = useMemo(
     () => ({
-      status, signIn: doSignIn, setUp: doSetUp, acceptInvitation: doAccept,
+      status, sso, signIn: doSignIn, setUp: doSetUp, acceptInvitation: doAccept,
       completePasswordReset: doReset, signOut: doSignOut, retry, setMe,
     }),
-    [status, doSignIn, doSetUp, doAccept, doReset, doSignOut, retry, setMe],
+    [status, sso, doSignIn, doSetUp, doAccept, doReset, doSignOut, retry, setMe],
   );
   return <AuthContext.Provider value={api}>{children}</AuthContext.Provider>;
 }

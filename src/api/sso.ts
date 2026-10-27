@@ -17,6 +17,8 @@ export interface SsoSettings {
   /** What to register at the provider: built on the public address when there is one. */
   redirect_uri: string;
   public_url: string | null;
+  /** Passwords from the internet too; off: only from the company network while this is on. */
+  password_anywhere: boolean;
 }
 
 export interface SsoUpdate {
@@ -27,6 +29,7 @@ export interface SsoUpdate {
   client_id: string;
   /** Empty keeps the saved one. */
   client_secret: string;
+  password_anywhere: boolean;
 }
 
 export async function getSso(signal?: AbortSignal): Promise<SsoSettings> {

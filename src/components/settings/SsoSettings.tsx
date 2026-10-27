@@ -87,7 +87,7 @@ export function SsoSettings() {
   }
 
   const set = (patch: Partial<Settings>) => setForm({ ...form, ...patch });
-  const changed = secret !== "" || (["enabled", "provider", "tenant", "issuer", "client_id"] as const)
+  const changed = secret !== "" || (["enabled", "provider", "tenant", "issuer", "client_id", "password_anywhere"] as const)
     .some((k) => form[k] !== saved[k]);
 
   async function save(next: Settings) {
@@ -95,7 +95,8 @@ export function SsoSettings() {
     setError(null);
     try {
       const s = await saveSso({ enabled: next.enabled, provider: next.provider, tenant: next.tenant,
-        issuer: next.issuer, client_id: next.client_id, client_secret: secret });
+        issuer: next.issuer, client_id: next.client_id, client_secret: secret,
+        password_anywhere: next.password_anywhere });
       setSaved(s);
       setForm(s);
       setSecret("");
@@ -178,6 +179,16 @@ export function SsoSettings() {
           <input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} autoComplete="new-password"
             placeholder={saved.has_secret ? t("Saved — leave empty to keep it") : ""} className={`${INPUT} font-mono`} />
         </Row>
+
+        <div className="flex items-start gap-3 px-5 py-3.5">
+          <Switch on={form.password_anywhere} onChange={(on) => set({ password_anywhere: on })} label={t("Passwords from the internet")} />
+          <span className="text-[13px]">
+            <b className="block font-semibold">{t("Allow passwords from the internet")}</b>
+            <span className="text-xs text-muted">
+              {t("Off: from outside the company network people sign in with their work account (and its second factor); a password works only from the office, VPN or Tailscale.")}
+            </span>
+          </span>
+        </div>
 
         <div className="flex flex-wrap items-center gap-3 px-5 py-3.5">
           <Switch on={form.enabled} onChange={(on) => set({ enabled: on })} label={t("Single sign-on")} />

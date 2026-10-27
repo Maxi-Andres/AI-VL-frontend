@@ -21,7 +21,7 @@ import {
   IconUser,
   IconUsers,
 } from "@tabler/icons-react";
-import { AuthError, getAuthState, ssoStartUrl, type SsoOption } from "../api/auth";
+import { AuthError, ssoStartUrl, type SsoOption } from "../api/auth";
 import { lookupInvitation, lookupPasswordReset, type InvitationInfo, type ResetInfo } from "../api/team";
 import { ROLES } from "./roles";
 import { PASSWORD_MIN, passwordStrength } from "../lib/password";
@@ -183,17 +183,6 @@ function ErrorNote({ text, shakeKey }: { text: string; shakeKey: number }) {
 // --------------------------------------------------------------------------- //
 // Single sign-on (sso.py): the button, and what the sign-in page says when it comes back failed
 // --------------------------------------------------------------------------- //
-/** The company's single sign-on option, read once (null while unknown or when it is off). */
-function useSso(): SsoOption | null {
-  const [sso, setSso] = useState<SsoOption | null>(null);
-  useEffect(() => {
-    const ctl = new AbortController();
-    getAuthState(ctl.signal).then((s) => setSso(s.sso ?? null)).catch(() => undefined);
-    return () => ctl.abort();
-  }, []);
-  return sso;
-}
-
 // Why the provider's round trip ended back here (?sso_error=… from the backend).
 const SSO_ERRORS: Record<string, string> = {
   off: msg("Single sign-on is not turned on for this workspace."),
@@ -250,7 +239,7 @@ export function SignInScreen({ orgName, expired }: { orgName: string | null; exp
   const [error, setError] = useState<string | null>(null);
   const [tries, setTries] = useState(0);
   const [forgot, setForgot] = useState(false);
-  const sso = useSso();
+  const { sso } = useAuth();
   const [ssoError] = useState(takeSsoError);
   // With single sign-on on, the password is the way in when the provider is down: one click
   // away instead of the first thing on the page.
@@ -542,7 +531,7 @@ export function InviteScreen() {
   const [error, setError] = useState<string | null>(null);
   const [tries, setTries] = useState(0);
 
-  const sso = useSso();
+  const { sso } = useAuth();
 
   useEffect(() => {
     if (!token) return;
