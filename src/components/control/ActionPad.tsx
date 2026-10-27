@@ -279,7 +279,7 @@ function Group({ title, count, shut, onToggle, ui, children }: {
         <span className={`rounded-full px-1.5 text-[11px] font-bold ${ui.count}`}>{count}</span>
         <IconChevronDown size={16} className={`ml-auto opacity-60 transition-transform ${shut ? "-rotate-90" : ""}`} />
       </button>
-      {!shut && <div className="px-2.5 pb-2.5">{children}</div>}
+      {!shut && <div className="px-2.5 pt-1.5 pb-2.5">{children}</div>}
     </section>
   );
 }
