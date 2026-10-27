@@ -933,6 +933,7 @@ export function LivePage() {
                 classes={classes}
                 maxFps={maxFps}
                 enabled={yoloEnabled}
+                now={{ objects: objects.length, inferMs, fps: detFps, perClass }}
                 onEnabledChange={setYoloEnabled}
                 onModelChange={handleModelChange}
                 onConfChange={setConf}

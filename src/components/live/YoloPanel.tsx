@@ -1,9 +1,27 @@
-import { Button } from "../ui/Button";
-import { Field } from "../ui/Field";
-import { MultiSelect, Select } from "../ui/Select";
+import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
+import { IconCheck, IconScan, IconSearch, IconX } from "@tabler/icons-react";
+import { Switch } from "../ui/Switch";
 
-const IMG_SIZES = ["320", "640", "960", "1280"];
-const FPS_CAPS = ["Unlimited", "1", "2", "5", "10", "15", "30"];
+const IMG_SIZES = [320, 640, 960, 1280];
+const FPS_CAPS = [1, 2, 5, 10, 15, 30, 0]; // 0 = unlimited
+
+// One-tap class sets, offered when the model knows them (COCO's names).
+const PRESETS: { label: string; classes: string[] }[] = [
+  { label: "People", classes: ["person"] },
+  { label: "Vehicles", classes: ["bicycle", "car", "motorcycle", "bus", "truck"] },
+  { label: "Animals", classes: ["bird", "cat", "dog", "horse"] },
+];
+
+/** What detection is seeing right now, measured on the page from the replies. */
+export interface DetectionNow {
+  objects: number;
+  /** Server-side inference time per frame (ms), when replies are coming. */
+  inferMs: string | null;
+  /** Frames actually processed per second. */
+  fps: string | null;
+  perClass: { label: string; n: number; color: string }[];
+}
 
 interface Props {
   models: string[];
@@ -16,6 +34,7 @@ interface Props {
   maxFps: number;
   /** Master YOLO on/off (off = no detection runs, no GPU use). */
   enabled: boolean;
+  now: DetectionNow;
   onEnabledChange: (v: boolean) => void;
   onModelChange: (v: string) => void;
   onConfChange: (v: number) => void;
@@ -24,7 +43,12 @@ interface Props {
   onMaxFpsChange: (v: number) => void;
 }
 
-/** Live YOLO controls: on/off switch, model, confidence, image size, class filter. */
+/**
+ * Live detection (YOLO), as in the mockup: one switch that says what it costs, then each
+ * setting on its own row with a word on what it does, the image size and frame cap as buttons,
+ * and the classes as chips you search and tap — with one-tap sets. While it runs, what it sees
+ * right now sits under the switch.
+ */
 export function YoloPanel({
   models,
   classOptions,
@@ -34,6 +58,7 @@ export function YoloPanel({
   classes,
   maxFps,
   enabled,
+  now,
   onEnabledChange,
   onModelChange,
   onConfChange,
@@ -41,81 +66,171 @@ export function YoloPanel({
   onClassesChange,
   onMaxFpsChange,
 }: Props) {
+  const [q, setQ] = useState("");
+  const shown = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    const list = needle ? classOptions.filter((c) => c.toLowerCase().includes(needle)) : classOptions;
+    // The chosen ones first, so a choice never scrolls out of sight.
+    return [...list.filter((c) => classes.includes(c)), ...list.filter((c) => !classes.includes(c))];
+  }, [q, classOptions, classes]);
+  const presets = PRESETS.map((p) => ({ ...p, classes: p.classes.filter((c) => classOptions.includes(c)) }))
+    .filter((p) => p.classes.length);
+  const toggle = (c: string) => onClassesChange(classes.includes(c) ? classes.filter((x) => x !== c) : [...classes, c]);
+  const same = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
+
   return (
     <div>
-      <div className="mb-2.5 flex items-center justify-between gap-2">
-        <h2 className="m-0 text-[13.5px] font-extrabold text-fg">
-          Live detection (YOLO)
-        </h2>
-        <Button
-          variant={enabled ? "primary" : "secondary"}
-          className="px-2 py-1 text-[11px]"
-          aria-pressed={enabled}
-          title="Run YOLO detection on the current video. Off = no detection anywhere, so the GPU stays idle."
-          onClick={() => onEnabledChange(!enabled)}
-        >
-          {enabled ? "On" : "Off"}
-        </Button>
+      {/* The switch, and what it costs */}
+      <div className={`flex items-center gap-3 rounded-2xl p-3.5 transition-colors duration-300 ${enabled ? "bg-good-bg" : "bg-subtle"}`}>
+        <span className={`grid size-9 shrink-0 place-items-center rounded-[10px] bg-panel shadow-card transition-colors ${enabled ? "text-good-fg" : "text-muted"}`}>
+          <IconScan size={19} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <b className="block text-[13.5px]">Live detection</b>
+          <small className="block text-xs text-muted">
+            {enabled ? `Running ${model.replace(/\.pt$/, "")} at ${imgsz}px on the server` : "Off — nothing is detected and the GPU stays idle"}
+          </small>
+        </div>
+        <Switch on={enabled} onChange={onEnabledChange} label="Live detection" />
       </div>
 
-      <Field label="Model">
-        <Select
-          options={models}
-          value={model}
-          onChange={(e) => onModelChange(e.target.value)}
-        />
-      </Field>
+      {/* What it sees right now */}
+      <div className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out ${enabled ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
+        <div className="min-h-0 overflow-hidden">
+          <div className="mt-2 rounded-2xl border border-line p-3">
+            <div className="grid grid-cols-3 gap-2">
+              <Stat label="In view" value={String(now.objects)} />
+              <Stat label="Inference" value={now.inferMs ?? "—"} unit={now.inferMs ? "ms" : undefined} />
+              <Stat label="Processed" value={now.fps ?? "—"} unit={now.fps ? "fps" : undefined} />
+            </div>
+            <div className="mt-2.5 flex min-h-[26px] flex-wrap gap-1.5">
+              {now.perClass.length ? now.perClass.map((c) => (
+                <span key={c.label} className="flex animate-rise items-center gap-1.5 rounded-full bg-subtle px-2.5 py-1 text-xs font-bold">
+                  <span className="size-2 rounded-sm" style={{ background: c.color }} />
+                  {c.label}<span className="text-muted">×{c.n}</span>
+                </span>
+              )) : <span className="self-center text-xs text-dim">Nothing in view{classes.length ? " of the chosen classes" : ""}.</span>}
+            </div>
+          </div>
+        </div>
+      </div>
 
-      <Field
-        label={<>conf <span className="text-fg">{conf.toFixed(2)}</span></>}
-        inline
-      >
-        <input
-          type="range"
-          min={0.05}
-          max={0.9}
-          step={0.05}
-          value={conf}
-          onChange={(e) => onConfChange(parseFloat(e.target.value))}
-          className="w-full"
-        />
-      </Field>
+      <div className={`transition-opacity ${enabled ? "" : "opacity-70"}`}>
+        <Row label="Model" hint="Bigger models see more, and cost more GPU">
+          <select value={model} onChange={(e) => onModelChange(e.target.value)} aria-label="Model"
+            className="w-40 rounded-lg border border-line bg-bg px-2 py-1.5 text-xs font-semibold text-fg focus:border-accent focus:outline-none">
+            {models.map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
+        </Row>
 
-      <Field label="imgsz" inline>
-        <Select
-          options={IMG_SIZES}
-          value={String(imgsz)}
-          onChange={(e) => onImgszChange(parseInt(e.target.value, 10))}
-        />
-      </Field>
+        <div className="border-b border-line py-3">
+          <div className="flex items-baseline justify-between">
+            <b className="text-[13px]">Confidence</b>
+            <b className="font-mono text-[12.5px]">{conf.toFixed(2)}</b>
+          </div>
+          <input type="range" min={0.05} max={0.9} step={0.05} value={conf} aria-label="Confidence"
+            onChange={(e) => onConfChange(parseFloat(e.target.value))}
+            className="mt-2 w-full accent-[var(--color-accent)]" />
+          <div className="flex justify-between text-[11px] text-dim">
+            <span>More boxes, more mistakes</span><span>Fewer, surer</span>
+          </div>
+        </div>
 
-      <Field
-        label="Max FPS"
-        hint="Cap the frames/sec sent to save CPU/bandwidth."
-        inline
-      >
-        <Select
-          options={FPS_CAPS}
-          value={maxFps > 0 ? String(maxFps) : "Unlimited"}
-          onChange={(e) =>
-            onMaxFpsChange(
-              e.target.value === "Unlimited" ? 0 : parseInt(e.target.value, 10),
-            )
-          }
-        />
-      </Field>
+        <Row label="Image size" hint="Bigger finds smaller objects, costs GPU">
+          <Segs options={IMG_SIZES.map((n) => [n, String(n)])} value={imgsz} onChange={onImgszChange} />
+        </Row>
 
-      <Field
-        label="Classes filter (empty = all)"
-        hint="Tap to toggle each class. Empty = detect everything."
-      >
-        <MultiSelect
-          options={classOptions}
-          selected={classes}
-          onSelectionChange={onClassesChange}
-          rows={3}
-        />
-      </Field>
+        <Row label="Max FPS" hint="Frames sent per second: CPU and bandwidth">
+          <Segs options={FPS_CAPS.map((n) => [n, n ? String(n) : "∞"])} value={maxFps} onChange={onMaxFpsChange} />
+        </Row>
+
+        <div className="mt-4 mb-1.5 flex items-center text-[11px] font-extrabold tracking-[.08em] text-dim uppercase">
+          Classes
+          <span className="ml-auto text-[11.5px] font-semibold tracking-normal normal-case">
+            {classes.length ? `${classes.length} chosen` : "Empty = detect everything"}
+          </span>
+        </div>
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          <Preset on={classes.length === 0} onClick={() => onClassesChange([])}>Everything</Preset>
+          {presets.map((p) => (
+            <Preset key={p.label} on={same(classes, p.classes)} onClick={() => onClassesChange(p.classes)}>{p.label}</Preset>
+          ))}
+        </div>
+        <label className="mb-2.5 flex h-9 items-center gap-2 rounded-lg border border-line bg-bg px-2.5 focus-within:border-accent">
+          <IconSearch size={15} className="text-muted" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Filter ${classOptions.length} classes…`}
+            className="min-w-0 flex-1 bg-transparent text-[13px] text-fg outline-none placeholder:text-dim" />
+          {q && (
+            <button type="button" onClick={() => setQ("")} aria-label="Clear the filter" className="cursor-pointer text-dim hover:text-fg">
+              <IconX size={14} />
+            </button>
+          )}
+        </label>
+        <div className="flex flex-wrap gap-1.5">
+          {shown.map((c) => {
+            const on = classes.includes(c);
+            return (
+              <button key={c} type="button" onClick={() => toggle(c)} aria-pressed={on}
+                className={`flex cursor-pointer items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold transition duration-150 active:scale-95 ${
+                  on ? "border-fg bg-fg text-bg" : "border-line text-muted hover:border-dim hover:text-fg"}`}>
+                {on && <IconCheck size={12} stroke={3} />}
+                {c}
+              </button>
+            );
+          })}
+          {!shown.length && <span className="text-xs text-dim">No class matches “{q}”.</span>}
+        </div>
+      </div>
     </div>
+  );
+}
+
+function Stat({ label, value, unit }: { label: string; value: string; unit?: string }) {
+  return (
+    <div>
+      <small className="block text-[10.5px] font-bold tracking-wider text-dim uppercase">{label}</small>
+      <b className="font-mono text-[15px]">
+        {value}
+        {unit && <em className="ml-1 text-[11px] font-semibold text-muted not-italic">{unit}</em>}
+      </b>
+    </div>
+  );
+}
+
+function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 border-b border-line py-3">
+      <div className="min-w-0 flex-1">
+        <b className="block text-[13px]">{label}</b>
+        {hint && <small className="block text-[11.5px] leading-snug text-dim">{hint}</small>}
+      </div>
+      <div className="shrink-0">{children}</div>
+    </div>
+  );
+}
+
+function Segs<T extends number>({ options, value, onChange }: {
+  options: [T, string][]; value: T; onChange: (v: T) => void;
+}) {
+  return (
+    <div className="flex rounded-[10px] bg-subtle p-[3px]">
+      {options.map(([v, label]) => (
+        <button key={v} type="button" onClick={() => onChange(v)} aria-pressed={value === v}
+          className={`min-w-8 cursor-pointer rounded-lg px-2 py-1 text-xs font-bold transition ${
+            value === v ? "bg-panel text-fg shadow-card" : "text-muted hover:text-fg"}`}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function Preset({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} aria-pressed={on}
+      className={`cursor-pointer rounded-lg px-2.5 py-1 text-xs font-bold transition active:scale-95 ${
+        on ? "bg-good-bg text-good-fg" : "bg-subtle text-muted hover:text-fg"}`}>
+      {children}
+    </button>
   );
 }
