@@ -526,20 +526,18 @@ export function ControlPage() {
 
   const keyCap = (k: string, label = k.toUpperCase()) => (
     <kbd className={`inline-grid h-6 min-w-6 place-items-center rounded-md border px-1.5 font-mono text-[11px] font-semibold transition ${
-      pressed.has(k) ? "translate-y-px border-[#3fd6c4] bg-[#3fd6c4] text-[#04211e]" : "border-white/25 text-white"}`}>
+      pressed.has(k) ? "translate-y-px border-accent bg-accent text-on-accent" : "border-line"}`}>
       {label}
     </kbd>
   );
 
-  const speedSeg = (glass: boolean) => (
-    <Segmented className={`flex rounded-lg p-0.5 ${glass ? "bg-white/10" : "bg-subtle"}`} title={t("Speed preset (LB / RB on a gamepad)")}
-      pill={glass ? "bg-[#3fd6c4]/25" : "bg-panel shadow-card"}>
+  const speedSeg = (
+    <Segmented className="flex rounded-lg bg-subtle p-0.5" title={t("Speed preset (LB / RB on a gamepad)")}
+      pill="bg-panel shadow-card">
       {SPEED_NAMES.map((s) => (
         <button key={s} type="button" onClick={() => setSpeed(s)} data-on={speed === s}
           className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-bold capitalize transition-colors ${
-            speed === s
-              ? glass ? "text-[#5fe3d4]" : "text-fg"
-              : glass ? "text-white/65 hover:text-white" : "text-muted hover:text-fg"}`}>
+            speed === s ? "text-fg" : "text-muted hover:text-fg"}`}>
           {t(SPEED_LABEL[s])}
         </button>
       ))}
@@ -570,20 +568,27 @@ export function ControlPage() {
     />
   );
 
-  const glass = "border border-white/10 bg-[#0c1016]/65 text-white shadow-[0_20px_50px_-20px_rgba(0,0,0,0.6)] backdrop-blur-xl";
+  // A bar button whose panel is open: solid accent, so it reads as "on" over any picture.
+  const openBtn = "bg-accent text-on-accent shadow-card";
+
+  // Arm lives in the page's top bar and again in the cockpit's, the same button in both.
+  const armButton = (small: boolean) => (
+    <button type="button" aria-pressed={armed} onClick={() => setArmed((a) => !a)}
+      title={t("While disarmed the robot never moves (Start on a gamepad)")}
+      className={`flex cursor-pointer items-center gap-2 font-bold transition active:scale-[0.97] ${
+        small ? "rounded-lg px-3 py-1.5 text-[12px]" : "rounded-xl px-4 py-2 text-[13px] shadow-card"} ${
+        armed ? "bg-accent text-on-accent" : "bg-fg text-bg"}`}>
+      <IconPlayerPlayFilled size={small ? 12 : 14} />
+      {armed ? t("Armed") : t("Arm to drive")}
+    </button>
+  );
 
   return (
     <main className="grid gap-4 p-4 lg:h-[calc(100dvh-65px)] lg:grid-cols-[minmax(0,1fr)_380px] lg:overflow-hidden">
       <div className="flex min-h-0 min-w-0 flex-col gap-3">
         {/* Arm, safety, speed */}
         <div className="flex flex-wrap items-center gap-2.5">
-          <button type="button" aria-pressed={armed} onClick={() => setArmed((a) => !a)}
-            title={t("While disarmed the robot never moves (Start on a gamepad)")}
-            className={`flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2 text-[13px] font-bold shadow-card transition active:scale-[0.97] ${
-              armed ? "bg-accent text-on-accent" : "bg-fg text-bg"}`}>
-            <IconPlayerPlayFilled size={14} />
-            {armed ? t("Armed") : t("Arm to drive")}
-          </button>
+          {armButton(false)}
           <span className={`flex min-w-0 items-center gap-2 text-[12.5px] font-semibold ${armed ? "text-good-fg" : "text-muted"}`}>
             <span className={`size-2 shrink-0 rounded-full ${armed ? "bg-good-fg shadow-[0_0_0_4px_var(--color-good-bg)]" : "bg-dim"}`} />
             <span className="truncate">
@@ -606,7 +611,7 @@ export function ControlPage() {
               <span className={`absolute top-0.5 size-4 rounded-full bg-white shadow transition-all ${safeMode ? "left-[18px]" : "left-0.5"}`} />
             </span>
           </button>
-          {speedSeg(false)}
+          {speedSeg}
         </div>
 
         {/* The stage: the robot's camera, and in fullscreen the whole cockpit. */}
@@ -627,16 +632,13 @@ export function ControlPage() {
           {!cockpit && <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/35 via-transparent to-black/45" />}
 
           {/* Top: state chips, video settings, fullscreen */}
-          <div className={`absolute inset-x-3 top-3 z-10 flex items-center gap-2 ${cockpit ? `rounded-2xl p-2 pl-3 ${glass}` : ""}`}>
+          {/* z-20: the video menu that drops from this bar must land over the actions drawer. */}
+          <div className={`absolute inset-x-3 top-3 z-20 flex items-center gap-2 ${cockpit ? "cockpit-glass rounded-2xl p-2 pl-3" : ""}`}>
             <span className="on-video flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11.5px] font-extrabold tracking-wider">
               <span className={`size-2 rounded-full ${live ? "animate-pulse bg-[#ff5a5f]" : "bg-dim"}`} />
               {live ? t("LIVE") : t("NO VIDEO")}
             </span>
-            {cockpit && (
-              <span className={`rounded-lg px-2.5 py-1 text-[11.5px] font-bold ${armed ? "bg-[#3fd6c4]/20 text-[#5fe3d4]" : "bg-white/10 text-white/70"}`}>
-                {armed ? t("Armed") : t("Disarmed")}
-              </span>
-            )}
+            {cockpit && armButton(true)}
             {posing && (
               <span className="rounded-lg bg-accent/85 px-2.5 py-1 text-[11.5px] font-bold text-on-accent"
                 title={t("Pose is on: the sticks tilt the body instead of walking. Turn Pose off (or press Stop) to walk again.")}>
@@ -650,14 +652,16 @@ export function ControlPage() {
             )}
             <span className="flex-1" />
             {cockpit && (
-              <button type="button" onClick={() => setDrawer((d) => !d)} title={t("All actions")}
-                className="grid size-9 cursor-pointer place-items-center rounded-lg bg-white/10 text-white transition hover:bg-white/20">
+              <button type="button" aria-pressed={drawer} title={t("All actions")}
+                onClick={() => { setDrawer((d) => !d); setVideoMenu(false); }}
+                className={`grid size-9 cursor-pointer place-items-center rounded-lg transition ${drawer ? openBtn : "on-video"}`}>
                 {drawer ? <IconLayoutSidebarRightCollapse size={18} /> : <IconLayoutSidebarRightExpand size={18} />}
               </button>
             )}
             <div className="relative">
-              <button type="button" onClick={() => setVideoMenu((v) => !v)} title={t("Video quality and transport")}
-                className="on-video grid size-9 cursor-pointer place-items-center rounded-lg transition">
+              <button type="button" aria-pressed={videoMenu} title={t("Video quality and transport")}
+                onClick={() => { setVideoMenu((v) => !v); setDrawer(false); }}
+                className={`grid size-9 cursor-pointer place-items-center rounded-lg transition ${videoMenu ? openBtn : "on-video"}`}>
                 <IconAdjustmentsHorizontal size={18} />
               </button>
               {videoMenu && (
@@ -675,28 +679,28 @@ export function ControlPage() {
             </button>
           </div>
 
-          {/* Bottom: sticks on touch (and always in the cockpit), keys on desktop */}
-          {(isTouch || cockpit) && (
+          {/* Bottom: sticks on a touch screen, keys on a computer (a mouse cannot hold two
+              sticks at once, so on a PC they were only in the way) */}
+          {isTouch && (
             <>
-              <div className={`absolute bottom-5 left-5 z-10 ${cockpit ? `rounded-full p-3 ${glass}` : ""}`}>
+              <div className={`absolute bottom-5 left-5 z-10 ${cockpit ? "cockpit-glass rounded-full p-3" : ""}`}>
                 <Joystick label={t("Move")} onChange={(x, y) => { leftRef.current = { x, y }; }} />
               </div>
-              <div className={`absolute bottom-5 z-10 ${cockpit ? `right-5 rounded-full p-3 ${glass} ${drawer ? "mr-[396px]" : ""}` : "right-5"}`}>
+              <div className={`absolute right-5 bottom-5 z-10 ${cockpit ? `cockpit-glass rounded-full p-3 ${drawer ? "mr-[396px]" : ""}` : ""}`}>
                 <Joystick label={t("Rotate")} axis="x" onChange={(x) => { rightRef.current = { x }; }} />
               </div>
             </>
           )}
           {!isTouch && (
             <div className={`pointer-events-none absolute inset-x-0 z-10 flex justify-center ${cockpit ? "bottom-28" : "bottom-4"}`}>
-              {/* Dark whatever the theme: the key caps are drawn for a dark ground. */}
-              <div className="flex items-center gap-2 rounded-xl bg-black/60 px-3 py-2 text-xs font-semibold text-white/80">
+              <div className="on-video flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold">
                 {pad ? (
                   <>{t("Left stick move · Right stick rotate · Start arm · Back stop · LB/RB speed")}</>
                 ) : (
                   <>
                     {keyCap("w")}{keyCap("a")}{keyCap("s")}{keyCap("d")}<span>{t("move")}</span>
                     {keyCap("arrowleft", "←")}{keyCap("arrowright", "→")}<span>{t("turn")}</span>
-                    {!armed && <span className="text-white/55">· {t("arm first")}</span>}
+                    {!armed && <span className="on-video-muted">· {t("arm first")}</span>}
                   </>
                 )}
               </div>
@@ -706,15 +710,15 @@ export function ControlPage() {
           {/* Cockpit: speed, readings and STOP in one glass ribbon; all actions in a drawer. */}
           {cockpit && (
             <>
-              <div className={`absolute bottom-5 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 rounded-2xl p-2 pl-4 ${glass}`}>
+              <div className="cockpit-glass absolute bottom-5 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 rounded-2xl p-2 pl-4">
                 <Reading label={t("Max speed")} value={`${vmax.vx.toFixed(1)}`} unit="m/s" />
                 {pct !== null && <Reading label={t("Battery")} value={`${pct}`} unit="%" />}
-                {speedSeg(true)}
+                {speedSeg}
                 {stopButton(true)}
               </div>
-              <aside className={`absolute top-[76px] right-3 bottom-3 z-10 flex w-[380px] flex-col overflow-hidden rounded-2xl transition-transform duration-300 ${glass} ${drawer ? "" : "translate-x-[calc(100%+24px)]"}`}>
-                <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3 text-sm font-extrabold">
-                  <IconBolt size={16} className="text-[#5fe3d4]" />{t("All actions")}
+              <aside className={`cockpit-glass absolute top-[76px] right-3 bottom-3 z-10 flex w-[380px] flex-col overflow-hidden rounded-2xl transition-transform duration-300 ${drawer ? "" : "translate-x-[calc(100%+24px)]"}`}>
+                <div className="flex items-center gap-2 border-b border-line px-4 py-3 text-sm font-extrabold">
+                  <IconBolt size={16} className="text-accent" />{t("All actions")}
                 </div>
                 <div className="min-h-0 flex-1 overflow-y-auto p-3">{actionPad(true)}</div>
               </aside>
@@ -725,9 +729,9 @@ export function ControlPage() {
         {/* Readings + STOP */}
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl border border-line bg-panel px-4 py-2.5 shadow-card">
           <Reading label={t("Max speed")} value={`${vmax.vx.toFixed(1)}`}
-            unit={`m/s · ${t(SPEED_LABEL[speed]).toLowerCase()}`} light />
-          <Reading label={t("Battery")} value={pct === null ? "—" : `${pct}`} unit={pct === null ? undefined : "%"} light />
-          <Reading label="Gamepad" value={pad ? t("Connected") : t("None")} light />
+            unit={`m/s · ${t(SPEED_LABEL[speed]).toLowerCase()}`} />
+          <Reading label={t("Battery")} value={pct === null ? "—" : `${pct}`} unit={pct === null ? undefined : "%"} />
+          <Reading label="Gamepad" value={pad ? t("Connected") : t("None")} />
           <span className="flex-1" />
           {stopButton(true)}
         </div>
@@ -806,13 +810,13 @@ export function ControlPage() {
 }
 
 /** One reading in the bars: a small label over a number. */
-function Reading({ label, value, unit, light }: { label: string; value: string; unit?: string; light?: boolean }) {
+function Reading({ label, value, unit }: { label: string; value: string; unit?: string }) {
   return (
     <div className="flex flex-col leading-tight">
-      <small className={`text-[10.5px] font-bold tracking-wider uppercase ${light ? "text-dim" : "text-white/55"}`}>{label}</small>
+      <small className="text-[10.5px] font-bold tracking-wider uppercase text-dim">{label}</small>
       <b className="text-[15px] font-bold">
         <span className="font-mono">{value}</span>
-        {unit && <em className={`ml-1 text-[11px] font-semibold not-italic ${light ? "text-muted" : "text-white/55"}`}>{unit}</em>}
+        {unit && <em className="ml-1 text-[11px] font-semibold not-italic text-muted">{unit}</em>}
       </b>
     </div>
   );

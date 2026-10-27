@@ -143,23 +143,15 @@ export function ActionPad({
   const advanced = [...hidden].filter((n) => !choiceSet.has(n));
   if (advanced.length) groups.push({ title: ADVANCED_GROUP, items: advanced });
 
-  const ui = glass
-    ? {
-        card: "border-white/10 bg-white/[0.04]",
-        head: "bg-[#161b24]/95 text-white",
-        count: "bg-white/10 text-white/60",
-        btn: "border-white/10 bg-white/[0.06] text-white hover:border-[#3fd6c4]/60 hover:bg-[#3fd6c4]/15",
-        input: "border-white/15 bg-white/[0.06] text-white",
-        sub: "text-white/45",
-      }
-    : {
-        card: "border-line bg-panel",
-        head: "bg-panel text-fg",
-        count: "bg-subtle text-muted",
-        btn: "border-line bg-panel text-fg hover:border-accent hover:bg-good-bg hover:text-good-fg",
-        input: "border-line bg-bg text-fg",
-        sub: "text-dim",
-      };
+  // Glass is the same theme colours, translucent: the cockpit's frosted panel shows through.
+  const ui = {
+    card: glass ? "border-line bg-panel/55" : "border-line bg-panel",
+    head: glass ? "bg-panel/95 text-fg" : "bg-panel text-fg",
+    count: "bg-subtle text-muted",
+    btn: `border-line ${glass ? "bg-panel/70" : "bg-panel"} text-fg hover:border-accent hover:bg-good-bg hover:text-good-fg`,
+    input: `border-line ${glass ? "bg-bg/70" : "bg-bg"} text-fg`,
+    sub: "text-dim",
+  };
   const btn = `flex min-w-0 items-center gap-1.5 rounded-lg border px-2.5 py-2 text-left text-[12.5px] font-semibold transition active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-55 disabled:active:scale-100 ${ui.btn}`;
 
   const renderSimple = (name: string) => {
