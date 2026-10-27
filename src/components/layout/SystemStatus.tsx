@@ -28,8 +28,9 @@ const TEXT = { good: "text-good-fg", warn: "text-warn-fg", bad: "text-bad-fg", i
 /**
  * The header's one pill for the robots and the services behind them, as in the mockup:
  * "3 of 5 up" at a glance, everything on click. Each robot counts as a service (does it
- * answer?), then the AI engine, robot control and robot video — and, below them, everyone
- * with Pilot open and, for those on the live session, what they are doing there.
+ * answer?), then the services in systemRows (AI engine, vision assistant, robot control, camera
+ * link) and the GPU's memory — and, below them, everyone with Pilot open and, for those on the
+ * live session, what they are doing there.
  *
  * The robot Live and Drive work with is picked here, and its name stays on the pill: the
  * mockup shows only the count, but an operator must never drive one robot believing it is

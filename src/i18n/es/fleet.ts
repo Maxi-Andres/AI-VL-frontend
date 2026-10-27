@@ -24,7 +24,7 @@ export const FLEET: Record<string, string> = {
   "{n} with a floor plan": "{n} con plano",
   "Team online": "Equipo en línea",
   "of {n} · +{invited} invited": "de {n} · +{invited} invitados",
-  "Live video": "Video en vivo",
+  "Services up": "Servicios activos",
   "Get {org} ready": "Prepara {org}",
   "A few steps and your team can start operating.": "Unos pocos pasos y tu equipo podrá empezar a operar.",
   "Open Team": "Abrir Equipo",

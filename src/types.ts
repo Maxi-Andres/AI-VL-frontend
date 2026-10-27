@@ -156,7 +156,14 @@ export interface Presence {
     dry_run?: boolean | null;
   };
   /** The inference service (YOLO / VLM / speech). */
-  iacore: { online: boolean };
+  iacore: {
+    online: boolean;
+    /** The VLM server (its own process: llama-server or Ollama). Null/absent when iacore is
+     * down or too old to tell. */
+    vlm?: { online: boolean; backend?: string } | null;
+    /** The whole GPU, every process on it. Null without an NVIDIA card. */
+    gpu?: { used_mb: number; total_mb: number; name?: string } | null;
+  };
 }
 
 /** Payload of POST /api/command — the Unitree command interpreter.

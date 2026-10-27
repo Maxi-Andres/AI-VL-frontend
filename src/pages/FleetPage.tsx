@@ -10,6 +10,7 @@ import {
   IconPencil,
   IconPlus,
   IconRobot,
+  IconServer,
   IconSteeringWheel,
   IconUserPlus,
   IconUsers,
@@ -136,7 +137,8 @@ export function FleetPage() {
   const siteName = useMemo(() => Object.fromEntries(sites.map((s) => [s.id, s.name])), [sites]);
   const online = robots.filter((r) => presence && robotState(presence, r.slot, net).tone === "good").length;
   const site = sites[Math.min(siteIdx, Math.max(0, sites.length - 1))] ?? null;
-  const cam = presence?.robot_cam;
+  const services = presence ? systemRows(presence).filter((r) => r.service) : [];
+  const servicesUp = services.filter((r) => r.tone === "good").length;
   const here = people?.online ?? [];
   const withPlan = sites.filter((s) => s.has_plan).length;
 
@@ -217,9 +219,10 @@ export function FleetPage() {
               : t("of {n}", { n: people.members })
             : undefined}
           fill={people?.members ? here.length / people.members : 0} />
-        <Kpi delay={180} icon={<IconVideo size={17} />} tint="bad" label={t("Live video")}
-          value={cam?.live ? `${cam.fps ? Math.round(cam.fps) : "—"}` : t("Off")} unit={cam?.live ? "fps" : undefined}
-          fill={cam?.live && cam.fps ? Math.min(1, cam.fps / 15) : 0} />
+        {/* The services up, as in the header's pill. Missions take this place once they exist. */}
+        <Kpi delay={180} icon={<IconServer size={17} />} tint="bad" label={t("Services up")}
+          value={services.length ? servicesUp : "—"} unit={services.length ? t("of {n}", { n: services.length }) : undefined}
+          fill={services.length ? servicesUp / services.length : 0} />
       </div>
 
       {onboarding && (
