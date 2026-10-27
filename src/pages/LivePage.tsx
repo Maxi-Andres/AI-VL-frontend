@@ -53,6 +53,7 @@ import type {
   DetectionMessage,
   YoloConfig,
 } from "../types";
+import { Segmented } from "../components/ui/Segmented";
 
 // VLM overlay boxes are drawn one flat color (they aren't YOLO classes). YOLO
 // boxes are colored per-class by the palette in draw.ts (no override).
@@ -774,19 +775,19 @@ export function LivePage() {
       <div className="flex min-h-0 min-w-0 flex-col gap-3">
         {/* Source, and for the robot camera its picture settings */}
         <div className="flex flex-wrap items-center gap-2.5">
-          <div className="flex rounded-xl bg-subtle p-1">
+          <Segmented className="flex rounded-xl bg-subtle p-1">
             {([
               ["own", "My camera", IconDeviceLaptop, mayAnalyze, chooseOwnCamera],
               ["robot", "Robot camera", IconVideo, mayOperate, chooseRobotCamera],
               ["view", "View only", IconEye, mayMirror, chooseMirror],
             ] as const).filter((b) => b[3]).map(([id, label, Icon, , go]) => (
-              <button key={id} type="button" onClick={() => void go()}
-                className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-bold transition ${
-                  source === id ? "bg-panel text-fg shadow-card" : "text-muted hover:text-fg"}`}>
+              <button key={id} type="button" onClick={() => void go()} data-on={source === id}
+                className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-bold transition-colors ${
+                  source === id ? "text-fg" : "text-muted hover:text-fg"}`}>
                 <Icon size={15} />{label}
               </button>
             ))}
-          </div>
+          </Segmented>
           <StatusText status={robotCamStatus} className="min-w-0 truncate text-xs text-muted" />
           {cameraError && <span className="min-w-0 truncate text-xs text-bad-fg">{cameraError}</span>}
           <span className="flex-1" />
@@ -839,19 +840,19 @@ export function LivePage() {
       {/* Side panel: the AI, detection and the command interpreter, each with its own scroll. */}
       {mayAnalyze && (
         <aside className="flex min-h-[480px] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-card">
-          <div className="m-3 mb-0 flex gap-0.5 rounded-xl bg-subtle p-1">
+          <Segmented className="m-3 mb-0 flex gap-0.5 rounded-xl bg-subtle p-1">
             {([
               ["vlm", "Ask VLM", IconSparkles],
               ["yolo", "Detection", IconScan],
               ["command", "Command", IconTerminal2],
             ] as const).map(([id, label, Icon]) => (
-              <button key={id} type="button" onClick={() => setPanel(id)}
-                className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg py-1.5 text-[12.5px] font-bold transition ${
-                  panel === id ? "bg-panel text-fg shadow-card" : "text-muted hover:text-fg"}`}>
+              <button key={id} type="button" onClick={() => setPanel(id)} data-on={panel === id}
+                className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg py-1.5 text-[12.5px] font-bold transition-colors ${
+                  panel === id ? "text-fg" : "text-muted hover:text-fg"}`}>
                 <Icon size={15} />{label}
               </button>
             ))}
-          </div>
+          </Segmented>
           {/* The chat keeps its own scroll (and stays mounted, so switching tabs keeps the
               conversation); the other two scroll as a whole. */}
           <div className={`min-h-0 flex-1 p-4 ${panel === "vlm" ? "flex flex-col" : "overflow-y-auto"}`}>

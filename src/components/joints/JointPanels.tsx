@@ -15,6 +15,7 @@ import {
 } from "../../lib/g1Joints";
 import { StatusText, type Status } from "../ui/StatusText";
 import type { JointLimits } from "./RobotViewer";
+import { Segmented } from "../ui/Segmented";
 
 /** The Joints page's side panels. Presentational: everything comes in through props. */
 
@@ -81,10 +82,11 @@ export function SourceBar({ kind, onKind, state, locked = false }: {
       type="button"
       onClick={() => onKind(k)}
       aria-pressed={kind === k}
+      data-on={kind === k}
       disabled={locked && kind !== k}
       title={locked && kind !== k ? "Release the arms first: while you hold them you watch the live robot." : undefined}
-      className={`cursor-pointer rounded-lg px-3 py-1.5 text-[12.5px] font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${
-        kind === k ? "bg-panel text-fg shadow-card" : "text-muted hover:text-fg"
+      className={`cursor-pointer rounded-lg px-3 py-1.5 text-[12.5px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+        kind === k ? "text-fg" : "text-muted hover:text-fg"
       }`}
     >
       {label}
@@ -94,10 +96,10 @@ export function SourceBar({ kind, onKind, state, locked = false }: {
     ? "text-warn-fg" : state.link === "live" || state.link === "replay" ? "text-good-fg" : "text-muted";
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-      <div className="flex rounded-xl bg-subtle p-1">
+      <Segmented className="flex rounded-xl bg-subtle p-1">
         {opt("live", "Live robot")}
         {opt("replay", "Recorded walk")}
-      </div>
+      </Segmented>
       <StatusText status={linkStatus(state)} className={`min-w-0 text-[12.5px] font-semibold ${tone}`} />
       {state.note && <span className="min-w-0 text-xs text-muted">{state.note}</span>}
     </div>

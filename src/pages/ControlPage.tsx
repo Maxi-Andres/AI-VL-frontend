@@ -31,6 +31,7 @@ import { choiceSendable, unsendableSkills } from "../components/control/unsendab
 import { useRobotTransports } from "../hooks/useRobotTransports";
 import { CameraCanvas } from "../components/live/CameraCanvas";
 import { useRobot } from "../components/layout/RobotContext";
+import { Segmented } from "../components/ui/Segmented";
 
 // Max velocities per speed preset (m/s, m/s, rad/s), PER ROBOT. Below these sit two more
 // clamps — the executor's (go2_/g1_commands MAX_*) and the relay's (MAX_* in its relay.env) —
@@ -518,17 +519,18 @@ export function ControlPage() {
   );
 
   const speedSeg = (glass: boolean) => (
-    <div className={`flex rounded-lg p-0.5 ${glass ? "bg-white/10" : "bg-subtle"}`} title="Speed preset (LB / RB on a gamepad)">
+    <Segmented className={`flex rounded-lg p-0.5 ${glass ? "bg-white/10" : "bg-subtle"}`} title="Speed preset (LB / RB on a gamepad)"
+      pill={glass ? "bg-[#3fd6c4]/25" : "bg-panel shadow-card"}>
       {SPEED_NAMES.map((s) => (
-        <button key={s} type="button" onClick={() => setSpeed(s)}
-          className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-bold capitalize transition ${
+        <button key={s} type="button" onClick={() => setSpeed(s)} data-on={speed === s}
+          className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-bold capitalize transition-colors ${
             speed === s
-              ? glass ? "bg-[#3fd6c4]/25 text-[#5fe3d4]" : "bg-panel text-fg shadow-card"
+              ? glass ? "text-[#5fe3d4]" : "text-fg"
               : glass ? "text-white/65 hover:text-white" : "text-muted hover:text-fg"}`}>
           {s}
         </button>
       ))}
-    </div>
+    </Segmented>
   );
 
   const stopButton = (big: boolean) => (
@@ -718,19 +720,19 @@ export function ControlPage() {
 
       {/* Side panel: its own scroll; the page never scrolls on desktop. */}
       <aside className="flex min-h-[420px] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-card">
-        <div className="m-3 mb-0 flex gap-0.5 rounded-xl bg-subtle p-1">
+        <Segmented className="m-3 mb-0 flex gap-0.5 rounded-xl bg-subtle p-1">
           {([
             ["actions", "Actions", IconBolt],
             ["speak", "Speak", IconSpeakerphone],
             ["log", "Log", IconList],
           ] as const).map(([id, label, Icon]) => (
-            <button key={id} type="button" onClick={() => setTab(id)}
-              className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg py-1.5 text-[12.5px] font-bold transition ${
-                tab === id ? "bg-panel text-fg shadow-card" : "text-muted hover:text-fg"}`}>
+            <button key={id} type="button" onClick={() => setTab(id)} data-on={tab === id}
+              className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg py-1.5 text-[12.5px] font-bold transition-colors ${
+                tab === id ? "text-fg" : "text-muted hover:text-fg"}`}>
               <Icon size={15} />{label}
             </button>
           ))}
-        </div>
+        </Segmented>
 
         {tab === "actions" && (
           <>

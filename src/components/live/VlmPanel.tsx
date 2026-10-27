@@ -24,6 +24,7 @@ import type { ChatMessage, ChatSummary, NewMessage } from "../../api/chats";
 import { DropMenu, useDropdown } from "../ui/DropMenu";
 import { Select } from "../ui/Select";
 import { StatusText } from "../ui/StatusText";
+import { Segmented } from "../ui/Segmented";
 
 // Longer-side sizes (px) offered for the frame sent to the VLM; "Full" = native. Nothing
 // below 1152: the VLM server upscales every image to at least 1024 tokens of 32x32 px (~1 Mpx,
@@ -413,15 +414,15 @@ export function VlmPanel({
                 )}
                 {voice.micSupported && (
                   <Row label="Hands-free listens" hint={voice.wakeSupported ? undefined : "This browser cannot hear a wake word"}>
-                    <div className="flex rounded-lg bg-subtle p-0.5">
+                    <Segmented className="flex rounded-lg bg-subtle p-0.5">
                       {([["open", "Just speak"], ["wake", "Say “robot”"]] as const).map(([m, label]) => (
-                        <button key={m} type="button" onClick={() => voice.onListenModeChange(m)}
+                        <button key={m} type="button" onClick={() => voice.onListenModeChange(m)} data-on={voice.listenMode === m}
                           disabled={m === "wake" && !voice.wakeSupported}
-                          className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${voice.listenMode === m ? "bg-panel text-fg shadow-card" : "text-muted"}`}>
+                          className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${voice.listenMode === m ? "text-fg" : "text-muted"}`}>
                           {label}
                         </button>
                       ))}
-                    </div>
+                    </Segmented>
                   </Row>
                 )}
                 {voice.speechSupported && (
@@ -432,14 +433,14 @@ export function VlmPanel({
                 )}
                 {voice.speechSupported && voice.robotSpeaker && (
                   <Row label="Speak through" hint={voice.speechOutput === "robot" && voice.robotSpeakerError ? undefined : "The robot plays the same voice"}>
-                    <div className="flex rounded-lg bg-subtle p-0.5">
+                    <Segmented className="flex rounded-lg bg-subtle p-0.5">
                       {(["browser", "robot"] as const).map((o) => (
-                        <button key={o} type="button" onClick={() => voice.onSpeechOutputChange(o)}
-                          className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-bold ${voice.speechOutput === o ? "bg-panel text-fg shadow-card" : "text-muted"}`}>
+                        <button key={o} type="button" onClick={() => voice.onSpeechOutputChange(o)} data-on={voice.speechOutput === o}
+                          className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-bold transition-colors ${voice.speechOutput === o ? "text-fg" : "text-muted"}`}>
                           {o === "browser" ? "This device" : "Robot"}
                         </button>
                       ))}
-                    </div>
+                    </Segmented>
                   </Row>
                 )}
                 {voice.speechOutput === "robot" && voice.robotSpeakerError && (

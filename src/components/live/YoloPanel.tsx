@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { IconCheck, IconScan, IconSearch, IconX } from "@tabler/icons-react";
 import { Switch } from "../ui/Switch";
+import { Segmented } from "../ui/Segmented";
 
 const IMG_SIZES = [320, 640, 960, 1280];
 const FPS_CAPS = [1, 2, 5, 10, 15, 30, 0]; // 0 = unlimited
@@ -213,15 +214,15 @@ function Segs<T extends number>({ options, value, onChange }: {
   options: [T, string][]; value: T; onChange: (v: T) => void;
 }) {
   return (
-    <div className="flex rounded-[10px] bg-subtle p-[3px]">
+    <Segmented className="flex rounded-[10px] bg-subtle p-[3px]">
       {options.map(([v, label]) => (
-        <button key={v} type="button" onClick={() => onChange(v)} aria-pressed={value === v}
-          className={`min-w-8 cursor-pointer rounded-lg px-2 py-1 text-xs font-bold transition ${
-            value === v ? "bg-panel text-fg shadow-card" : "text-muted hover:text-fg"}`}>
+        <button key={v} type="button" onClick={() => onChange(v)} aria-pressed={value === v} data-on={value === v}
+          className={`min-w-8 cursor-pointer rounded-lg px-2 py-1 text-xs font-bold transition-colors ${
+            value === v ? "text-fg" : "text-muted hover:text-fg"}`}>
           {label}
         </button>
       ))}
-    </div>
+    </Segmented>
   );
 }
 

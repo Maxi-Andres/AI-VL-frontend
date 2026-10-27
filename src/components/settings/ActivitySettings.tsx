@@ -3,6 +3,7 @@ import { IconChevronLeft, IconChevronRight, IconLoader2 } from "@tabler/icons-re
 import { getActivity } from "../../api/fleet";
 import type { ActivityKind, ActivityPage } from "../../api/fleet";
 import { ActivityRow } from "../fleet/ActivityFeed";
+import { Segmented } from "../ui/Segmented";
 
 // Settings → Activity: everything notable that changed in the company, newest first, in
 // numbered pages — the server counts the total, so this holds whether the log has 40 events
@@ -74,15 +75,15 @@ export function ActivitySettings() {
       </p>
       <div className="rounded-2xl border border-line bg-panel shadow-card">
         <div className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3">
-          <div className="flex rounded-lg bg-subtle p-0.5">
+          <Segmented className="flex rounded-lg bg-subtle p-0.5">
             {KINDS.map((k) => (
-              <button key={k.label} type="button" onClick={() => pick(k.id)} aria-pressed={kind === k.id}
-                className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-bold transition ${
-                  kind === k.id ? "bg-panel text-fg shadow-card" : "text-muted hover:text-fg"}`}>
+              <button key={k.label} type="button" onClick={() => pick(k.id)} aria-pressed={kind === k.id} data-on={kind === k.id}
+                className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-bold transition-colors ${
+                  kind === k.id ? "text-fg" : "text-muted hover:text-fg"}`}>
                 {k.label}
               </button>
             ))}
-          </div>
+          </Segmented>
           <span className="ml-auto flex items-center gap-2 text-xs text-muted">
             {busy && <IconLoader2 size={14} className="animate-spin" />}
             {data && (data.total ? `${from.toLocaleString()}–${to.toLocaleString()} of ${data.total.toLocaleString()}` : "")}

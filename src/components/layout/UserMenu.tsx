@@ -15,6 +15,7 @@ import { followSystem, applyTheme, saveTheme, useThemeChoice, type ThemeChoice }
 import { ROLE_LABEL } from "../../auth/roles";
 import { Avatar } from "../ui/Avatar";
 import { DropMenu, useDropdown } from "../ui/DropMenu";
+import { Segmented } from "../ui/Segmented";
 
 const THEMES: { value: ThemeChoice; label: string; icon: typeof IconSun }[] = [
   { value: "light", label: "Light", icon: IconSun },
@@ -26,16 +27,16 @@ const THEMES: { value: ThemeChoice; label: string; icon: typeof IconSun }[] = [
 export function ThemePicker({ className = "" }: { className?: string }) {
   const theme = useThemeChoice();
   return (
-    <div className={`grid grid-cols-3 gap-1 rounded-lg bg-subtle p-1 ${className}`}>
+    <Segmented className={`grid grid-cols-3 gap-1 rounded-lg bg-subtle p-1 ${className}`}>
       {THEMES.map(({ value, label, icon: Icon }) => (
-        <button key={value} type="button" onClick={() => saveTheme(value)} aria-pressed={theme === value}
-          className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition ${
-            theme === value ? "bg-panel text-fg shadow-card" : "text-muted hover:text-fg"}`}>
+        <button key={value} type="button" onClick={() => saveTheme(value)} aria-pressed={theme === value} data-on={theme === value}
+          className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+            theme === value ? "text-fg" : "text-muted hover:text-fg"}`}>
           <Icon size={14} />
           {label}
         </button>
       ))}
-    </div>
+    </Segmented>
   );
 }
 

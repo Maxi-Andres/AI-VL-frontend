@@ -6,12 +6,14 @@ import type { Me, SetupInput } from "../api/auth";
 import { onSignedOut } from "./signedOut";
 import { loadPrefs } from "../lib/prefs";
 import { applyTheme, savedTheme } from "../lib/theme";
+import { applyLanguage } from "../i18n";
 
 /** Signed in: the person's own preferences into this browser first (theme, voice, volume…),
  * so the app opens the way they left it on any computer. */
 async function arrive(me: Me): Promise<Me> {
   await loadPrefs(me.user.id);
   applyTheme(savedTheme());
+  applyLanguage();
   return me;
 }
 

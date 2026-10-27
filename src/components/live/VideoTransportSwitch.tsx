@@ -1,5 +1,6 @@
 import { StatusText } from "../ui/StatusText";
 import { useVideoTransport } from "../layout/VideoTransportContext";
+import { Segmented } from "../ui/Segmented";
 
 /**
  * Pick the path the picture takes. Renders nothing where there is nothing to switch to.
@@ -24,17 +25,17 @@ export function VideoTransportSwitch() {
   ];
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div role="radiogroup" aria-label="Video transport" title={detail || undefined}
+      <Segmented role="radiogroup" aria-label="Video transport" title={detail || undefined}
         className="flex rounded-[10px] bg-subtle p-[3px]">
         {options.map((o) => (
-          <button key={o.id} type="button" role="radio" aria-checked={transport === o.id}
+          <button key={o.id} type="button" role="radio" aria-checked={transport === o.id} data-on={transport === o.id}
             onClick={() => setTransport(o.id)} disabled={o.off} title={o.title}
-            className={`cursor-pointer rounded-lg px-2.5 py-1.5 text-[12.5px] font-bold whitespace-nowrap transition disabled:cursor-not-allowed disabled:line-through disabled:opacity-50 ${
-              transport === o.id ? "bg-panel text-fg shadow-card" : "text-muted hover:text-fg"}`}>
+            className={`cursor-pointer rounded-lg px-2.5 py-1.5 text-[12.5px] font-bold whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:line-through disabled:opacity-50 ${
+              transport === o.id ? "text-fg" : "text-muted hover:text-fg"}`}>
             {o.label}
           </button>
         ))}
-      </div>
+      </Segmented>
       {lastError && (
         // The one failure a user can fix themselves, and the only one worth a link.
         //

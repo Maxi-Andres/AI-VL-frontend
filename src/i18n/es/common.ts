@@ -1,0 +1,22 @@
+// Spanish — words shared across the app: the header, the user menu, dates and times.
+export const COMMON: Record<string, string> = {
+  "Fleet": "Flota",
+  "Live": "En vivo",
+  "Drive": "Manejar",
+  "Joints": "Articulaciones",
+  "Settings": "Configuración",
+  "Profile": "Perfil",
+  "Team & roles": "Equipo y roles",
+  "Appearance": "Apariencia",
+  "Light": "Claro",
+  "Dark": "Oscuro",
+  "System": "Sistema",
+  "Language": "Idioma",
+  "Sign out": "Cerrar sesión",
+  "Your company": "Tu empresa",
+  "just now": "recién",
+  "{n} min ago": "hace {n} min",
+  "{n} h ago": "hace {n} h",
+  "yesterday": "ayer",
+  "{n} days ago": "hace {n} días",
+};

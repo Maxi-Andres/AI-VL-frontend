@@ -14,6 +14,7 @@ import { useJointControl } from "../hooks/useJointControl";
 import { STALE_AGE_MS, useJointSource, type JointSourceKind } from "../hooks/useJointSource";
 import { JOINTS, JOINT_BY_URDF, readJoint } from "../lib/g1Joints";
 import { GHOST_MIN_RAD } from "../lib/jointControl";
+import { Segmented } from "../components/ui/Segmented";
 
 /**
  * Joints — the G1 in 3D, posed live from its own joint readings, and (steps J2-J3 of
@@ -142,15 +143,15 @@ export function JointsPage() {
       {/* One column no wider than the page gives it: an auto track grows to its widest child,
           and a long message once pushed the whole panel sideways under a scrollbar. */}
       <aside className="flex min-h-[480px] min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-card">
-        <div className="m-3 mb-0 grid grid-cols-4 gap-0.5 rounded-xl bg-subtle p-1">
+        <Segmented className="m-3 mb-0 grid grid-cols-4 gap-0.5 rounded-xl bg-subtle p-1">
           {TABS.map(([id, label, Icon]) => (
-            <button key={id} type="button" onClick={() => setTab(id)} aria-pressed={tab === id}
-              className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-lg py-1.5 text-[12px] font-bold whitespace-nowrap transition ${
-                tab === id ? "bg-panel text-fg shadow-card" : "text-muted hover:text-fg"}`}>
+            <button key={id} type="button" onClick={() => setTab(id)} aria-pressed={tab === id} data-on={tab === id}
+              className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-lg py-1.5 text-[12px] font-bold whitespace-nowrap transition-colors ${
+                tab === id ? "text-fg" : "text-muted hover:text-fg"}`}>
               <Icon size={15} className="shrink-0" />{label}
             </button>
           ))}
-        </div>
+        </Segmented>
         <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] content-start gap-4 overflow-x-hidden overflow-y-auto p-4">
           {tab === "control" && (
             <ControlPanel

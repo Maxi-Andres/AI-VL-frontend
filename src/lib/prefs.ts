@@ -21,6 +21,7 @@ const SYNCED: Record<string, string> = {
   "aivl.speechOutput": "speechOutput",
   "pilot.mapLayer": "mapLayer",
   "pilot.chat": "chat",
+  "pilot.language": "language",
 };
 // Whose preferences this browser holds, so a second person on the same computer neither
 // inherits the first one's nor uploads them as their own.

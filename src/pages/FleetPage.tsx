@@ -42,6 +42,7 @@ import {
   errorText,
 } from "../components/fleet/FleetDialogs";
 import type { Presence } from "../types";
+import { Segmented } from "../components/ui/Segmented";
 
 // Fleet — home. The company at a glance: how many robots answer, its sites, its people, the
 // live video; every robot as a card (with its live picture when it is the one streaming);
@@ -283,14 +284,14 @@ export function FleetPage() {
               )}
               <div className="ml-auto flex items-center gap-1">
                 {sites.length > 1 && (
-                  <div className="mr-1 flex rounded-lg bg-subtle p-0.5">
+                  <Segmented className="mr-1 flex rounded-lg bg-subtle p-0.5">
                     {sites.map((s, i) => (
-                      <button key={s.id} onClick={() => setSiteIdx(i)}
-                        className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-bold ${s.id === site?.id ? "bg-panel text-fg shadow-card" : "text-muted hover:text-fg"}`}>
+                      <button key={s.id} onClick={() => setSiteIdx(i)} data-on={s.id === site?.id}
+                        className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-bold transition-colors ${s.id === site?.id ? "text-fg" : "text-muted hover:text-fg"}`}>
                         {s.name}
                       </button>
                     ))}
-                  </div>
+                  </Segmented>
                 )}
                 {mayConfigure && site && (
                   <IconButton title="Edit site" onClick={() => setEditingSite(site)}><IconPencil size={16} /></IconButton>
