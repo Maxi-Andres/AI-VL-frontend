@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { IconMaximize, IconMinimize } from "@tabler/icons-react";
 import { useT } from "../../i18n";
+import { enterScreen, leaveScreen, onScreenLeft } from "../../lib/screen";
 
 /**
  * Small overlay button that makes the element referenced by `targetRef` fill the screen, and
@@ -8,8 +9,8 @@ import { useT } from "../../i18n";
  * behaves identically everywhere. Position it inside a `relative` container — it pins itself
  * to the top-right corner.
  *
- * The stage fills the page (`.stage-expanded`); the browser's own fullscreen is left out on
- * purpose — see lib/screen.ts for why.
+ * Two layers: the stage fills the page (`.stage-expanded`), and the page goes to the browser's
+ * own fullscreen (lib/screen.ts). Leaving either way — this button, Esc, F11 — undoes both.
  */
 export function FullscreenButton<T extends HTMLElement>({
   targetRef,
@@ -24,13 +25,17 @@ export function FullscreenButton<T extends HTMLElement>({
     if (!el) return;
     el.classList.toggle("stage-expanded", expanded);
     if (!expanded) return;
+    enterScreen();
     const esc = (e: KeyboardEvent) => {
       if (e.key === "Escape") setExpanded(false);
     };
     window.addEventListener("keydown", esc);
+    const stopWatching = onScreenLeft(() => setExpanded(false));
     return () => {
       window.removeEventListener("keydown", esc);
+      stopWatching();
       el.classList.remove("stage-expanded");
+      leaveScreen();
     };
   }, [expanded, targetRef]);
 
