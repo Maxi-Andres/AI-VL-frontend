@@ -16,15 +16,17 @@ import { ROLE_LABEL } from "../../auth/roles";
 import { Avatar } from "../ui/Avatar";
 import { DropMenu, useDropdown } from "../ui/DropMenu";
 import { Segmented } from "../ui/Segmented";
+import { LANGUAGES, msg, setLanguage, useLanguage, useT } from "../../i18n";
 
 const THEMES: { value: ThemeChoice; label: string; icon: typeof IconSun }[] = [
-  { value: "light", label: "Light", icon: IconSun },
-  { value: "dark", label: "Dark", icon: IconMoon },
-  { value: "system", label: "System", icon: IconDeviceDesktop },
+  { value: "light", label: msg("Light"), icon: IconSun },
+  { value: "dark", label: msg("Dark"), icon: IconMoon },
+  { value: "system", label: msg("System"), icon: IconDeviceDesktop },
 ];
 
 /** Light / Dark / System, as one segmented control (the menu and Settings → Profile). */
 export function ThemePicker({ className = "" }: { className?: string }) {
+  const t = useT();
   const theme = useThemeChoice();
   return (
     <Segmented className={`grid grid-cols-3 gap-1 rounded-lg bg-subtle p-1 ${className}`}>
@@ -33,6 +35,22 @@ export function ThemePicker({ className = "" }: { className?: string }) {
           className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors ${
             theme === value ? "text-fg" : "text-muted hover:text-fg"}`}>
           <Icon size={14} />
+          {t(label)}
+        </button>
+      ))}
+    </Segmented>
+  );
+}
+
+/** English / Español: the whole app's language (the menu, Settings → Profile, sign-in). */
+export function LanguagePicker({ className = "" }: { className?: string }) {
+  const lang = useLanguage();
+  return (
+    <Segmented className={`grid grid-cols-2 gap-1 rounded-lg bg-subtle p-1 ${className}`} aria-label="Language">
+      {LANGUAGES.map(({ id, label }) => (
+        <button key={id} type="button" onClick={() => setLanguage(id)} aria-pressed={lang === id} data-on={lang === id}
+          className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+            lang === id ? "text-fg" : "text-muted hover:text-fg"}`}>
           {label}
         </button>
       ))}
@@ -43,6 +61,7 @@ export function ThemePicker({ className = "" }: { className?: string }) {
 /** The signed-in person, top right: who you are, in which company, with what role — and the
  * few things that are about you: your profile, the team (admins), the theme, signing out. */
 export function UserMenu() {
+  const t = useT();
   const me = useMe();
   const can = useCan();
   const { signOut } = useAuth();
@@ -61,7 +80,7 @@ export function UserMenu() {
         <Avatar id={me.user.id} name={me.user.name || me.user.email} color={me.user.color} size={34} />
         <span className="hidden text-left md:block">
           <b className="block text-[13px] leading-tight">{me.user.name}</b>
-          <small className="block text-[11.5px] leading-tight text-dim">{ROLE_LABEL[me.role]}</small>
+          <small className="block text-[11.5px] leading-tight text-dim">{t(ROLE_LABEL[me.role])}</small>
         </span>
         <IconChevronDown size={15} className="text-dim" />
       </button>
@@ -74,20 +93,22 @@ export function UserMenu() {
           </div>
         </div>
         <Link to="/settings#profile" onClick={() => setOpen(false)} className={item}>
-          <IconUserCircle size={17} className="text-muted" />Profile
+          <IconUserCircle size={17} className="text-muted" />{t("Profile")}
         </Link>
         {can("manage_users") && (
           <Link to="/settings#team" onClick={() => setOpen(false)} className={item}>
-            <IconUsers size={17} className="text-muted" />Team &amp; roles
+            <IconUsers size={17} className="text-muted" />{t("Team & roles")}
           </Link>
         )}
         <div className="px-2.5 pt-2 pb-1.5">
-          <div className="mb-1.5 text-[11px] font-bold tracking-wider text-dim uppercase">Appearance</div>
+          <div className="mb-1.5 text-[11px] font-bold tracking-wider text-dim uppercase">{t("Appearance")}</div>
           <ThemePicker />
+          <div className="mt-2.5 mb-1.5 text-[11px] font-bold tracking-wider text-dim uppercase">{t("Language")}</div>
+          <LanguagePicker />
         </div>
         <div className="my-1 h-px bg-line" />
         <button onClick={() => void signOut()} className={`${item} w-full cursor-pointer text-left`}>
-          <IconLogout size={17} className="text-muted" />Sign out
+          <IconLogout size={17} className="text-muted" />{t("Sign out")}
         </button>
       </DropMenu>
     </div>

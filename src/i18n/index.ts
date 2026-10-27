@@ -5,7 +5,8 @@
 // keeps the app from drifting back into a mix of both.
 //
 // Rules for `t()`:
-//  - the argument is a string LITERAL (the test reads the code; a variable cannot be checked);
+//  - the argument is a string LITERAL (the test reads the code; a variable cannot be checked) —
+//    except a text marked where it is defined with msg("…"), passed on and translated later;
 //  - values go in as {name} placeholders: t("{n} of {m} online", { n, m });
 //  - whole sentences, not pieces glued together — word order differs between languages;
 //  - plural forms are separate keys, chosen by the caller ("1 message" / "{n} messages").
@@ -43,6 +44,11 @@ export function setLanguage(lang: Lang): void {
 export function applyLanguage(): void {
   document.documentElement.lang = language();
 }
+
+/** Marks a text for translation where it is DEFINED but translated later, where it is shown —
+ * labels in a list at the top of a file: `{ label: msg("Fleet") }`, then `t(label)` when drawn.
+ * It returns the text unchanged; it exists so ./coverage.test.ts can find the text. */
+export const msg = (text: string): string => text;
 
 export type Vars = Record<string, string | number>;
 

@@ -14,6 +14,7 @@ import { useMe } from "../../auth/AuthContext";
 // the gradient "S" is the same in both.
 import silkLogoOnDark from "../../assets/silk-logo.webp";
 import silkLogoOnLight from "../../assets/silk-logo-light-bg.webp";
+import { msg, useT } from "../../i18n";
 
 interface Props {
   /** The right side: robot status, voice, the signed-in person. */
@@ -21,12 +22,12 @@ interface Props {
 }
 
 const TABS: { to: string; label: string; icon: typeof IconBroadcast; perm?: Permission; end?: boolean }[] = [
-  { to: "/", label: "Fleet", icon: IconLayoutGrid, end: true },
-  { to: "/live", label: "Live", icon: IconBroadcast },
-  { to: "/drive", label: "Drive", icon: IconSteeringWheel, perm: "operate" },
-  { to: "/joints", label: "Joints", icon: IconMan },
+  { to: "/", label: msg("Fleet"), icon: IconLayoutGrid, end: true },
+  { to: "/live", label: msg("Live"), icon: IconBroadcast },
+  { to: "/drive", label: msg("Drive"), icon: IconSteeringWheel, perm: "operate" },
+  { to: "/joints", label: msg("Joints"), icon: IconMan },
   // Everyone has Settings: Profile is there. The team and the robot sections show by role.
-  { to: "/settings", label: "Settings", icon: IconSettings },
+  { to: "/settings", label: msg("Settings"), icon: IconSettings },
 ];
 
 const tabClass = ({ isActive }: { isActive: boolean }) =>
@@ -56,6 +57,7 @@ function useTabBar(nav: React.RefObject<HTMLElement | null>) {
 
 /** The app bar: brand, company, the pages this role may use, and a right-hand slot. */
 export function Header({ children }: Props) {
+  const t = useT();
   const can = useCan();
   const me = useMe();
   const nav = useRef<HTMLElement>(null);
@@ -74,7 +76,7 @@ export function Header({ children }: Props) {
           {/* The product is "Silk Pilot": the Silk logo beside it supplies the first word. */}
           <span className="border-l border-line pl-2.5 text-[17px] font-bold tracking-tight">Pilot</span>
         </div>
-        <span className="hidden shrink-0 items-center gap-2 rounded-[10px] border border-line bg-panel px-2.5 py-1.5 text-[13px] font-bold xl:flex" title="Your company">
+        <span className="hidden shrink-0 items-center gap-2 rounded-[10px] border border-line bg-panel px-2.5 py-1.5 text-[13px] font-bold xl:flex" title={t("Your company")}>
           <span className="size-5 rounded-md bg-gradient-to-br from-[#2fc1b1] to-[#d8cf3c]" />
           {me.org.name}
         </span>
@@ -82,7 +84,7 @@ export function Header({ children }: Props) {
           {TABS.filter((t) => !t.perm || can(t.perm)).map(({ to, label, icon: Icon, end }) => (
             <NavLink key={to} to={to} end={end} className={tabClass}>
               <Icon size={18} stroke={1.8} />
-              {label}
+              {t(label)}
             </NavLink>
           ))}
           {bar && (

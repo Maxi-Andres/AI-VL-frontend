@@ -19,4 +19,12 @@ export const COMMON: Record<string, string> = {
   "{n} h ago": "hace {n} h",
   "yesterday": "ayer",
   "{n} days ago": "hace {n} días",
+  "Viewer": "Observador",
+  "Operator": "Operador",
+  "Admin": "Administrador",
+  "Owner": "Dueño",
+  "Watches video and telemetry. Cannot move or change anything.": "Mira el video y la telemetría. No puede mover ni cambiar nada.",
+  "Also asks the AI, drives the robot, runs actions and moves joints.": "Además consulta a la IA, maneja el robot, ejecuta acciones y mueve articulaciones.",
+  "Also changes robot and video settings, and manages the team.": "Además cambia la configuración del robot y del video, y administra el equipo.",
+  "Everything, including the company itself and other owners.": "Todo, incluida la empresa y los demás dueños.",
 };

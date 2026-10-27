@@ -1,5 +1,5 @@
-// Every text marked for translation has its Spanish. Reads the code for t("…") / t('…') /
-// t(`…`) with a literal argument and checks each against the Spanish dictionary — a new
+// Every text marked for translation has its Spanish. Reads the code for t("…") / msg("…")
+// (any quotes) with a literal argument and checks each against the Spanish dictionary — a new
 // English text without its Spanish fails here, before it can ship as half and half.
 import { describe, expect, it } from "vitest";
 import { ES } from "./es";
@@ -8,7 +8,7 @@ import { ES } from "./es";
 const SOURCES = import.meta.glob(["../**/*.ts", "../**/*.tsx", "!../**/*.test.ts", "!../i18n/**"], {
   query: "?raw", import: "default", eager: true,
 }) as Record<string, string>;
-const CALL = /\bt\(\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
+const CALL = /\b(?:t|msg)\(\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
 
 function keys(): Map<string, string> {
   const found = new Map<string, string>();
