@@ -299,10 +299,22 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
   const openLoopRef = useRef(openLoop);
   openLoopRef.current = openLoop;
 
+  // The "¿Sí?" after a bare "Bender" is playing. The ear is NOT muted for it: muting kept it
+  // deaf for the ~2 s the acknowledgement takes to make and play, and a question asked right
+  // away was lost. The ear knows its own "sí" and ignores it (iacore's ear_common.ACK_ECHO).
+  // Real answers still mute it — those are long, and it would answer itself.
+  const [acking, setAcking] = useState(false);
+  const ackTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const ackDone = useCallback(() => {
+    clearTimeout(ackTimer.current);
+    setAcking(false);
+  }, []);
+
   // A "Bender, …" command from the robot's own microphone: the same answer, no recording here.
   const handleEarCommand = useCallback(async (text: string) => {
     if (busyRef.current) return;
     busyRef.current = true;
+    ackDone(); // the question is in: whatever the answer says mutes the ear as usual
     speech.cancel(); // a new question interrupts a spoken answer
     let spoke = false;
     try {
@@ -314,15 +326,21 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
       busyRef.current = false;
       if (!spoke) setPhase(voiceModeRef.current || robotEarRef.current ? "listening" : "off");
     }
-  }, [speech, answerText]);
+  }, [speech, answerText, ackDone]);
 
   const ear = useRobotEar({
     url: robotEarUrl(robot),
     enabled: robotEar && robotMic,
-    muted: speech.speaking,
+    muted: speech.speaking && !acking,
     onCommand: (text) => void handleEarCommand(text),
     onWake: () => {
-      if (spokenModeRef.current && !busyRef.current) speech.speak(WAKE_ACK);
+      if (spokenModeRef.current && !busyRef.current) {
+        setAcking(true);
+        // A stopped or failed playback may never call back: never stay unmuted past a few s.
+        clearTimeout(ackTimer.current);
+        ackTimer.current = setTimeout(() => setAcking(false), 4000);
+        speech.speak(WAKE_ACK, undefined, ackDone);
+      }
     },
   });
 
