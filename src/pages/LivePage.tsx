@@ -764,6 +764,12 @@ export function LivePage() {
   const cam = presence?.robot_cam;
   const frameRate = source !== "own" ? (cam?.live && cam.fps ? cam.fps.toFixed(1) : null) : detFps;
   const camRes = cam?.live ? cam.resolution ?? null : null;
+  // "View only" mirrors what someone else is streaming, so it is offered only when there is
+  // something to mirror: another browser's camera, or the robot camera running while this page
+  // is not on it. A viewer always has it (it is all they may do), and it never vanishes under
+  // the person using it.
+  const othersStreaming = (presence?.web.producers ?? 0) - (source === "own" && active ? 1 : 0) > 0;
+  const mayMirror = !mayOperate || source === "view" || othersStreaming || (!!cam?.live && source !== "robot");
 
   return (
     <main className={`grid gap-4 p-4 lg:h-[calc(100dvh-65px)] lg:overflow-hidden ${mayAnalyze ? "lg:grid-cols-[minmax(0,1fr)_420px]" : ""}`}>
@@ -774,7 +780,7 @@ export function LivePage() {
             {([
               ["own", "My camera", IconDeviceLaptop, mayAnalyze, chooseOwnCamera],
               ["robot", "Robot camera", IconVideo, mayOperate, chooseRobotCamera],
-              ["view", "View only", IconEye, true, chooseMirror],
+              ["view", "View only", IconEye, mayMirror, chooseMirror],
             ] as const).filter((b) => b[3]).map(([id, label, Icon, , go]) => (
               <button key={id} type="button" onClick={() => void go()}
                 className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-bold transition ${
