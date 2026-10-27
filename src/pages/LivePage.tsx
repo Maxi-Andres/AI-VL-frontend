@@ -36,7 +36,6 @@ import { StatusText, type Status } from "../components/ui/StatusText";
 import { useCan } from "../auth/permissions";
 import { colorForObject } from "../lib/draw";
 import {
-  IconAdjustmentsHorizontal,
   IconCameraRotate,
   IconDeviceLaptop,
   IconEye,
@@ -80,9 +79,8 @@ export function LivePage() {
   // Live is the robot's console: it opens on the robot camera for whoever may start it, a
   // mirror for whoever may only watch. This device's webcam is a choice, never the default.
   const [source, setSource] = useState<"own" | "robot" | "view">(mayOperate ? "robot" : "view");
-  // Presentation only: which side-panel tab is open, and the robot camera's settings menu.
+  // Presentation only: which side-panel tab is open.
   const [panel, setPanel] = useState<"vlm" | "yolo" | "command">("vlm");
-  const [videoMenu, setVideoMenu] = useState(false);
   const [robotCamStatus, setRobotCamStatus] = useState<Status | null>(null);
   const viewing = source !== "own"; // true when we're a /ws/view consumer
   // Master YOLO on/off (shared session flag). Default OFF so no GPU is used until
@@ -792,18 +790,12 @@ export function LivePage() {
           <StatusText status={robotCamStatus} className="min-w-0 truncate text-xs text-muted" />
           {cameraError && <span className="min-w-0 truncate text-xs text-bad-fg">{cameraError}</span>}
           <span className="flex-1" />
+          {/* The robot camera's picture, on the bar as in the mockup: which camera, and the
+              path it takes here. */}
           {source === "robot" && (
-            <div className="relative">
-              <button type="button" onClick={() => setVideoMenu((v) => !v)} aria-expanded={videoMenu}
-                className="flex cursor-pointer items-center gap-2 rounded-xl border border-line bg-panel px-3 py-2 text-[12.5px] font-bold shadow-card transition hover:border-dim">
-                <IconAdjustmentsHorizontal size={16} />Camera &amp; transport
-              </button>
-              {videoMenu && (
-                <div className="absolute top-12 right-0 z-30 flex w-[320px] animate-rise flex-col gap-3 rounded-xl border border-line bg-panel p-3 shadow-lift">
-                  <VideoTransportSwitch />
-                  <RobotCameraSwitch />
-                </div>
-              )}
+            <div className="flex flex-wrap items-center gap-2">
+              <RobotCameraSwitch />
+              <VideoTransportSwitch />
             </div>
           )}
         </div>

@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { getRobotVideo, setRobotVideo } from "../../api/backend";
-import { Button } from "../ui/Button";
+import { IconCamera, IconLoader2 } from "@tabler/icons-react";
 import { StatusText, type Status } from "../ui/StatusText";
 import { useRobot } from "../layout/RobotContext";
 
 /** Button labels for the cameras the robot reports. Unknown names show as-is. */
 const LABELS: Record<string, string> = {
-  front: "Front",
-  rs_color: "RealSense",
-  rs_depth: "Depth",
+  front: "Front camera",
+  rs_color: "RealSense color",
+  rs_depth: "RealSense depth",
 };
 
 const HINTS: Record<string, string> = {
@@ -85,20 +85,17 @@ export function RobotCameraSwitch() {
 
   if ((robot !== "go2" && robot !== "g1") || cameras.length === 0) return null;
   return (
-    <div className="flex flex-wrap items-center gap-2.5">
-      <span className="text-xs text-muted">Camera</span>
-      {cameras.map((c) => (
-        <Button
-          key={c}
-          variant={current === c ? "primary" : "secondary"}
-          onClick={() => pick(c)}
-          disabled={busy || current === c}
-          title={HINTS[c]}
-        >
-          {LABELS[c] ?? c}
-        </Button>
-      ))}
-      <StatusText status={status} className="text-xs text-muted" />
+    <div className="flex min-w-0 flex-wrap items-center gap-2">
+      <label className={`flex h-[34px] items-center gap-1.5 rounded-[10px] border border-line bg-panel pr-1 pl-2.5 transition focus-within:border-accent ${busy ? "opacity-60" : ""}`}
+        title={current ? HINTS[current] : undefined}>
+        {busy ? <IconLoader2 size={15} className="shrink-0 animate-spin text-muted" /> : <IconCamera size={15} className="shrink-0 text-muted" />}
+        <select value={current ?? ""} disabled={busy} onChange={(e) => void pick(e.target.value)} aria-label="Robot camera"
+          className="cursor-pointer bg-transparent pr-1 text-[12.5px] font-bold text-fg outline-none disabled:cursor-default">
+          {current === null && <option value="" disabled>Camera…</option>}
+          {cameras.map((c) => <option key={c} value={c}>{LABELS[c] ?? c}</option>)}
+        </select>
+      </label>
+      {status && <StatusText status={status} className="max-w-[220px] truncate text-xs text-muted" />}
     </div>
   );
 }

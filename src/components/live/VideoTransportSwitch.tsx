@@ -1,4 +1,3 @@
-import { Button } from "../ui/Button";
 import { StatusText } from "../ui/StatusText";
 import { useVideoTransport } from "../layout/VideoTransportContext";
 
@@ -13,34 +12,29 @@ export function VideoTransportSwitch() {
   const { transport, setTransport, available, detail, lastError, whepUrl, mjpegRetired } =
     useVideoTransport();
   if (!available) return null;
+  const options: { id: typeof transport; label: string; title?: string; off?: boolean }[] = [
+    {
+      id: "mjpeg", label: "MJPEG", off: mjpegRetired,
+      title: mjpegRetired
+        ? "Retired for this robot: H.264 intra arrives as early with fewer bytes (measured 2026-10-07)"
+        : "A JPEG per frame through this server: lowest delay on a healthy link",
+    },
+    { id: "h264", label: "H.264", title: "WebRTC from the video server: holds up on a lossy link" },
+    { id: "intra", label: "H.264 intra", title: "All-intra H.264 from the robot, decoded here. Half the bytes of MJPEG, no jitter buffer." },
+  ];
   return (
-    <div className="flex flex-wrap items-center gap-2.5">
-      <span className="text-xs text-muted">Video</span>
-      <Button
-        variant={transport === "mjpeg" ? "primary" : "secondary"}
-        onClick={() => setTransport("mjpeg")}
-        disabled={mjpegRetired}
-        className={mjpegRetired ? "line-through" : ""}
-        title={mjpegRetired
-          ? "Retired for this robot: H.264 intra arrives as early with fewer bytes (measured 2026-10-07)"
-          : undefined}
-      >
-        MJPEG
-      </Button>
-      <Button
-        variant={transport === "h264" ? "primary" : "secondary"}
-        onClick={() => setTransport("h264")}
-      >
-        H.264
-      </Button>
-      <Button
-        variant={transport === "intra" ? "primary" : "secondary"}
-        onClick={() => setTransport("intra")}
-        title="All-intra H.264 from the robot, decoded here. Half the bytes of MJPEG, no jitter buffer."
-      >
-        H.264 intra
-      </Button>
-      <span className="text-xs text-muted">{detail}</span>
+    <div className="flex flex-wrap items-center gap-2">
+      <div role="radiogroup" aria-label="Video transport" title={detail || undefined}
+        className="flex rounded-[10px] bg-subtle p-[3px]">
+        {options.map((o) => (
+          <button key={o.id} type="button" role="radio" aria-checked={transport === o.id}
+            onClick={() => setTransport(o.id)} disabled={o.off} title={o.title}
+            className={`cursor-pointer rounded-lg px-2.5 py-1.5 text-[12.5px] font-bold whitespace-nowrap transition disabled:cursor-not-allowed disabled:line-through disabled:opacity-50 ${
+              transport === o.id ? "bg-panel text-fg shadow-card" : "text-muted hover:text-fg"}`}>
+            {o.label}
+          </button>
+        ))}
+      </div>
       {lastError && (
         // The one failure a user can fix themselves, and the only one worth a link.
         //
