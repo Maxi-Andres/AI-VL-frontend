@@ -613,8 +613,8 @@ export function ControlPage() {
 
           {/* Top: state chips, video settings, fullscreen */}
           <div className={`absolute inset-x-3 top-3 z-10 flex items-center gap-2 ${cockpit ? `rounded-2xl p-2 pl-3 ${glass}` : ""}`}>
-            <span className="flex items-center gap-1.5 rounded-lg bg-black/55 px-2.5 py-1 text-[11.5px] font-extrabold tracking-wider text-white backdrop-blur">
-              <span className={`size-2 rounded-full ${live ? "animate-pulse bg-[#ff5a5f]" : "bg-white/40"}`} />
+            <span className="on-video flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11.5px] font-extrabold tracking-wider">
+              <span className={`size-2 rounded-full ${live ? "animate-pulse bg-[#ff5a5f]" : "bg-dim"}`} />
               {live ? "LIVE" : "NO VIDEO"}
             </span>
             {cockpit && (
@@ -629,7 +629,7 @@ export function ControlPage() {
               </span>
             )}
             {pad && (
-              <span className="flex items-center gap-1.5 rounded-lg bg-black/55 px-2.5 py-1 text-[11.5px] font-semibold text-white backdrop-blur" title={`Gamepad: ${pad.id}`}>
+              <span className="on-video flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11.5px] font-semibold" title={`Gamepad: ${pad.id}`}>
                 <IconDeviceGamepad2 size={14} />Gamepad
               </span>
             )}
@@ -642,7 +642,7 @@ export function ControlPage() {
             )}
             <div className="relative">
               <button type="button" onClick={() => setVideoMenu((v) => !v)} title="Video quality and transport"
-                className="grid size-9 cursor-pointer place-items-center rounded-lg bg-black/55 text-white backdrop-blur transition hover:bg-black/75">
+                className="on-video grid size-9 cursor-pointer place-items-center rounded-lg transition">
                 <IconAdjustmentsHorizontal size={18} />
               </button>
               {videoMenu && (
@@ -655,7 +655,7 @@ export function ControlPage() {
               )}
             </div>
             <button type="button" onClick={toggleCockpit} title={cockpit ? "Leave fullscreen (Esc)" : "Fullscreen cockpit (F)"}
-              className="grid size-9 cursor-pointer place-items-center rounded-lg bg-black/55 text-white backdrop-blur transition hover:bg-black/75">
+              className="on-video grid size-9 cursor-pointer place-items-center rounded-lg transition">
               {cockpit ? <IconMinimize size={18} /> : <IconMaximize size={18} />}
             </button>
           </div>
@@ -673,7 +673,7 @@ export function ControlPage() {
           )}
           {!isTouch && (
             <div className={`pointer-events-none absolute inset-x-0 z-10 flex justify-center ${cockpit ? "bottom-28" : "bottom-4"}`}>
-              <div className="flex items-center gap-2 rounded-xl bg-black/55 px-3 py-2 text-xs font-semibold text-white/75 backdrop-blur">
+              <div className="on-video flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold">
                 {pad ? (
                   <>Left stick move · Right stick rotate · Start arm · Back stop · LB/RB speed</>
                 ) : (

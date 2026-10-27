@@ -709,20 +709,20 @@ export function LivePage() {
     <>
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/35 via-transparent to-black/35" />
       <div className="absolute top-3 left-3 z-10 flex max-w-[70%] flex-wrap items-center gap-2">
-        <span className="flex items-center gap-1.5 rounded-lg bg-black/55 px-2.5 py-1 text-[11.5px] font-extrabold tracking-wider text-white backdrop-blur">
-          <span className={`size-2 rounded-full ${live ? "animate-pulse bg-[#ff5a5f]" : "bg-white/40"}`} />
+        <span className="on-video flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11.5px] font-extrabold tracking-wider">
+          <span className={`size-2 rounded-full ${live ? "animate-pulse bg-[#ff5a5f]" : "bg-dim"}`} />
           {live ? "LIVE" : source === "own" ? "CAMERA OFF" : "CONNECTING"}
         </span>
-        <span className="truncate rounded-lg bg-black/55 px-2.5 py-1 text-[11.5px] font-semibold text-white backdrop-blur">{sourceText}</span>
+        <span className="on-video truncate rounded-lg px-2.5 py-1 text-[11.5px] font-semibold">{sourceText}</span>
       </div>
       <div className="absolute top-3 right-14 z-10">
         <button type="button" disabled={!mayAnalyze} onClick={() => setYoloEnabled(!yoloEnabled)}
           title={mayAnalyze ? "Live detection on/off — off keeps the GPU idle" : "Live detection"}
-          className={`flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-extrabold backdrop-blur transition enabled:cursor-pointer ${
-            yoloEnabled ? "bg-white/90 text-[#0f1623]" : "bg-black/55 text-white/70"}`}>
-          <span className={`size-2 rounded-full ${yoloEnabled ? "bg-[#2fc1b1] shadow-[0_0_0_3px_rgba(47,193,177,0.25)]" : "bg-white/40"}`} />
+          className={`on-video flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-extrabold transition enabled:cursor-pointer ${
+            yoloEnabled ? "" : "on-video-muted"}`}>
+          <span className={`size-2 rounded-full ${yoloEnabled ? "bg-[#2fc1b1] shadow-[0_0_0_3px_rgba(47,193,177,0.25)]" : "bg-dim"}`} />
           YOLO
-          {yoloEnabled && <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[#0f1623] px-1 text-[11px] text-white">{objects.length}</span>}
+          {yoloEnabled && <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-fg px-1 text-[11px] text-bg">{objects.length}</span>}
         </button>
       </div>
       {source === "own" && (
@@ -746,7 +746,7 @@ export function LivePage() {
       )}
       {source === "view" && (
         <div className="pointer-events-none absolute inset-x-0 bottom-4 z-10 flex justify-center">
-          <span className="flex items-center gap-2 rounded-xl bg-black/55 px-3 py-2 text-xs font-semibold text-white/80 backdrop-blur">
+          <span className="on-video flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold">
             <IconEye size={15} className="text-[#5fe3d4]" />Read-only mirror of what this session is showing
           </span>
         </div>
