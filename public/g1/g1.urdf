@@ -18,7 +18,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/pelvis_ver0529.STL" />
+        <mesh filename="meshes/pelvis_ver0529.glb" />
       </geometry>
       <material name="dark" />
     </visual>
@@ -32,7 +32,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_hip_pitch_link.STL" />
+        <mesh filename="meshes/left_hip_pitch_link.glb" />
       </geometry>
       <material name="dark" />
     </visual>
@@ -53,7 +53,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_hip_roll_link.STL" />
+        <mesh filename="meshes/left_hip_roll_link.glb" />
       </geometry>
       <material name="white" />
     </visual>
@@ -74,7 +74,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_hip_yaw_link.STL" />
+        <mesh filename="meshes/left_hip_yaw_link.glb" />
       </geometry>
       <material name="white" />
     </visual>
@@ -95,7 +95,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_knee_link.STL" />
+        <mesh filename="meshes/left_knee_link.glb" />
       </geometry>
       <material name="white" />
     </visual>
@@ -116,7 +116,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_ankle_pitch_link.STL" />
+        <mesh filename="meshes/left_ankle_pitch_link.glb" />
       </geometry>
       <material name="white" />
     </visual>
@@ -137,7 +137,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_ankle_roll_link.STL" />
+        <mesh filename="meshes/left_ankle_roll_link.glb" />
       </geometry>
       <material name="dark" />
     </visual>
@@ -158,7 +158,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_hip_pitch_link.STL" />
+        <mesh filename="meshes/right_hip_pitch_link.glb" />
       </geometry>
       <material name="dark" />
     </visual>
@@ -179,7 +179,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_hip_roll_link.STL" />
+        <mesh filename="meshes/right_hip_roll_link.glb" />
       </geometry>
       <material name="white" />
     </visual>
@@ -200,7 +200,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_hip_yaw_link.STL" />
+        <mesh filename="meshes/right_hip_yaw_link.glb" />
       </geometry>
       <material name="white" />
     </visual>
@@ -221,7 +221,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_knee_link.STL" />
+        <mesh filename="meshes/right_knee_link.glb" />
       </geometry>
       <material name="white" />
     </visual>
@@ -242,7 +242,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_ankle_pitch_link.STL" />
+        <mesh filename="meshes/right_ankle_pitch_link.glb" />
       </geometry>
       <material name="white" />
     </visual>
@@ -263,7 +263,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_ankle_roll_link.STL" />
+        <mesh filename="meshes/right_ankle_roll_link.glb" />
       </geometry>
       <material name="dark" />
     </visual>
@@ -284,7 +284,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/waist_yaw_link_rev_1_0.STL" />
+        <mesh filename="meshes/waist_yaw_link_rev_1_0.glb" />
       </geometry>
       <material name="white" />
     </visual>
@@ -305,7 +305,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/waist_roll_link_rev_1_0.STL" />
+        <mesh filename="meshes/waist_roll_link_rev_1_0.glb" />
       </geometry>
       <material name="white" />
     </visual>
@@ -326,7 +326,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/torso_link_rev_1_0.STL" />
+        <mesh filename="meshes/torso_link_rev_1_0.glb" />
       </geometry>
       <material name="white" />
     </visual>
@@ -352,7 +352,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/logo_link.STL" />
+        <mesh filename="meshes/logo_link.glb" />
       </geometry>
       <material name="dark" />
     </visual>
@@ -366,7 +366,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/head_link.STL" />
+        <mesh filename="meshes/head_link.glb" />
       </geometry>
       <material name="dark" />
     </visual>
@@ -409,7 +409,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_shoulder_pitch_link.STL" />
+        <mesh filename="meshes/left_shoulder_pitch_link.glb" />
       </geometry>
       <material name="white" />
     </visual>
@@ -430,7 +430,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_shoulder_roll_link.STL" />
+        <mesh filename="meshes/left_shoulder_roll_link.glb" />
       </geometry>
       <material name="white" />
     </visual>
@@ -451,7 +451,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_shoulder_yaw_link.STL" />
+        <mesh filename="meshes/left_shoulder_yaw_link.glb" />
       </geometry>
       <material name="white" />
     </visual>
@@ -472,7 +472,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_elbow_link.STL" />
+        <mesh filename="meshes/left_elbow_link.glb" />
       </geometry>
       <material name="white" />
     </visual>
@@ -500,7 +500,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_wrist_roll_link.STL" />
+        <mesh filename="meshes/left_wrist_roll_link.glb" />
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1" />
@@ -523,7 +523,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_wrist_pitch_link.STL" />
+        <mesh filename="meshes/left_wrist_pitch_link.glb" />
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1" />
@@ -546,7 +546,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_wrist_yaw_link.STL" />
+        <mesh filename="meshes/left_wrist_yaw_link.glb" />
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1" />
@@ -567,7 +567,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_base2_link.STL" />
+        <mesh filename="meshes/left_base2_link.glb" />
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1" />
@@ -588,7 +588,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_base_link.STL" />
+        <mesh filename="meshes/left_base_link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -604,7 +604,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_thumb_metacarpal_Link.STL" />
+        <mesh filename="meshes/left_thumb_metacarpal_Link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -627,7 +627,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_thumb_proximal_Link.STL" />
+        <mesh filename="meshes/left_thumb_proximal_Link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -650,7 +650,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_thumb_distal_Link.STL" />
+        <mesh filename="meshes/left_thumb_distal_Link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -674,7 +674,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_thumb_tip_Link.STL" />
+        <mesh filename="meshes/left_thumb_tip_Link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -695,7 +695,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_index_proximal_Link.STL" />
+        <mesh filename="meshes/left_index_proximal_Link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -718,7 +718,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_index_distal_Link.STL" />
+        <mesh filename="meshes/left_index_distal_Link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -742,7 +742,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_index_tip_Link.STL" />
+        <mesh filename="meshes/left_index_tip_Link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -763,7 +763,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_middle_proximal_Link.STL" />
+        <mesh filename="meshes/left_middle_proximal_Link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -786,7 +786,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_middle_distal_Link.STL" />
+        <mesh filename="meshes/left_middle_distal_Link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -810,7 +810,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_middle_tip_Link.STL" />
+        <mesh filename="meshes/left_middle_tip_Link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -831,7 +831,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_ring_proximal_Link.STL" />
+        <mesh filename="meshes/left_ring_proximal_Link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -854,7 +854,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_ring_distal_Link.STL" />
+        <mesh filename="meshes/left_ring_distal_Link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -878,7 +878,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_ring_tip_Link.STL" />
+        <mesh filename="meshes/left_ring_tip_Link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -899,7 +899,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_pinky_proximal_Link.STL" />
+        <mesh filename="meshes/left_pinky_proximal_Link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -922,7 +922,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_pinky_distal_Link.STL" />
+        <mesh filename="meshes/left_pinky_distal_Link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -946,7 +946,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/left_pinky_tip_Link.STL" />
+        <mesh filename="meshes/left_pinky_tip_Link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -967,7 +967,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_shoulder_pitch_link.STL" />
+        <mesh filename="meshes/right_shoulder_pitch_link.glb" />
       </geometry>
       <material name="white" />
     </visual>
@@ -988,7 +988,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_shoulder_roll_link.STL" />
+        <mesh filename="meshes/right_shoulder_roll_link.glb" />
       </geometry>
       <material name="white" />
     </visual>
@@ -1009,7 +1009,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_shoulder_yaw_link.STL" />
+        <mesh filename="meshes/right_shoulder_yaw_link.glb" />
       </geometry>
       <material name="white" />
     </visual>
@@ -1030,7 +1030,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_elbow_link.STL" />
+        <mesh filename="meshes/right_elbow_link.glb" />
       </geometry>
       <material name="white" />
     </visual>
@@ -1058,7 +1058,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_wrist_roll_link.STL" />
+        <mesh filename="meshes/right_wrist_roll_link.glb" />
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1" />
@@ -1081,7 +1081,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_wrist_pitch_link.STL" />
+        <mesh filename="meshes/right_wrist_pitch_link.glb" />
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1" />
@@ -1104,7 +1104,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_wrist_yaw_link.STL" />
+        <mesh filename="meshes/right_wrist_yaw_link.glb" />
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1" />
@@ -1125,7 +1125,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_base2_link.STL" />
+        <mesh filename="meshes/right_base2_link.glb" />
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1" />
@@ -1146,7 +1146,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_base_link.STL" />
+        <mesh filename="meshes/right_base_link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -1162,7 +1162,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_thumb_metacarpal_link.STL" />
+        <mesh filename="meshes/right_thumb_metacarpal_link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -1185,7 +1185,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_thumb_proximal_link.STL" />
+        <mesh filename="meshes/right_thumb_proximal_link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -1208,7 +1208,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_thumb_distal_link.STL" />
+        <mesh filename="meshes/right_thumb_distal_link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -1232,7 +1232,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_thumb_tip.STL" />
+        <mesh filename="meshes/right_thumb_tip.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -1253,7 +1253,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_index_proximal_link.STL" />
+        <mesh filename="meshes/right_index_proximal_link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -1276,7 +1276,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_index_distal_link.STL" />
+        <mesh filename="meshes/right_index_distal_link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -1300,7 +1300,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_index_tip.STL" />
+        <mesh filename="meshes/right_index_tip.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -1321,7 +1321,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_middle_proximal_link.STL" />
+        <mesh filename="meshes/right_middle_proximal_link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -1344,7 +1344,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_middle_distal_link.STL" />
+        <mesh filename="meshes/right_middle_distal_link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -1368,7 +1368,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_middle_tip.STL" />
+        <mesh filename="meshes/right_middle_tip.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -1389,7 +1389,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_ring_proximal_link.STL" />
+        <mesh filename="meshes/right_ring_proximal_link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -1412,7 +1412,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_ring_distal_link.STL" />
+        <mesh filename="meshes/right_ring_distal_link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -1436,7 +1436,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_ring_tip.STL" />
+        <mesh filename="meshes/right_ring_tip.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -1457,7 +1457,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_pinky_proximal_link.STL" />
+        <mesh filename="meshes/right_pinky_proximal_link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -1480,7 +1480,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_pinky_distal_link.STL" />
+        <mesh filename="meshes/right_pinky_distal_link.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -1504,7 +1504,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/right_pinky_tip.STL" />
+        <mesh filename="meshes/right_pinky_tip.glb" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />

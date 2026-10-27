@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
-"""Build the G1 model the Joints page draws: public/g1/g1.urdf + public/g1/meshes/*.STL.
+"""Build the G1 model the Joints page draws: public/g1/g1.urdf + public/g1/meshes/*.glb.
 
 The source is Unitree's own description package (g1_description: URDF + STL meshes). Its full
-mesh set is ~100 MB and the variant we draw uses 31 MB of it — too heavy for a page that may
-be opened over LTE. This keeps the VISUAL geometry only (collision meshes are for physics, the
-page never uses them) and decimates every mesh to a face budget, so the result is a few MB.
+mesh set is ~100 MB and the variant we draw uses 31 MB of it (627k faces) — too heavy for a
+page that may be opened over LTE. This keeps the VISUAL geometry only (collision meshes are for
+physics, the page never uses them) and ships it WHOLE, compressed: each STL becomes a GLB with
+its normals baked in (smooth across gentle angles, sharp at the machined edges) and is packed by
+gltfpack with meshopt compression — ~3 MB for every face of the original.
+
+Why not fewer faces: until 2026-10-27 every mesh was decimated to 2000 faces (6.9 MB of STL).
+Decimation picks what to drop mesh by mesh, so the result was lumpy and NOT SYMMETRIC — the two
+sides of the pelvis came out different — and it was still twice the size of this.
 
 WHICH VARIANT: it must match the robot, or the drawn joints are not the robot's joints.
   - The BODY follows `mode_machine`. Ours reports 6 (read off rt/lf/lowstate by the telemetry
@@ -19,10 +25,11 @@ Its fingertip joints are "revolute" with lower == upper (a fixed angle written a
 they are turned into fixed joints with that angle baked into their origin, so nothing here
 leaves a joint the page could move by mistake.
 
-Run once, by hand, whenever the source package changes (needs: pip install trimesh
-fast-simplification numpy):
+Run once, by hand, whenever the source package changes (needs: pip install trimesh numpy
+scipy, and bun for `bunx gltfpack`):
 
-    git clone https://github.com/unitreerobotics/unitree_ros
+    git clone --depth 1 --filter=blob:none --sparse https://github.com/unitreerobotics/unitree_ros
+    git -C unitree_ros sparse-checkout set robots/g1_with_brainco_hand
     python3 scripts/build_g1_model.py unitree_ros/robots/g1_with_brainco_hand
 
 It is a build step, not part of `bun run build`: the output is committed as a static asset.
@@ -30,32 +37,36 @@ It is a build step, not part of `bun run build`: the output is committed as a st
 import argparse
 import math
 import shutil
+import subprocess
 import sys
+import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 VARIANT = "g1_29dof_mode_15_brainco_hand"
 # The lock-waist body (mode_machine 6): these have no motor on this robot.
 LOCKED = ("waist_roll_joint", "waist_pitch_joint")
-# Faces kept per mesh. The torso and pelvis are the largest source meshes (~100k faces); a
-# budget this size keeps every silhouette recognisable at the size the page draws them.
-FACE_BUDGET = 2000
+# Faces meeting at less than this are shaded as one smooth surface; sharper meets stay an edge.
+CREASE_DEGREES = 35
 OUT = Path(__file__).resolve().parent.parent / "public" / "g1"
 
 
-def simplify(src: Path, dst: Path) -> tuple[int, int]:
-    import fast_simplification
+def convert(src: Path, dst: Path) -> int:
+    """One STL -> one meshopt-compressed GLB, every face kept, normals baked. Returns faces."""
     import trimesh
 
     mesh = trimesh.load(src, force="mesh")
-    before = len(mesh.faces)
-    if before > FACE_BUDGET:
-        points, faces = fast_simplification.simplify(
-            mesh.vertices, mesh.faces, target_reduction=1 - FACE_BUDGET / before)
-        mesh = trimesh.Trimesh(points, faces, process=True)
+    mesh.merge_vertices()
+    shaded = trimesh.graph.smooth_shade(mesh, angle=math.radians(CREASE_DEGREES))
     dst.parent.mkdir(parents=True, exist_ok=True)
-    mesh.export(dst, file_type="stl")       # binary STL: what three's STLLoader reads fastest
-    return before, len(mesh.faces)
+    with tempfile.TemporaryDirectory() as tmp:
+        raw = Path(tmp) / dst.name
+        shaded.export(raw, include_normals=True)
+        # -vpf: float positions, so the mesh needs no dequantising node transform (urdf-loader
+        # resets the position of what it is handed, which would throw that offset away).
+        subprocess.run(["bunx", "gltfpack", "-i", str(raw), "-o", str(dst), "-cc", "-vpf"],
+                       check=True, capture_output=True)
+    return len(mesh.faces)
 
 
 def _rpy_to_matrix(r: float, p: float, y: float) -> list[list[float]]:
@@ -130,15 +141,13 @@ def main() -> int:
 
     if OUT.exists():
         shutil.rmtree(OUT / "meshes", ignore_errors=True)
-    total_before = total_after = 0
+    faces = 0
     done: dict[str, str] = {}
     for mesh_el in root.iter("mesh"):
         rel = mesh_el.get("filename", "")
-        name = Path(rel).name
+        name = Path(rel).stem + ".glb"
         if name not in done:
-            before, after = simplify(args.description_dir / rel, OUT / "meshes" / name)
-            total_before += before
-            total_after += after
+            faces += convert(args.description_dir / rel, OUT / "meshes" / name)
             done[name] = f"meshes/{name}"
         mesh_el.set("filename", done[name])
 
@@ -148,8 +157,7 @@ def main() -> int:
     with open(OUT / "g1.urdf", "a", encoding="utf-8") as f:
         f.write("\n")
     size = sum(p.stat().st_size for p in (OUT / "meshes").iterdir())
-    print(f"{len(done)} meshes, {total_before} -> {total_after} faces, "
-          f"{size / 1e6:.1f} MB -> {OUT}")
+    print(f"{len(done)} meshes, {faces} faces, {size / 1e6:.1f} MB -> {OUT}")
     return 0
 
 

@@ -17,8 +17,8 @@ import {
   WebGLRenderer,
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
-import { toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import URDFLoader, { type URDFJoint, type URDFRobot } from "urdf-loader";
 import { JOINTS, JOINT_BY_URDF, readJoint, tempLevel, type JointFrame } from "../../lib/g1Joints";
 import { liveStalls, type StallAlert } from "../../lib/jointControl";
@@ -139,9 +139,6 @@ const COLORS = {
     critical: new Color("#ef4444"),
   },
 };
-
-// Faces meeting at less than this are shaded as one smooth surface; sharper meets stay an edge.
-const CREASE_ANGLE = (35 * Math.PI) / 180;
 
 interface Part {
   mesh: Mesh;
@@ -321,17 +318,22 @@ export function RobotViewer({
       modelRef.current = { robot, ghost: ghostRobot, ghostMeshes, parts, meshes };
       setLoaded(true);
     };
+    // meshopt-compressed GLB: the whole original geometry in ~3 MB (scripts/build_g1_model.py).
+    const gltf = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
     loader.loadMeshCb = (path, manager, done) => {
       pending += 1;
-      new STLLoader(manager).load(
+      gltf.manager = manager;
+      gltf.load(
         path,
-        (geometry) => {
-          // STL carries one normal per triangle, so every face was lit flat and the decimated
-          // meshes showed each facet. Creased normals smooth across gentle angles and keep the
-          // machined edges sharp.
-          const smooth = toCreasedNormals(geometry, CREASE_ANGLE);
-          if (smooth !== geometry) geometry.dispose();
-          done(new Mesh(smooth, new MeshStandardMaterial()));
+        ({ scene: file }) => {
+          // One mesh per file, the original geometry with its normals baked by the build script.
+          // Handed over as a bare Mesh so urdf-loader paints it with the URDF's colour (it only
+          // does that for a Mesh, not for the glTF's group around it).
+          let geometry: Mesh["geometry"] | null = null;
+          file.traverse((o) => {
+            if (!geometry && (o as Mesh).isMesh) geometry = (o as Mesh).geometry;
+          });
+          done(geometry ? new Mesh(geometry, new MeshStandardMaterial()) : new Group());
           pending -= 1;
           finish();
         },
