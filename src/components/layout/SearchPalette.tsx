@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -139,7 +140,9 @@ export function SearchPalette() {
         className="grid size-9 cursor-pointer place-items-center rounded-[10px] border border-line bg-panel text-muted transition hover:text-fg hover:shadow-card">
         <IconSearch size={18} />
       </button>
-      {open && (
+      {/* Rendered on <body>: the header's backdrop blur makes it the containing block of
+          anything fixed inside it, which trapped this overlay in the header's strip. */}
+      {open && createPortal(
         <div className="fixed inset-0 z-[60] bg-black/40 px-4 pt-[12vh] backdrop-blur-sm" onMouseDown={(e) => e.target === e.currentTarget && setOpen(false)}>
           <div role="dialog" aria-label="Search" className="mx-auto w-full max-w-[580px] animate-rise overflow-hidden rounded-2xl border border-line bg-panel shadow-lift">
             <div className="flex items-center gap-3 border-b border-line px-4">
@@ -166,7 +169,8 @@ export function SearchPalette() {
               ))}
             </ul>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );

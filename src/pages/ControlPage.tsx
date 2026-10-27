@@ -558,7 +558,7 @@ export function ControlPage() {
   const glass = "border border-white/10 bg-[#0c1016]/65 text-white shadow-[0_20px_50px_-20px_rgba(0,0,0,0.6)] backdrop-blur-xl";
 
   return (
-    <main className="grid gap-4 p-4 lg:h-[calc(100dvh-57px)] lg:grid-cols-[minmax(0,1fr)_380px] lg:overflow-hidden">
+    <main className="grid gap-4 p-4 lg:h-[calc(100dvh-65px)] lg:grid-cols-[minmax(0,1fr)_380px] lg:overflow-hidden">
       <div className="flex min-h-0 min-w-0 flex-col gap-3">
         {/* Arm, safety, speed */}
         <div className="flex flex-wrap items-center gap-2.5">

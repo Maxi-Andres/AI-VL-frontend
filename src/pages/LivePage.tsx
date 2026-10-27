@@ -21,6 +21,7 @@ import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { useCamera } from "../hooks/useCamera";
 import { useDetectionSocket } from "../hooks/useDetectionSocket";
 import { useOptions } from "../hooks/useOptions";
+import { usePresence } from "../hooks/usePresence";
 import { useVideoTransport } from "../components/layout/VideoTransportContext";
 import { VideoTransportSwitch } from "../components/live/VideoTransportSwitch";
 import { RobotCameraSwitch } from "../components/live/RobotCameraSwitch";
@@ -501,6 +502,7 @@ export function LivePage() {
   // spoken mode) reads the answer aloud as it streams. Also drives the manual
   // read-aloud button.
   const { va, registerAsk } = useVoiceAssistantContext();
+  const { presence } = usePresence();
   // While this page is open, questions are about ITS frame and the answer shows in its panel;
   // elsewhere the app-wide assistant asks about the robot's camera (VoiceAssistantContext).
   useEffect(() => {
@@ -731,8 +733,17 @@ export function LivePage() {
     </>
   );
 
+  // The readings under the picture. With the robot camera, the frame rate is what reaches the
+  // gateway (presence), so it shows with detection off too; with this browser's camera it is
+  // the cadence of detection replies. Inference time comes with each detection reply.
+  const detFps = /^[\d.]+ fps/.test(fps) ? fps.replace(/ fps.*/, "") : null;
+  const inferMs = /ms/.test(fps) ? fps.replace(/.*?(\d+) ms.*/, "$1") : null;
+  const cam = presence?.robot_cam;
+  const frameRate = source !== "own" ? (cam?.live && cam.fps ? cam.fps.toFixed(1) : null) : detFps;
+  const camRes = cam?.live ? cam.resolution ?? null : null;
+
   return (
-    <main className={`grid gap-4 p-4 lg:h-[calc(100dvh-57px)] lg:overflow-hidden ${mayAnalyze ? "lg:grid-cols-[minmax(0,1fr)_420px]" : ""}`}>
+    <main className={`grid gap-4 p-4 lg:h-[calc(100dvh-65px)] lg:overflow-hidden ${mayAnalyze ? "lg:grid-cols-[minmax(0,1fr)_420px]" : ""}`}>
       <div className="flex min-h-0 min-w-0 flex-col gap-3">
         {/* Source, and for the robot camera its picture settings */}
         <div className="flex flex-wrap items-center gap-2.5">
@@ -787,8 +798,9 @@ export function LivePage() {
 
         {/* Readings + what is on screen */}
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl border border-line bg-panel px-4 py-2.5 shadow-card">
-          <Reading label="Frame rate" value={fps.replace(/ fps.*/, "")} unit={/fps/.test(fps) ? "fps" : undefined} />
-          {/ms/.test(fps) && <Reading label="YOLO inference" value={fps.replace(/.*?(\d+) ms.*/, "$1")} unit="ms" />}
+          <Reading label="Frame rate" value={frameRate ?? "—"} unit={frameRate ? "fps" : undefined} />
+          {source !== "own" && camRes && <Reading label="Resolution" value={camRes} />}
+          <Reading label="YOLO inference" value={yoloEnabled && inferMs ? inferMs : "—"} unit={yoloEnabled && inferMs ? "ms" : undefined} />
           <Reading label="Objects" value={yoloEnabled ? String(objects.length) : "—"} />
           <Reading label="Model" value={yoloEnabled ? `${yoloModel.replace(/\.pt$/, "")} · ${imgsz}px` : "Detection off"} />
           <span className="flex-1" />
@@ -819,8 +831,10 @@ export function LivePage() {
               </button>
             ))}
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            {panel === "vlm" && (
+          {/* The chat keeps its own scroll (and stays mounted, so switching tabs keeps the
+              conversation); the other two scroll as a whole. */}
+          <div className={`min-h-0 flex-1 p-4 ${panel === "vlm" ? "flex flex-col" : "overflow-y-auto"}`}>
+            <div className={panel === "vlm" ? "flex min-h-[520px] flex-1 flex-col lg:min-h-0" : "hidden"}>
               <VlmPanel
                 models={options.vlm_models}
                 scopes={Object.keys(options.scopes)}
@@ -856,7 +870,7 @@ export function LivePage() {
                   onToggleRobotEar: va.toggleRobotEar,
                   robotEarStatus: va.robotEarStatus,
                   speaking: va.speaking,
-                  onSpeak: () => va.speak(vlmOutput),
+                  onSpeak: (text) => va.speak(text ?? vlmOutput),
                   onStopSpeak: va.stopSpeak,
                   voices: va.voices,
                   voiceURI: va.voiceURI,
@@ -867,7 +881,7 @@ export function LivePage() {
                   robotSpeakerError: va.robotSpeakerError,
                 }}
               />
-            )}
+            </div>
             {panel === "yolo" && (
               <YoloPanel
                 models={options.yolo_models}
