@@ -113,11 +113,25 @@ export interface RobotInfo {
   short?: string;
 }
 
+/** A person on the live session, however many tabs they have open (`sockets`). Name and
+ * colour only — the gateway never hands out anyone's email through presence. */
+export interface WebPerson {
+  user_id: string;
+  name: string;
+  color?: string | null;
+  /** Streaming their own camera in (/ws/detect). */
+  streaming: boolean;
+  /** Watching the session's picture (/ws/view) — the robot camera when it is live. */
+  watching: boolean;
+  sockets: number;
+}
+
 /** Payload of GET /api/presence — who is attached to the gateway right now, so the
  * header can show a pill per participant instead of one anonymous "connected". */
 export interface Presence {
-  /** Browsers on the live session: producers stream their own camera, viewers watch. */
-  web: { producers: number; viewers: number; total: number };
+  /** Browsers on the live session: producers stream their own camera, viewers watch.
+   * The counts are sockets; `people` is who is behind them (absent from an older gateway). */
+  web: { producers: number; viewers: number; total: number; people?: WebPerson[] };
   robot_cam: {
     /** A robot-camera bridge socket is attached to the gateway. */
     attached: boolean;

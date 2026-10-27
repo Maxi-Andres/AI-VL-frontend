@@ -1,5 +1,5 @@
 import { IconBrain, IconDeviceDesktop, IconSteeringWheel, IconVideo } from "@tabler/icons-react";
-import type { Presence } from "../../types";
+import type { Presence, WebPerson } from "../../types";
 
 // The services behind the robots, in words a customer reads: can the AI see, can a robot be
 // moved, is video arriving, who is on the live session. One source for the header's services
@@ -21,7 +21,8 @@ export interface SystemRow {
 export function systemRows(p: Presence): SystemRow[] {
   const cam = p.robot_cam;
   const ex = p.executor;
-  const people = p.web.total;
+  const people = p.web.people;
+  const online = people?.length ?? p.web.total;
   return [
     {
       key: "ai", icon: IconBrain, label: "AI engine", service: true,
@@ -47,10 +48,23 @@ export function systemRows(p: Presence): SystemRow[] {
     },
     {
       key: "session", icon: IconDeviceDesktop, label: "Live session", service: false,
-      tone: people ? "good" : "idle", state: people ? `${people} connected` : "Idle",
-      detail: people ? `${p.web.producers} streaming · ${p.web.viewers} watching` : "No one is on Live right now.",
+      tone: online ? "good" : "idle", state: online ? `${online} online` : "Idle",
+      // People, not sockets, once the gateway names them: one person on two tabs is one.
+      detail: !online ? "No one is on Live right now."
+        : people ? `${people.filter((x) => x.streaming).length} streaming · ${people.filter((x) => x.watching).length} watching`
+          : `${p.web.producers} streaming · ${p.web.viewers} watching`,
     },
   ];
+}
+
+/** What a person on the live session is doing, in words: their own camera going in, the
+ * session's picture coming out, or both. What everyone watches is the robot camera while it
+ * is live. */
+export function personActivity(person: WebPerson, p: Presence): string {
+  const watching = p.robot_cam.live ? "watching the robot camera" : "watching the live view";
+  if (person.streaming && person.watching) return `Streaming their camera, ${watching}`;
+  if (person.streaming) return "Streaming their camera";
+  return watching[0].toUpperCase() + watching.slice(1);
 }
 
 export const PILL: Record<Tone, string> = {

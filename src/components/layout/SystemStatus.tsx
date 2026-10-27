@@ -2,14 +2,18 @@ import { useEffect, useState } from "react";
 import { IconCheck, IconChevronDown } from "@tabler/icons-react";
 import { getFleet } from "../../api/fleet";
 import type { FleetRobot } from "../../api/fleet";
+import { getOnline } from "../../api/team";
+import type { Online } from "../../api/team";
+import { useMe } from "../../auth/AuthContext";
 import { usePresence } from "../../hooks/usePresence";
 import { useRobotTransports } from "../../hooks/useRobotTransports";
+import { Avatar } from "../ui/Avatar";
 import { DropMenu, useDropdown } from "../ui/DropMenu";
 import { RobotIcon } from "../fleet/RobotIcon";
 import { BatteryPill, robotState } from "./PresencePills";
 import { useRobot } from "./RobotContext";
 import { StatusBadge } from "./StatusBadge";
-import { PILL, systemRows } from "./systemRows";
+import { PILL, personActivity, systemRows } from "./systemRows";
 
 const DOT = { good: "bg-good-fg", warn: "bg-warn-fg", bad: "bg-bad-fg", idle: "bg-dim" };
 const RING = {
@@ -23,7 +27,8 @@ const TEXT = { good: "text-good-fg", warn: "text-warn-fg", bad: "text-bad-fg", i
 /**
  * The header's one pill for the robots and the services behind them, as in the mockup:
  * "3 of 5 up" at a glance, everything on click. Each robot counts as a service (does it
- * answer?), then the AI engine, robot control and robot video.
+ * answer?), then the AI engine, robot control and robot video — and, below them, everyone
+ * with Pilot open and, for those on the live session, what they are doing there.
  *
  * The robot Live and Drive work with is picked here, and its name stays on the pill: the
  * mockup shows only the count, but an operator must never drive one robot believing it is
@@ -31,10 +36,12 @@ const TEXT = { good: "text-good-fg", warn: "text-warn-fg", bad: "text-bad-fg", i
  */
 export function SystemStatus({ connected }: { connected: boolean }) {
   const { robot, setRobot, robots } = useRobot();
+  const me = useMe();
   const { presence, reachable } = usePresence();
   const net = useRobotTransports();
   const { open, setOpen, ref } = useDropdown();
   const [fleet, setFleet] = useState<Record<string, FleetRobot>>({});
+  const [here, setHere] = useState<Online | null>(null);
 
   // The company's names and colours for its robots, where registered in Fleet; refreshed on
   // open so a rename shows without a reload.
@@ -43,6 +50,7 @@ export function SystemStatus({ connected }: { connected: boolean }) {
     getFleet(ctl.signal)
       .then((f) => setFleet(Object.fromEntries(f.robots.map((r) => [r.slot, r]))))
       .catch(() => undefined);
+    if (open) getOnline(ctl.signal).then(setHere).catch(() => undefined);
     return () => ctl.abort();
   }, [open]);
 
@@ -51,6 +59,15 @@ export function SystemStatus({ connected }: { connected: boolean }) {
     return { ...r, name: fleet[r.id]?.name ?? r.short ?? r.label, color: fleet[r.id]?.color, st };
   });
   const services = presence && reachable ? systemRows(presence) : [];
+  // Everyone with Pilot open (the team's online list), and for those on the live session what
+  // they do there (presence: one row per person, however many tabs). Someone on Live counts
+  // even before the online list catches up.
+  const live = (presence && reachable ? presence.web.people : undefined) ?? [];
+  const people = [
+    ...live.map((u) => ({ id: u.user_id, name: u.name, color: u.color, live: u })),
+    ...(here?.online ?? []).filter((o) => !live.some((u) => u.user_id === o.id))
+      .map((o) => ({ id: o.id, name: o.name, color: o.color, live: null })),
+  ];
   const counted = [...robotRows.map((r) => r.st?.tone ?? "idle"), ...services.filter((s) => s.service).map((s) => s.tone)];
   const up = counted.filter((t) => t === "good").length;
   const tone = !reachable ? "bad" : !presence ? "idle"
@@ -99,6 +116,36 @@ export function SystemStatus({ connected }: { connected: boolean }) {
             <span className={`ml-auto rounded-full px-2 py-0.5 text-[11.5px] font-bold ${PILL[r.tone]}`}>{r.state}</span>
           </div>
         ))}
+        {reachable && (
+          <>
+            <div className="mt-1 flex items-center border-t border-line px-2.5 pt-2.5 pb-1 text-[11px] font-extrabold tracking-[.1em] text-dim uppercase">
+              People online
+              <span className="ml-auto tracking-normal">{people.length}</span>
+            </div>
+            {!people.length && <p className="m-0 px-2.5 py-2 text-[13px] text-muted">{here ? "No one else is here." : "Checking…"}</p>}
+            {/* A busy session must not push "This browser" off the screen. */}
+            <div className="max-h-[220px] overflow-y-auto">
+              {people.map((u) => (
+                <div key={u.id} className="flex items-center gap-2.5 px-2.5 py-2 text-[13px]"
+                  title={u.live && u.live.sockets > 1 ? `${u.live.sockets} connections` : undefined}>
+                  <Avatar id={u.id} name={u.name || "Unnamed member"} color={u.color} size={26} />
+                  <span className="min-w-0 flex-1">
+                    <b className="block truncate">
+                      {u.name || "Unnamed member"}
+                      {u.id === me.user.id && <span className="font-semibold text-dim"> (you)</span>}
+                    </b>
+                    <small className="block truncate text-[11.5px] text-dim">
+                      {u.live && presence ? personActivity(u.live, presence) : "Using Pilot"}
+                    </small>
+                  </span>
+                  <span className={`rounded-full px-2 py-0.5 text-[11.5px] font-bold ${PILL[u.live?.streaming ? "good" : u.live ? "warn" : "idle"]}`}>
+                    {u.live?.streaming ? "Streaming" : u.live ? "Watching" : "Online"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
         <div className="mt-1 flex items-center gap-2.5 border-t border-line px-2.5 pt-2.5 pb-1.5 text-[13px] font-semibold">
           This browser
           <span className="ml-auto"><StatusBadge connected={connected} /></span>
