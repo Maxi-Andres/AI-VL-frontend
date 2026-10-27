@@ -3,6 +3,11 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { rememberPref } from "../../lib/prefs";
 import { MAP_TILES, SATELLITE_ATTRIBUTION } from "../../config";
+
+// OpenStreetMap's tile servers refuse a request with no Referer ("403 Access blocked", their
+// usage policy), and Pilot's pages send none to other sites (Referrer-Policy: same-origin, so a
+// link never carries a path out). The tiles alone send the site's origin — never the path.
+const TILE_REFERRER = "strict-origin-when-cross-origin";
 import { useT } from "../../i18n";
 
 // A site's location on a street map. Read-only by default; with `onPick`, a click moves the
@@ -85,8 +90,8 @@ export function SiteMap({ lat, lon, onPick, focus = 0, satellite = null, classNa
     if (!m) return;
     tiles.current?.remove();
     tiles.current = (shown === "satellite" && satellite
-      ? L.tileLayer(satellite, { attribution: SATELLITE_ATTRIBUTION, maxZoom: 19 })
-      : L.tileLayer(MAP_TILES.url, { attribution: MAP_TILES.attribution, maxZoom: MAP_TILES.maxZoom })).addTo(m);
+      ? L.tileLayer(satellite, { attribution: SATELLITE_ATTRIBUTION, maxZoom: 19, referrerPolicy: TILE_REFERRER })
+      : L.tileLayer(MAP_TILES.url, { attribution: MAP_TILES.attribution, maxZoom: MAP_TILES.maxZoom, referrerPolicy: TILE_REFERRER })).addTo(m);
   }, [shown, satellite]);
 
   const pick = (l: Layer) => {
