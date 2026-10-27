@@ -248,7 +248,9 @@ export function FleetPage() {
         </section>
       )}
 
-      <div className="grid items-start gap-4 xl:grid-cols-[1.45fr_1fr]">
+      {/* One height for the row: the robots and the site end on the same line, and when the
+          robots outgrow the map the map grows with them. */}
+      <div className="grid gap-4 xl:grid-cols-[1.45fr_1fr]">
         {/* Robots and the site side by side (similar heights); the site card stays in view
             while a long robot list scrolls. */}
           {/* Robots */}
@@ -291,7 +293,7 @@ export function FleetPage() {
           </section>
 
           {/* Site */}
-          <section className="animate-rise overflow-hidden rounded-2xl border border-line bg-panel shadow-card [animation-delay:180ms] xl:sticky xl:top-[72px]">
+          <section className="flex animate-rise flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-card [animation-delay:180ms]">
             <header className="flex flex-wrap items-center gap-2.5 border-b border-line px-5 py-3">
               <h2 className="m-0 text-[15px] font-extrabold">{site ? site.name : t("Sites")}</h2>
               {site && (
@@ -320,7 +322,7 @@ export function FleetPage() {
             </header>
             {site ? (
               <>
-                <div className="relative h-[300px] bg-bg">
+                <div className="relative min-h-[300px] flex-1 bg-bg">
                   {site.has_plan ? (
                     <img src={planUrl(site, planVersion)} alt={t("Floor plan of {name}", { name: site.name })} className="absolute inset-0 size-full object-contain p-3" />
                   ) : site.lat !== null && site.lon !== null ? (
@@ -416,6 +418,14 @@ function Kpi({ icon, tint, label, value, unit, fill, delay }: {
   );
 }
 
+/** Classes for the last System tile so it fills its row instead of leaving a hole: 2 columns
+ * from `sm`, and 4 at `xl` when the panel is wide (static class names, for Tailwind). */
+function lastSpan(n: number, wide: boolean): string {
+  const sm = n % 2 === 1 ? "sm:col-span-2" : "";
+  if (!wide) return sm;
+  return `${sm} ${["xl:col-span-1", "xl:col-span-4", "xl:col-span-3", "xl:col-span-2"][n % 4]}`;
+}
+
 /** The services behind the robots (systemRows), as tiles. All of it from /api/presence. */
 function SystemPanel({ presence, wide }: { presence: Presence | null; wide: boolean }) {
   const t = useT();
@@ -438,8 +448,8 @@ function SystemPanel({ presence, wide }: { presence: Presence | null; wide: bool
       </header>
       {p ? (
         <div className={`grid gap-3 p-4 sm:grid-cols-2 ${wide ? "xl:grid-cols-4" : ""}`}>
-          {rows.map((r) => (
-            <div key={r.key} className="rounded-xl border border-line bg-bg p-4">
+          {rows.map((r, i) => (
+            <div key={r.key} className={`rounded-xl border border-line bg-bg p-4 ${i === rows.length - 1 ? lastSpan(rows.length, wide) : ""}`}>
               <div className="flex items-center gap-2.5">
                 <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${PILL[r.tone]}`}><r.icon size={18} /></span>
                 <b className="min-w-0 truncate text-[14px]">{r.label}</b>
@@ -448,6 +458,12 @@ function SystemPanel({ presence, wide }: { presence: Presence | null; wide: bool
                 </span>
               </div>
               <p className="m-0 mt-2.5 text-[12.5px] text-muted">{r.detail}</p>
+              {r.meter !== undefined && (
+                <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-subtle">
+                  <div className={`h-full rounded-full transition-[width] duration-700 ${r.tone === "bad" ? "bg-bad-fg" : r.tone === "warn" ? "bg-warn-fg" : "bg-gradient-to-r from-[#2fc1b1] to-[#d8cf3c]"}`}
+                    style={{ width: `${Math.round(Math.min(1, r.meter) * 100)}%` }} />
+                </div>
+              )}
             </div>
           ))}
         </div>

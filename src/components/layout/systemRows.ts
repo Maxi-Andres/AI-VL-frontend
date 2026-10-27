@@ -22,6 +22,8 @@ export interface SystemRow {
   detail: string;
   /** Counted in "N of M up"; the GPU is a resource the services share, not a service. */
   service: boolean;
+  /** A 0-1 fill drawn under the tile (the GPU's memory). */
+  meter?: number;
 }
 
 // GPU memory past these fractions is a warning, then a problem: a full card froze the whole
@@ -71,7 +73,7 @@ export function systemRows(p: Presence): SystemRow[] {
   if (gpu && gpu.total_mb > 0) {
     const used = gpu.used_mb / gpu.total_mb;
     rows.push({
-      key: "gpu", icon: IconCpu, label: t("GPU memory"), service: false,
+      key: "gpu", icon: IconCpu, label: t("GPU memory"), service: false, meter: used,
       tone: used >= GPU_BAD ? "bad" : used >= GPU_WARN ? "warn" : "good",
       state: `${(gpu.used_mb / 1024).toFixed(1)} / ${(gpu.total_mb / 1024).toFixed(1)} GB`,
       detail: used >= GPU_WARN
