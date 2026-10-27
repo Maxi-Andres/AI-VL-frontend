@@ -65,11 +65,40 @@ export async function getOnline(signal?: AbortSignal): Promise<Online> {
   return (await check(await backendFetch("/api/team/online", { signal }))).json();
 }
 
+/** A one-time link to hand over: its path (with the token), and the company's address it is
+ * built on — null when none is set, and then the page's own address is the only guess. */
+export interface OneTimeLink {
+  path: string;
+  base: string | null;
+}
+
+/** The full URL of a one-time link: on the company's address, else this page's. */
+export const linkUrl = (l: OneTimeLink) => `${l.base ?? location.origin}${l.path}`;
+
+/** This page was opened on this very computer: a link built on its address opens nowhere else. */
+export const onLocalAddress = () => /^(localhost|127\.|\[?::1\]?$)/.test(location.hostname);
+
 /** Returns the invitation and the link to hand over — the only time its token is visible. */
-export async function invite(email: string, role: Role): Promise<{ invitation: Invitation; link: string }> {
+export async function invite(email: string, role: Role): Promise<{ invitation: Invitation; link: OneTimeLink }> {
   const r = await check(await backendFetch("/api/team/invitations", json("POST", { email, role })));
-  const body = (await r.json()) as { invitation: Invitation; link_path: string };
-  return { invitation: body.invitation, link: `${location.origin}${body.link_path}` };
+  const body = (await r.json()) as { invitation: Invitation; link_path: string; base_url: string | null };
+  return { invitation: body.invitation, link: { path: body.link_path, base: body.base_url } };
+}
+
+export interface ServerAddress {
+  /** The address links are built on, or null when not set. */
+  public_url: string | null;
+  /** The addresses this server answers on, as the browser asking reached it (scheme, port). */
+  candidates: { url: string; label: string }[];
+}
+
+export async function getAddress(signal?: AbortSignal): Promise<ServerAddress> {
+  return (await check(await backendFetch("/api/team/address", { signal }))).json();
+}
+
+export async function setAddress(publicUrl: string): Promise<string | null> {
+  const r = await check(await backendFetch("/api/team/address", json("PUT", { public_url: publicUrl })));
+  return ((await r.json()) as { public_url: string | null }).public_url;
 }
 
 export async function revokeInvitation(id: string): Promise<void> {
@@ -102,10 +131,10 @@ export async function acceptInvitation(
 }
 
 /** A one-time link for a member who forgot their password; valid 24 h, shown only now. */
-export async function makePasswordReset(id: string): Promise<{ link: string; expires_at: string }> {
+export async function makePasswordReset(id: string): Promise<{ link: OneTimeLink; expires_at: string }> {
   const r = await check(await backendFetch(`/api/team/members/${encodeURIComponent(id)}/password-reset`, { method: "POST" }));
-  const body = (await r.json()) as { link_path: string; expires_at: string };
-  return { link: `${location.origin}${body.link_path}`, expires_at: body.expires_at };
+  const body = (await r.json()) as { link_path: string; expires_at: string; base_url: string | null };
+  return { link: { path: body.link_path, base: body.base_url }, expires_at: body.expires_at };
 }
 
 export interface ResetInfo {

@@ -330,7 +330,7 @@ export function VlmPanel({
         <button type="button" onClick={analyze} disabled={!canAsk || busy}
           className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-accent/40 bg-good-bg py-2 text-[13px] font-bold text-good-fg transition hover:border-accent active:scale-[.98] disabled:cursor-default disabled:opacity-50">
           <IconScan size={17} />Find objects
-          <span className="font-semibold opacity-70">· {scope}</span>
+          <span className="font-semibold opacity-70" title="Scope · prompt variant (change them under the settings)">· {scope} · {variant}</span>
         </button>
 
         <div className="rounded-xl border border-line bg-bg transition focus-within:border-accent">

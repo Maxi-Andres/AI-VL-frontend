@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import {
+  IconAlertTriangle,
   IconCheck,
   IconCopy,
   IconLink,
@@ -11,8 +12,10 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import type { Role } from "../../api/auth";
-import { getTeam, invite, makePasswordReset, revokeInvitation, updateMember } from "../../api/team";
-import type { Invitation, Member, Team } from "../../api/team";
+import {
+  getAddress, getTeam, invite, linkUrl, makePasswordReset, onLocalAddress, revokeInvitation, setAddress, updateMember,
+} from "../../api/team";
+import type { Invitation, Member, OneTimeLink, ServerAddress, Team } from "../../api/team";
 import { useMe } from "../../auth/AuthContext";
 import { ROLES, ROLE_LABEL, ROLE_RANK } from "../../auth/roles";
 import { Avatar } from "../ui/Avatar";
@@ -45,7 +48,7 @@ export function TeamSettings() {
   const [error, setError] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
   const [confirm, setConfirm] = useState<{ text: string; run: () => Promise<void> } | null>(null);
-  const [shared, setShared] = useState<{ title: string; to: string; link: string; valid: string } | null>(null);
+  const [shared, setShared] = useState<{ title: string; to: string; link: OneTimeLink; valid: string } | null>(null);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -94,6 +97,8 @@ export function TeamSettings() {
           </button>
         </div>
       )}
+
+      <LinkAddress />
 
       {me.role === "owner" && team && team.members.filter((m) => m.role === "owner" && m.active).length === 1 && (
         <div className="mb-4 flex items-start gap-3 rounded-xl border border-warn-fg/30 bg-warn-bg px-4 py-3 text-sm">
@@ -325,14 +330,19 @@ function ConfirmDialog({ text, onCancel, onConfirm }: {
 }
 
 /** A one-time link (invitation or password reset) to hand over. Shown once: only its hash is
- * kept on the server, so closing this is the last chance to copy it. */
+ * kept on the server, so closing this is the last chance to copy it. Built on the company's
+ * address; when there is none and this page runs on localhost, it says so and offers this
+ * server's real addresses — a localhost link opens on no one else's computer. */
 function LinkDialog({ title, to, link, valid, onClose }: {
-  title: string; to: string; link: string; valid: string; onClose: () => void;
+  title: string; to: string; link: OneTimeLink; valid: string; onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [base, setBase] = useState(link.base);
+  const [changing, setChanging] = useState(!link.base && onLocalAddress());
+  const url = linkUrl({ ...link, base });
   async function copy() {
     try {
-      await navigator.clipboard.writeText(link);
+      await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch {
@@ -345,9 +355,15 @@ function LinkDialog({ title, to, link, valid, onClose }: {
         Send this link to <b className="text-fg">{to}</b> by email or chat. It works once and
         expires in {valid}. For safety it is shown only now.
       </p>
-      <div className="mb-5 flex items-center gap-2 rounded-lg border border-line bg-bg py-1.5 pr-1.5 pl-3">
+      {!base && onLocalAddress() && (
+        <div className="mb-3 flex items-start gap-2 rounded-lg border border-warn-fg/30 bg-warn-bg px-3 py-2 text-[12.5px] text-warn-fg">
+          <IconAlertTriangle size={16} className="mt-px shrink-0" />
+          <span>This link uses <b>localhost</b>, which opens only on this computer. Pick the address people reach Pilot on — it is kept for every link from now on.</span>
+        </div>
+      )}
+      <div className="mb-2 flex items-center gap-2 rounded-lg border border-line bg-bg py-1.5 pr-1.5 pl-3">
         <IconLink size={16} className="shrink-0 text-muted" />
-        <input readOnly value={link} onFocus={(e) => e.target.select()}
+        <input readOnly value={url} onFocus={(e) => e.target.select()}
           className="min-w-0 flex-1 bg-transparent font-mono text-xs text-fg outline-none" />
         <button onClick={copy}
           className="flex cursor-pointer items-center gap-1.5 rounded-md bg-accent px-2.5 py-1.5 text-xs font-semibold text-on-accent">
@@ -355,10 +371,104 @@ function LinkDialog({ title, to, link, valid, onClose }: {
           {copied ? "Copied" : "Copy"}
         </button>
       </div>
-      <div className="flex justify-end">
+      {changing ? (
+        <AddressPicker current={base} onSaved={(u) => { setBase(u); setChanging(false); }} />
+      ) : (
+        <p className="m-0 text-xs text-dim">
+          Points to {base ?? location.origin} ·{" "}
+          <button type="button" onClick={() => setChanging(true)} className="cursor-pointer font-bold text-accent hover:underline">Change</button>
+        </p>
+      )}
+      <div className="mt-5 flex justify-end">
         <button onClick={onClose} className="cursor-pointer rounded-lg px-3.5 py-2 text-sm font-semibold text-fg hover:bg-bg">Done</button>
       </div>
     </Dialog>
+  );
+}
+
+/** Choose the address links point to: one of this server's own, or typed. Saved for the
+ * company, so it is chosen once. */
+function AddressPicker({ current, onSaved }: { current: string | null; onSaved: (url: string | null) => void }) {
+  const [info, setInfo] = useState<ServerAddress | null>(null);
+  const [custom, setCustom] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const ctl = new AbortController();
+    getAddress(ctl.signal).then(setInfo).catch((e) => !ctl.signal.aborted && setError(errorText(e)));
+    return () => ctl.abort();
+  }, []);
+
+  async function save(url: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const saved = await setAddress(url);
+      onSaved(saved);
+      // Every other place showing it (the row in Settings) follows at once.
+      window.dispatchEvent(new CustomEvent(ADDRESS_CHANGED, { detail: saved }));
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="grid gap-1.5">
+      {!info && !error && <p className="m-0 text-xs text-muted"><IconLoader2 size={14} className="inline animate-spin" /> Finding this server's addresses…</p>}
+      {info?.candidates.map((c) => (
+        <button key={c.url} type="button" disabled={busy} onClick={() => void save(c.url)}
+          className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition hover:border-accent disabled:opacity-50 ${
+            current === c.url ? "border-accent bg-good-bg" : "border-line"}`}>
+          <span className="min-w-0 flex-1">
+            <b className="block truncate font-mono text-[12.5px]">{c.url}</b>
+            <small className="block text-[11.5px] text-muted">{c.label}</small>
+          </span>
+          {current === c.url && <IconCheck size={15} className="shrink-0 text-accent" />}
+        </button>
+      ))}
+      <form className="flex gap-1.5" onSubmit={(e) => { e.preventDefault(); if (custom.trim()) void save(custom); }}>
+        <input value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="Or type it: https://pilot.company.com"
+          className="min-w-0 flex-1 rounded-lg border border-line bg-bg px-3 py-1.5 text-xs text-fg focus:border-accent focus:outline-none" />
+        <button type="submit" disabled={busy || !custom.trim()}
+          className="cursor-pointer rounded-lg bg-fg px-3 text-xs font-bold text-bg disabled:opacity-40">Use</button>
+      </form>
+      {error && <p role="alert" className="m-0 text-xs text-danger">{error}</p>}
+    </div>
+  );
+}
+
+const ADDRESS_CHANGED = "pilot:linkAddress";
+
+/** Settings → Team: the address links point to, with a way to change it. */
+function LinkAddress() {
+  const [url, setUrl] = useState<string | null | undefined>(undefined);
+  const [changing, setChanging] = useState(false);
+  useEffect(() => {
+    const ctl = new AbortController();
+    getAddress(ctl.signal).then((a) => setUrl(a.public_url)).catch(() => setUrl(null));
+    const changed = (e: Event) => setUrl((e as CustomEvent<string | null>).detail);
+    window.addEventListener(ADDRESS_CHANGED, changed);
+    return () => {
+      ctl.abort();
+      window.removeEventListener(ADDRESS_CHANGED, changed);
+    };
+  }, []);
+  if (url === undefined) return null;
+  return (
+    <div className={`mb-4 rounded-xl border px-4 py-3 ${!url && onLocalAddress() ? "border-warn-fg/30 bg-warn-bg" : "border-line bg-panel"}`}>
+      <div className="flex flex-wrap items-center gap-2 text-[13px]">
+        <IconLink size={16} className="text-muted" />
+        <b>Invitation links point to</b>
+        <span className="font-mono text-[12.5px] text-muted">{url ?? `${location.origin} (this page — not set)`}</span>
+        <button type="button" onClick={() => setChanging((v) => !v)} className="ml-auto cursor-pointer text-xs font-bold text-accent hover:underline">
+          {changing ? "Close" : "Change"}
+        </button>
+      </div>
+      {changing && <div className="mt-3"><AddressPicker current={url} onSaved={(u) => { setUrl(u); setChanging(false); }} /></div>}
+    </div>
   );
 }
 
@@ -367,7 +477,7 @@ function InviteDialog({ roles, onClose }: { roles: typeof ROLES; onClose: () => 
   const [role, setRole] = useState<Role>("operator");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [link, setLink] = useState<string | null>(null);
+  const [link, setLink] = useState<OneTimeLink | null>(null);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
