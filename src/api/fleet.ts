@@ -46,7 +46,8 @@ export interface Fleet {
   satellite: string | null;
 }
 
-async function check(r: Response): Promise<Response> {
+/** A failed response as an error the person can read (the backend writes `detail` for people). */
+export async function check(r: Response): Promise<Response> {
   if (r.ok) return r;
   let message = `Something went wrong (${r.status}).`;
   try {
@@ -59,7 +60,7 @@ async function check(r: Response): Promise<Response> {
   throw new AuthError(r.status, message);
 }
 
-const json = (method: string, body: unknown): RequestInit => ({
+export const json = (method: string, body: unknown): RequestInit => ({
   method,
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify(body),

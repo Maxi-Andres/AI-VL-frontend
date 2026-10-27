@@ -23,6 +23,7 @@ import { useDetectionSocket } from "../hooks/useDetectionSocket";
 import { useOptions } from "../hooks/useOptions";
 import { usePresence } from "../hooks/usePresence";
 import { useRobotVolume } from "../hooks/useRobotVolume";
+import { useChats } from "../hooks/useChats";
 import { setSpeechVolume, useSpeechVolume } from "../lib/speechVolume";
 import { useVideoTransport } from "../components/layout/VideoTransportContext";
 import { VideoTransportSwitch } from "../components/live/VideoTransportSwitch";
@@ -76,7 +77,9 @@ export function LivePage() {
   const can = useCan();
   const mayAnalyze = can("analyze");
   const mayOperate = can("operate");
-  const [source, setSource] = useState<"own" | "robot" | "view">(mayAnalyze ? "own" : "view");
+  // Live is the robot's console: it opens on the robot camera for whoever may start it, a
+  // mirror for whoever may only watch. This device's webcam is a choice, never the default.
+  const [source, setSource] = useState<"own" | "robot" | "view">(mayOperate ? "robot" : "view");
   // Presentation only: which side-panel tab is open, and the robot camera's settings menu.
   const [panel, setPanel] = useState<"vlm" | "yolo" | "command">("vlm");
   const [videoMenu, setVideoMenu] = useState(false);
@@ -344,7 +347,7 @@ export function LivePage() {
   }, [stop]);
 
   // Use this device's own webcam (producer). Stops the robot camera if we started it.
-  const useOwnCamera = useCallback(async () => {
+  const chooseOwnCamera = useCallback(async () => {
     if (source === "robot") {
       try { await setRobotCamera("stop"); } catch { /* ignore */ }
     }
@@ -353,7 +356,7 @@ export function LivePage() {
   }, [source]);
 
   // Use the robot camera: stop our webcam, start the bridge, view via /ws/view.
-  const useRobotCam = useCallback(async () => {
+  const chooseRobotCamera = useCallback(async () => {
     handleStop();
     setSource("robot");
     setRobotCamStatus({ tone: "busy", text: "Starting robot camera…" });
@@ -368,9 +371,19 @@ export function LivePage() {
     }
   }, [handleStop]);
 
+  // Opening on the robot camera starts it, as choosing it does.
+  const opened = useRef(false);
+  useEffect(() => {
+    if (opened.current) return;
+    opened.current = true;
+    if (source === "robot") void chooseRobotCamera();
+    // Once, on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Mirror the session read-only (what the old Monitor did): view /ws/view without
   // producing or starting the robot camera.
-  const useMirror = useCallback(async () => {
+  const chooseMirror = useCallback(async () => {
     handleStop();
     if (source === "robot") {
       try { await setRobotCamera("stop"); } catch { /* ignore */ }
@@ -505,6 +518,9 @@ export function LivePage() {
   // read-aloud button.
   const { va, registerAsk } = useVoiceAssistantContext();
   const { presence } = usePresence();
+  // The assistant's conversations, kept per person on the server: they survive a camera switch,
+  // a reload or another computer.
+  const chats = useChats(mayAnalyze);
   // Spoken answers' volume: the robot speaker's when it speaks through the robot, else this
   // device's.
   const toRobotSpeaker = va.speechOutput === "robot" && va.robotSpeaker;
@@ -756,9 +772,9 @@ export function LivePage() {
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="flex rounded-xl bg-subtle p-1">
             {([
-              ["own", "My camera", IconDeviceLaptop, mayAnalyze, useOwnCamera],
-              ["robot", "Robot camera", IconVideo, mayOperate, useRobotCam],
-              ["view", "View only", IconEye, true, useMirror],
+              ["own", "My camera", IconDeviceLaptop, mayAnalyze, chooseOwnCamera],
+              ["robot", "Robot camera", IconVideo, mayOperate, chooseRobotCamera],
+              ["view", "View only", IconEye, true, chooseMirror],
             ] as const).filter((b) => b[3]).map(([id, label, Icon, , go]) => (
               <button key={id} type="button" onClick={() => void go()}
                 className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-bold transition ${
@@ -843,6 +859,16 @@ export function LivePage() {
           <div className={`min-h-0 flex-1 p-4 ${panel === "vlm" ? "flex flex-col" : "overflow-y-auto"}`}>
             <div className={panel === "vlm" ? "flex min-h-[520px] flex-1 flex-col lg:min-h-0" : "hidden"}>
               <VlmPanel
+                chat={{
+                  chats: chats.chats,
+                  current: chats.current,
+                  history: chats.history,
+                  version: chats.version,
+                  error: chats.error,
+                  onOpen: (id) => void chats.open(id),
+                  onDelete: (id) => void chats.remove(id),
+                  onSave: (msg) => chats.save({ ...msg, robot: source === "own" ? "" : cmdRobot }),
+                }}
                 models={options.vlm_models}
                 scopes={Object.keys(options.scopes)}
                 variants={variants}

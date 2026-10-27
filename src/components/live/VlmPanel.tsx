@@ -6,6 +6,8 @@ import {
   IconChevronDown,
   IconHeadset,
   IconHeadsetOff,
+  IconMessages,
+  IconPlus,
   IconMessage,
   IconMessageOff,
   IconMicrophone,
@@ -18,6 +20,8 @@ import {
   IconVolume,
   IconVolumeOff,
 } from "@tabler/icons-react";
+import type { ChatMessage, ChatSummary, NewMessage } from "../../api/chats";
+import { DropMenu, useDropdown } from "../ui/DropMenu";
 import { Select } from "../ui/Select";
 import { StatusText } from "../ui/StatusText";
 
@@ -82,7 +86,23 @@ export interface VoiceControls {
   robotSpeakerError: string | null;
 }
 
+/** The person's saved conversations (useChats): this panel shows one and saves to it. */
+export interface ChatControls {
+  chats: ChatSummary[];
+  current: string | null;
+  /** The open conversation's messages, as loaded. */
+  history: ChatMessage[];
+  /** Changes when another conversation is opened or a new one started. */
+  version: number;
+  error: string | null;
+  onOpen: (id: string | null) => void;
+  onDelete: (id: string) => void;
+  /** Keep a finished exchange (the robot it was about is added by the page). */
+  onSave: (msg: Omit<NewMessage, "robot">) => void;
+}
+
 interface Props {
+  chat: ChatControls;
   models: string[];
   scopes: string[];
   variants: string[];
@@ -152,6 +172,7 @@ const failed = (status: string) => /^(Error|Request failed)/.test(status);
  * with the answer when it ends.
  */
 export function VlmPanel({
+  chat,
   models,
   scopes,
   variants,
@@ -179,7 +200,10 @@ export function VlmPanel({
   const hearing = voice.phase === "recording" || voice.phase === "transcribing";
   const pending = useRef<Turn["kind"] | null>(null);
   const wasBusy = useRef(false);
-  const nextId = useRef(1);
+  // Ids for turns made here, apart from the saved messages' ids.
+  const nextId = useRef(1_000_000);
+  // What the open turn asked, for saving it once the answer is in.
+  const asked = useRef<{ kind: Turn["kind"]; question: string } | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   // Follow the newest message — unless the person scrolled up to read an older one; sending
@@ -193,14 +217,30 @@ export function VlmPanel({
       pending.current = null;
       const question = kind === "analysis" ? `${scope} · ${variant}` : prompt.trim() || "(spoken question)";
       setTurns((t) => [...t, { id: nextId.current++, kind, question, answer: "", status: "", done: false }]);
+      asked.current = { kind, question };
       if (kind === "question") onPromptChange("");
     } else if (!busy && wasBusy.current) {
       setTurns((t) => t.map((x, i) => (i === t.length - 1 ? { ...x, answer: output, status, done: true } : x)));
+      // Kept for good: an answer, or what went wrong — not an empty turn that was cut short.
+      if (asked.current && (output.trim() || status)) chat.onSave({ ...asked.current, answer: output, status });
+      asked.current = null;
     }
     wasBusy.current = busy;
     // Only the edges of `busy` open and close turns; the rest is read at that moment.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [busy]);
+
+  // Another conversation opened (or a new one): show its history, from the bottom.
+  useEffect(() => {
+    setTurns(chat.history.map((m) => ({ id: m.id, kind: m.kind, question: m.question, answer: m.answer, status: m.status, done: true })));
+    stick.current = true;
+    requestAnimationFrame(() => {
+      const el = scroller.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+    // Only on a switch: `history` also follows saves, which must not reload the view.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chat.version]);
 
   // While a turn is open, its answer is the stream as it arrives.
   const live = busy ? { answer: output, status } : null;
@@ -240,6 +280,7 @@ export function VlmPanel({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      <Conversations chat={chat} busy={busy} />
       <div ref={scroller} className="-mx-1 min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-1"
         onScroll={(e) => {
           const el = e.currentTarget;
@@ -268,12 +309,6 @@ export function VlmPanel({
             </div>
           ) : (
             <div className="grid grid-cols-[minmax(0,1fr)] gap-4 pb-1">
-              <div className="flex justify-end">
-                <button type="button" onClick={() => setTurns([])} disabled={busy}
-                  className="flex cursor-pointer items-center gap-1 text-[11.5px] font-bold text-dim hover:text-fg disabled:opacity-40">
-                  <IconTrash size={13} />Clear
-                </button>
-              </div>
               {turns.map((t, i) => {
                 const last = i === turns.length - 1;
                 const answer = last && live ? live.answer : t.answer;
@@ -579,6 +614,66 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
         {hint && <small className="block text-[11px] leading-snug text-dim">{hint}</small>}
       </div>
       <div className="shrink-0">{children}</div>
+    </div>
+  );
+}
+
+function ago(iso: string): string {
+  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m} min ago`;
+  if (m < 1440) return `${Math.floor(m / 60)} h ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+/** Which conversation is open, the others to switch to, a new one, and deleting. */
+function Conversations({ chat, busy }: { chat: ChatControls; busy: boolean }) {
+  const { open, setOpen, ref } = useDropdown();
+  const [confirm, setConfirm] = useState<string | null>(null);
+  const title = chat.chats.find((c) => c.id === chat.current)?.title ?? "New conversation";
+  return (
+    <div className="mb-2 flex items-center gap-1.5">
+      <div ref={ref} className="relative min-w-0 flex-1">
+        <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} disabled={busy}
+          className="flex w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12.5px] font-bold transition hover:bg-subtle disabled:cursor-default disabled:opacity-60">
+          <IconMessages size={15} className="shrink-0 text-muted" />
+          <span className="min-w-0 truncate">{title}</span>
+          {chat.chats.length > 0 && <span className="shrink-0 text-[11px] font-semibold text-dim">{chat.chats.length}</span>}
+          <IconChevronDown size={14} className={`ml-auto shrink-0 text-dim transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+        <DropMenu open={open} className="top-9 right-auto left-0 w-full">
+          {chat.chats.length === 0 && <p className="m-0 px-2.5 py-3 text-center text-[12.5px] text-muted">No saved conversations yet.</p>}
+          <ul className="m-0 max-h-[320px] list-none overflow-y-auto p-0">
+            {chat.chats.map((c) => (
+              <li key={c.id} className={`group flex items-center gap-1 rounded-[9px] ${c.id === chat.current ? "bg-subtle" : "hover:bg-subtle"}`}>
+                <button type="button" onClick={() => { chat.onOpen(c.id); setOpen(false); setConfirm(null); }}
+                  className="min-w-0 flex-1 cursor-pointer px-2.5 py-2 text-left">
+                  <b className="block truncate text-[12.5px]">{c.title || "Untitled"}</b>
+                  <small className="block text-[11px] text-dim">{ago(c.updated_at)}{c.messages ? ` · ${c.messages} message${c.messages === 1 ? "" : "s"}` : ""}</small>
+                </button>
+                {confirm === c.id ? (
+                  <button type="button" onClick={() => { chat.onDelete(c.id); setConfirm(null); }}
+                    className="mr-1.5 shrink-0 cursor-pointer rounded-md bg-bad-bg px-2 py-1 text-[11px] font-bold text-bad-fg">
+                    Delete
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => setConfirm(c.id)} aria-label={`Delete ${c.title}`} title="Delete this conversation"
+                    className="mr-1 grid size-7 shrink-0 cursor-pointer place-items-center rounded-md text-dim opacity-60 transition group-hover:opacity-100 hover:bg-bad-bg hover:text-bad-fg">
+                    <IconTrash size={14} />
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </DropMenu>
+      </div>
+      <button type="button" onClick={() => chat.onOpen(null)} disabled={busy || chat.current === null} title="New conversation"
+        className="flex shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-line px-2.5 py-1.5 text-[12px] font-bold transition hover:bg-subtle active:scale-95 disabled:cursor-default disabled:opacity-40">
+        <IconPlus size={14} />New
+      </button>
+      {chat.error && (
+        <span role="alert" title={chat.error} className="max-w-[40%] shrink truncate text-[11px] font-semibold text-bad-fg">{chat.error}</span>
+      )}
     </div>
   );
 }

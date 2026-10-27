@@ -1,0 +1,108 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { addMessage, deleteChat, getChat, listChats } from "../api/chats";
+import type { ChatMessage, ChatSummary, NewMessage } from "../api/chats";
+
+const LAST = "pilot.chat"; // the conversation this browser had open last
+
+/**
+ * The person's conversations with the vision assistant, kept on the server: the list, the one
+ * open, and what it said. A new chat exists only once its first message is saved. `version`
+ * changes when another conversation is opened (or a new one started) — not when a message is
+ * saved — so the chat view reloads its history exactly then.
+ *
+ * Saves run one after another: a second answer that lands while the first message is still
+ * making the chat goes into that same chat, not into a new one.
+ */
+export function useChats(enabled: boolean) {
+  const [chats, setChats] = useState<ChatSummary[]>([]);
+  const [current, setCurrent] = useState<string | null>(null);
+  const [history, setHistory] = useState<ChatMessage[]>([]);
+  const [version, setVersion] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const currentRef = useRef<string | null>(null);
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+
+  const refresh = useCallback(async (signal?: AbortSignal) => {
+    const list = await listChats(signal);
+    setChats(list);
+    return list;
+  }, []);
+
+  const open = useCallback(async (id: string | null, signal?: AbortSignal) => {
+    currentRef.current = id;
+    setCurrent(id);
+    try {
+      if (id) localStorage.setItem(LAST, id);
+      else localStorage.removeItem(LAST);
+    } catch {
+      /* private mode */
+    }
+    if (!id) {
+      setHistory([]);
+      setVersion((v) => v + 1);
+      return;
+    }
+    try {
+      const chat = await getChat(id, signal);
+      setHistory(chat.messages);
+      setError(null);
+    } catch (e) {
+      if (signal?.aborted) return;
+      setHistory([]);
+      setError(e instanceof Error ? e.message : "Could not open the conversation.");
+    }
+    setVersion((v) => v + 1);
+  }, []);
+
+  // On arrival: the conversation this browser had open, else the latest one.
+  useEffect(() => {
+    if (!enabled) return;
+    const ctl = new AbortController();
+    refresh(ctl.signal)
+      .then((list) => {
+        let last: string | null = null;
+        try {
+          last = localStorage.getItem(LAST);
+        } catch {
+          /* private mode */
+        }
+        const pick = list.find((c) => c.id === last)?.id ?? list[0]?.id ?? null;
+        return open(pick, ctl.signal);
+      })
+      .catch(() => undefined);
+    return () => ctl.abort();
+  }, [enabled, refresh, open]);
+
+  const save = useCallback((msg: NewMessage) => {
+    queue.current = queue.current.then(async () => {
+      try {
+        const chat = await addMessage(currentRef.current, msg);
+        if (currentRef.current !== chat.id) {
+          currentRef.current = chat.id; // the chat this first message made; no reload
+          setCurrent(chat.id);
+          try {
+            localStorage.setItem(LAST, chat.id);
+          } catch {
+            /* private mode */
+          }
+        }
+        setError(null);
+        await refresh();
+      } catch (e) {
+        setError(e instanceof Error ? `Not saved: ${e.message}` : "Not saved.");
+      }
+    });
+  }, [refresh]);
+
+  const remove = useCallback(async (id: string) => {
+    try {
+      await deleteChat(id);
+      const list = await refresh();
+      if (currentRef.current === id) await open(list[0]?.id ?? null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not delete it.");
+    }
+  }, [refresh, open]);
+
+  return { chats, current, history, version, error, open, startNew: () => void open(null), save, remove };
+}
