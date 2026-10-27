@@ -1,14 +1,18 @@
+import type { ReactNode } from "react";
 import {
   IconAlertTriangle,
+  IconArrowUp,
+  IconBolt,
+  IconFlask,
   IconMicrophone,
-  IconMicrophoneOff,
-  IconPlayerStopFilled,
+  IconOctagon,
+  IconPlayerPlay,
+  IconQuestionMark,
 } from "@tabler/icons-react";
 import { StatusText, type Status } from "../ui/StatusText";
+import { Switch } from "../ui/Switch";
 import type { CommandResponse } from "../../types";
-import { Button } from "../ui/Button";
-import { Field } from "../ui/Field";
-import { Select } from "../ui/Select";
+import { fmtMs } from "../../lib/format";
 
 interface Props {
   // Robot is selected globally in the header (see RobotContext); not a prop here.
@@ -48,10 +52,11 @@ interface Props {
 }
 
 /**
- * Robot command interpreter (verification view). Type or speak a command and see
- * which SKILL the interpreter picks and the exact JSON it would hand to the robot
- * executor — so you can check it chooses correctly BEFORE anything moves. It does
- * not drive the robot; it only shows the decision.
+ * The command interpreter, as in the mockup: one phrase in (typed or spoken), the ONE skill it
+ * maps to out — shown as a skill with its parameters and what the robot would say, so a wrong
+ * pick is easy to spot before anything moves; the exact JSON stays folded below it. Nothing is
+ * sent until "Robot" is switched on; "Auto" fires on every interpretation; "Safe" blocks the
+ * acrobatics. STOP is always there, whatever the switches say.
  */
 export function CommandPanel({
   models,
@@ -77,183 +82,150 @@ export function CommandPanel({
   safeMode,
   onToggleSafeMode,
 }: Props) {
-  const canExecute = !!result && result.skill !== "unknown";
-  // Show only the robot-facing decision (not the raw model/debug fields).
-  const decision = result
-    ? { skill: result.skill, params: result.params, say: result.say }
-    : null;
+  const understood = !!result && result.skill !== "unknown";
+  const canExecute = understood && execEnabled && !executing;
+  // Only the robot-facing decision, not the model's debug fields.
+  const decision = result ? { skill: result.skill, params: result.params, say: result.say } : null;
+  const params = result ? Object.entries(result.params ?? {}) : [];
+  const failed = /^(Error|Request failed)/i.test(status);
 
   return (
-    <div>
-      <h2 className="m-0 mb-3 flex items-center gap-2 text-[13.5px] font-extrabold text-fg">
-        One phrase, one robot skill
-        <span className="rounded-full bg-warn-bg px-2 py-0.5 text-[11px] font-bold text-warn-fg">Experimental</span>
-      </h2>
+    <div className="grid gap-3">
+      <div className="flex items-start gap-2.5 rounded-xl bg-warn-bg px-3 py-2.5 text-[12.5px] text-warn-fg">
+        <IconFlask size={17} className="mt-px shrink-0" />
+        <p className="m-0"><b>Experimental</b> · turns one phrase into one robot skill. Not autonomous.</p>
+      </div>
 
-      <Field
-        label="Model"
-        hint="An *-instruct model answers fastest (no reasoning step)."
-      >
-        <Select
-          options={models}
-          value={model}
-          onChange={(e) => onModelChange(e.target.value)}
-        />
-      </Field>
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <b className="block text-[13px]">Model</b>
+          <small className="block text-[11.5px] text-dim">An *-instruct model answers fastest</small>
+        </div>
+        <select value={model} onChange={(e) => onModelChange(e.target.value)} aria-label="Model"
+          className="w-40 shrink-0 rounded-lg border border-line bg-bg px-2 py-1.5 text-xs font-semibold text-fg focus:border-accent focus:outline-none">
+          {models.map((m) => <option key={m} value={m}>{m}</option>)}
+        </select>
+      </div>
 
-      <Field
-        label="Command"
-        hint='Type a command (Spanish or English), e.g. "andá para adelante", "pará", "saludá".'
-      >
-        <textarea
-          value={text}
-          onChange={(e) => onTextChange(e.target.value)}
+      {/* The phrase */}
+      <div className="rounded-[14px] border border-line bg-bg transition focus-within:border-accent focus-within:shadow-[0_0_0_4px_var(--color-good-bg)]">
+        <textarea value={text} onChange={(e) => onTextChange(e.target.value)} rows={2} aria-label="Command"
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               if (text.trim() && !busy) onInterpret();
             }
           }}
-          placeholder="e.g. levantá las manos"
-          rows={2}
-          className="w-full resize-y rounded-md border border-line bg-sunken p-2 font-mono text-xs leading-[1.4]"
-        />
-      </Field>
-
-      <div className="mb-2 flex flex-wrap gap-2">
-        <Button
-          variant="accent"
-          className="flex-1"
-          disabled={busy || !text.trim()}
-          onClick={onInterpret}
-        >
-          Interpret
-        </Button>
-        {micSupported && (
-          <Button
-            variant={recording ? "primary" : "secondary"}
-            className="inline-flex items-center gap-1.5 px-2.5"
-            disabled={busy && !recording}
-            aria-pressed={recording}
-            title="Speak one command; it gets transcribed and interpreted"
-            onClick={onRecord}
-          >
-            {recording ? (
-              <IconMicrophone size={16} stroke={2} />
-            ) : (
-              <IconMicrophoneOff size={16} stroke={2} />
-            )}
-            {recording ? "Listening…" : "Speak"}
-          </Button>
-        )}
+          placeholder="e.g. levantá las manos · andá para adelante · pará · saludá"
+          className="block min-h-[64px] w-full resize-none bg-transparent px-3 pt-2.5 text-[13px] text-fg outline-none placeholder:text-dim" />
+        <div className="flex items-center gap-2 py-1.5 pr-1.5 pl-3">
+          <span className="flex-1 text-[11.5px] font-semibold text-dim">Spanish or English · Enter to interpret</span>
+          {micSupported && (
+            <button type="button" onClick={onRecord} disabled={busy && !recording} aria-pressed={recording}
+              title="Speak one command: it is transcribed and interpreted"
+              className={`flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12.5px] font-bold transition active:scale-95 disabled:cursor-default disabled:opacity-40 ${
+                recording ? "animate-pulse border-bad-fg/40 bg-bad-bg text-bad-fg" : "border-line hover:bg-subtle"}`}>
+              <IconMicrophone size={15} />{recording ? "Listening…" : "Speak"}
+            </button>
+          )}
+          <button type="button" onClick={onInterpret} disabled={busy || !text.trim()}
+            className="flex cursor-pointer items-center gap-1 rounded-lg bg-fg px-3 py-1.5 text-[12.5px] font-bold text-bg transition active:scale-95 disabled:cursor-default disabled:opacity-35">
+            {busy && !recording ? "Interpreting…" : "Interpret"}<IconArrowUp size={14} />
+          </button>
+        </div>
       </div>
 
-      <div className="mx-0 mt-2 mb-1 flex min-h-4 items-center gap-2 text-xs text-muted">
-        <span>{status}</span>
-      </div>
-
-      {/* The chosen skill, big and obvious, so a wrong pick is easy to spot. */}
+      {/* What it understood */}
+      {failed && !result && <p className="m-0 rounded-xl bg-bad-bg px-3 py-2 text-[12.5px] text-bad-fg">{status}</p>}
       {result && (
-        <div className="mb-2 flex items-baseline gap-2">
-          <span className="text-[11px] uppercase tracking-wide text-muted">
-            skill
-          </span>
-          <span
-            className={`font-mono text-sm font-semibold ${
-              result.skill === "unknown" ? "text-bad-fg" : "text-accent"
-            }`}
-          >
-            {result.skill}
-          </span>
+        <div key={`${result.understood}-${result.elapsed_ms}`}
+          className={`animate-rise rounded-2xl border p-3 ${understood ? "border-line bg-panel" : "border-bad-fg/30 bg-bad-bg"}`}>
+          <small className="block text-[10.5px] font-bold tracking-wider text-dim uppercase">
+            {understood ? "Interpreted as" : "Not understood"}
+          </small>
+          <div className="mt-1.5 flex items-center gap-2">
+            <span className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[12.5px] font-bold ${
+              understood ? "bg-good-bg text-good-fg" : "bg-panel text-bad-fg"}`}>
+              {understood ? <IconBolt size={14} /> : <IconQuestionMark size={14} />}
+              {result.skill}
+            </span>
+            <span className="ml-auto font-mono text-[11.5px] text-dim">{fmtMs(result.elapsed_ms)}</span>
+          </div>
+          {params.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {params.map(([k, v]) => (
+                <span key={k} className="rounded-md bg-subtle px-2 py-0.5 text-[11.5px]">
+                  <span className="text-muted">{k}</span> <b className="font-mono">{typeof v === "object" ? JSON.stringify(v) : String(v)}</b>
+                </span>
+              ))}
+            </div>
+          )}
+          {result.say && <p className="m-0 mt-2 text-[12.5px] text-muted">Robot says <span className="text-fg">“{result.say}”</span></p>}
+          {result.understood && <p className="m-0 mt-1 text-[11.5px] text-dim">Heard “{result.understood}”</p>}
+          <details className="mt-2 text-[11px] text-dim">
+            <summary className="cursor-pointer font-bold select-none hover:text-fg">What the robot receives</summary>
+            <pre className="m-0 mt-1 max-h-48 overflow-auto rounded-lg bg-subtle p-2 font-mono whitespace-pre-wrap text-muted">
+              {JSON.stringify(decision, null, 2)}
+            </pre>
+          </details>
         </div>
       )}
 
-      {result?.understood && (
-        <p className="m-0 mb-2 text-xs text-muted">
-          heard: <span className="text-fg">“{result.understood}”</span>
-        </p>
-      )}
-
-      {/* Exact JSON the robot executor receives. */}
-      <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-md border border-line bg-sunken p-2 font-mono text-xs leading-[1.4]">
-        {decision ? JSON.stringify(decision, null, 2) : ""}
-      </pre>
-
-      {/* EMERGENCY STOP — always available. Tells the server to halt all motion
-          now (cancels any move loop + StopMove), independent of the switches. */}
-      <Button
-        variant="secondary"
-        className="mt-3 w-full !bg-[#ef4444] !text-white py-2 text-sm font-bold hover:brightness-110"
-        onClick={onStop}
-        title="Halt the robot NOW — stop sending any movement"
-      >
-        <span className="inline-flex items-center gap-1.5">
-          <IconPlayerStopFilled size={15} stroke={2} />
-          STOP — quedate quieto
-        </span>
-      </Button>
-
-      {/* Execution switches, color-coded: green = safe, red = dangerous/acting,
-          amber = armed. "Robot" arms execution; "Auto" fires without the button;
-          "Safe" blocks acrobatics. */}
-      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        <Button
-          variant="secondary"
-          className={`px-2 py-1 text-[11px] ${execEnabled ? "!bg-[#f59e0b] !text-black" : ""}`}
-          aria-pressed={execEnabled}
-          title="Master switch: while off, no command is ever sent to the robot"
-          onClick={onToggleExecEnabled}
-        >
-          Robot {execEnabled ? "ON" : "OFF"}
-        </Button>
-        <Button
-          variant="secondary"
-          className={`px-2 py-1 text-[11px] ${autoRun ? "!bg-[#ef4444] !text-white" : ""}`}
-          aria-pressed={autoRun}
-          disabled={!execEnabled}
-          title="When on, an interpreted command runs automatically (no button)"
-          onClick={onToggleAutoRun}
-        >
-          Auto {autoRun ? "ON" : "OFF"}
-        </Button>
-        <Button
-          variant="secondary"
-          className={`px-2 py-1 text-[11px] ${
-            safeMode ? "!bg-[#22c55e] !text-black" : "!bg-[#ef4444] !text-white"}`}
-          aria-pressed={safeMode}
-          title="SAFE_MODE: block acrobatic skills (flips, handstand, walk-upright)"
-          onClick={onToggleSafeMode}
-        >
-          Safe {safeMode ? "ON" : "OFF"}
-        </Button>
+      {/* The three switches: whether anything reaches the robot, whether it fires by itself,
+          and whether acrobatics are blocked. Amber = armed, red = acts or unguarded. */}
+      <div className="grid grid-cols-3 gap-2">
+        <Gate label="Robot" on={execEnabled} onChange={onToggleExecEnabled} tone={execEnabled ? "warn" : "idle"}
+          state={execEnabled ? "Armed" : "Off"} title="Master switch: while off, no command is ever sent to the robot" />
+        <Gate label="Auto" on={autoRun} onChange={onToggleAutoRun} disabled={!execEnabled} tone={autoRun ? "bad" : "idle"}
+          state={autoRun ? "Runs at once" : "Off"} title="When on, an interpreted command runs automatically" />
+        <Gate label="Safe" on={safeMode} onChange={onToggleSafeMode} tone={safeMode ? "good" : "bad"}
+          state={safeMode ? "On" : "Acrobatics allowed"} title="Block acrobatic skills (flips, handstand, walk-upright)" />
       </div>
-      {/* Loud warnings when a dangerous mode is on. */}
-      {!safeMode && (
-        <p className="m-0 mt-1 flex items-center gap-1 text-[11px] font-semibold text-bad-fg">
-          <IconAlertTriangle size={13} stroke={2} className="shrink-0" />
-          Safe OFF — acrobatics (flips/handstand) enabled
-        </p>
-      )}
-      {execEnabled && autoRun && (
-        <p className="m-0 mt-1 flex items-center gap-1 text-[11px] font-semibold text-bad-fg">
-          <IconAlertTriangle size={13} stroke={2} className="shrink-0" />
-          Auto ON — runs on interpret, no button press needed
-        </p>
-      )}
+      {!safeMode && <Warn>Safe is off — flips and handstands can run.</Warn>}
+      {execEnabled && autoRun && <Warn>Auto is on — a command runs as soon as it is interpreted.</Warn>}
 
-      {/* Manual trigger (used when Auto is off, or to re-fire). */}
-      <Button
-        variant="primary"
-        className="mt-2 w-full"
-        disabled={!execEnabled || !canExecute || executing}
-        onClick={onExecuteOnRobot}
-        title={execEnabled
-          ? "Send this skill to the robot executor (the robot acts)"
-          : "Turn Robot ON to enable execution"}
-      >
-        {executing ? "Sending to robot…" : "Execute on robot"}
-      </Button>
-      <StatusText status={executeStatus} className="mt-1 text-xs text-muted" />
+      <button type="button" onClick={onExecuteOnRobot} disabled={!canExecute}
+        title={execEnabled ? "Send this skill to the robot (the robot acts)" : "Turn Robot on to enable execution"}
+        className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-fg text-[13px] font-bold text-bg transition active:scale-[.98] disabled:cursor-default disabled:bg-subtle disabled:text-dim">
+        <IconPlayerPlay size={17} />
+        {executing ? "Sending to the robot…" : execEnabled ? "Execute on robot" : "Turn Robot on to execute"}
+      </button>
+      <StatusText status={executeStatus} className="-mt-1 text-xs text-muted" />
+
+      {/* EMERGENCY STOP — always available, whatever the switches: the server halts all
+          motion now (cancels any move loop and stops the robot). */}
+      <button type="button" onClick={onStop} title="Halt the robot NOW — stop sending any movement"
+        className="flex h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-[#e5484e] to-[#c42f35] text-[13.5px] font-extrabold tracking-[.06em] text-white shadow-[0_8px_20px_-8px_rgba(217,63,69,.7),inset_0_1px_0_rgba(255,255,255,.2)] transition active:scale-[.97]">
+        <IconOctagon size={19} />STOP — stay still
+      </button>
     </div>
+  );
+}
+
+const TONE = {
+  good: "border-good-fg/30 bg-good-bg",
+  warn: "border-warn-fg/30 bg-warn-bg",
+  bad: "border-bad-fg/30 bg-bad-bg",
+  idle: "border-line bg-panel",
+};
+const TEXT = { good: "text-good-fg", warn: "text-warn-fg", bad: "text-bad-fg", idle: "text-dim" };
+
+function Gate({ label, on, onChange, state, tone, title, disabled = false }: {
+  label: string; on: boolean; onChange: () => void; state: string; tone: keyof typeof TONE; title: string; disabled?: boolean;
+}) {
+  return (
+    <div title={title} className={`flex flex-col items-center gap-1.5 rounded-xl border px-2 py-2.5 text-center transition-colors duration-300 ${TONE[tone]} ${disabled ? "opacity-50" : ""}`}>
+      <b className="text-[12.5px]">{label}</b>
+      <Switch on={on} onChange={() => onChange()} label={label} disabled={disabled} />
+      <small className={`text-[11px] leading-tight font-bold ${TEXT[tone]}`}>{state}</small>
+    </div>
+  );
+}
+
+function Warn({ children }: { children: ReactNode }) {
+  return (
+    <p className="-mt-1 m-0 flex items-center gap-1.5 text-[11.5px] font-semibold text-bad-fg">
+      <IconAlertTriangle size={14} className="shrink-0" />{children}
+    </p>
   );
 }
