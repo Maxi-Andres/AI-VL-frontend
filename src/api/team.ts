@@ -97,6 +97,11 @@ export async function updateMember(id: string, change: { role?: Role; active?: b
   await check(await backendFetch(`/api/team/members/${encodeURIComponent(id)}`, json("PATCH", change)));
 }
 
+/** Take someone out of the company for good: signed out at once, the account deleted. */
+export async function removeMember(id: string): Promise<void> {
+  await check(await backendFetch(`/api/team/members/${encodeURIComponent(id)}`, { method: "DELETE" }));
+}
+
 export interface InvitationInfo {
   email: string;
   role: Role;

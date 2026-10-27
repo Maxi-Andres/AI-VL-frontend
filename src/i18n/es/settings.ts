@@ -387,4 +387,6 @@ export const SETTINGS: Record<string, string> = {
   "Allow passwords from the internet": "Permitir contraseñas desde internet",
   "Off: from outside the company network people sign in with their work account (and its second factor); a password works only from the office, VPN or Tailscale.":
     "Apagado: desde fuera de la red de la empresa se entra con la cuenta de trabajo (y su segundo factor); la contraseña sirve solo desde la oficina, la VPN o Tailscale.",
+  "Remove {name} from {org}? They are signed out now and their account is deleted, with their conversations. To keep it for later, Disable instead.":
+    "¿Quitar a {name} de {org}? Se cierra su sesión ahora y se borra su cuenta, con sus conversaciones. Para conservarla, usa Desactivar.",
 };

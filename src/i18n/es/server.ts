@@ -68,4 +68,5 @@ export const SERVER: Record<string, string> = {
     "El proveedor de identidad no respondió para ese inquilino o emisor. Revísalo y vuelve a intentarlo.",
   "From outside the company network, sign in with your work account.":
     "Desde fuera de la red de la empresa, inicia sesión con tu cuenta de trabajo.",
+  "You cannot remove yourself.": "No puedes quitarte a ti mismo.",
 };

@@ -13,7 +13,7 @@ import {
 } from "@tabler/icons-react";
 import type { Role } from "../../api/auth";
 import {
-  getAddress, getTeam, invite, linkUrl, makePasswordReset, onLocalAddress, revokeInvitation, setAddress, updateMember,
+  getAddress, getTeam, invite, linkUrl, makePasswordReset, onLocalAddress, removeMember, revokeInvitation, setAddress, updateMember,
 } from "../../api/team";
 import type { Invitation, Member, OneTimeLink, ServerAddress, Team } from "../../api/team";
 import { useMe } from "../../auth/AuthContext";
@@ -205,6 +205,19 @@ export function TeamSettings() {
                       className="cursor-pointer rounded-md px-2.5 py-1 text-xs font-medium text-muted hover:bg-bg hover:text-fg"
                     >
                       {m.active ? t("Disable") : t("Enable")}
+                    </button>
+                  )}
+                  {editable(m) && (
+                    <button
+                      onClick={() =>
+                        act(
+                          t("Remove {name} from {org}? They are signed out now and their account is deleted, with their conversations. To keep it for later, Disable instead.", { name: m.name, org: me.org.name }),
+                          () => removeMember(m.id),
+                        )
+                      }
+                      className="cursor-pointer rounded-md px-2.5 py-1 text-xs font-medium text-danger hover:bg-bad-bg"
+                    >
+                      {t("Remove")}
                     </button>
                   )}
                 </td>
