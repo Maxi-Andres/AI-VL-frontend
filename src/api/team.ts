@@ -53,6 +53,18 @@ export async function getTeam(signal?: AbortSignal): Promise<Team> {
   return (await check(await backendFetch("/api/team", { signal }))).json();
 }
 
+export interface Online {
+  /** People with Pilot open right now (a request in the last few minutes). */
+  online: { id: string; name: string; color: string }[];
+  /** Active members in all. */
+  members: number;
+}
+
+/** Who has Pilot open, out of how many. Everyone may ask: names and colours only. */
+export async function getOnline(signal?: AbortSignal): Promise<Online> {
+  return (await check(await backendFetch("/api/team/online", { signal }))).json();
+}
+
 /** Returns the invitation and the link to hand over — the only time its token is visible. */
 export async function invite(email: string, role: Role): Promise<{ invitation: Invitation; link: string }> {
   const r = await check(await backendFetch("/api/team/invitations", json("POST", { email, role })));

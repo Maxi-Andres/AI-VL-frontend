@@ -11,7 +11,6 @@ import {
   IconPlus,
   IconRobot,
   IconSteeringWheel,
-  IconUserCheck,
   IconUserPlus,
   IconUsers,
   IconVideo,
@@ -19,8 +18,8 @@ import {
 import { getActivity, getFleet, planUrl } from "../api/fleet";
 import type { ActivityEvent, Fleet, FleetRobot, Site } from "../api/fleet";
 import { AuthError } from "../api/auth";
-import { getTeam } from "../api/team";
-import type { Team } from "../api/team";
+import { getOnline, getTeam } from "../api/team";
+import type { Online, Team } from "../api/team";
 import { useMe } from "../auth/AuthContext";
 import { useCan } from "../auth/permissions";
 import { usePresence } from "../hooks/usePresence";
@@ -83,6 +82,7 @@ export function FleetPage() {
   const net = useRobotTransports();
   const [fleet, setFleet] = useState<Fleet | null>(null);
   const [team, setTeam] = useState<Team | null>(null);
+  const [people, setPeople] = useState<Online | null>(null);
   const [activity, setActivity] = useState<ActivityEvent[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [siteIdx, setSiteIdx] = useState(0);
@@ -95,6 +95,7 @@ export function FleetPage() {
   // leaves the others on screen.
   const load = useCallback(async (signal?: AbortSignal) => {
     if (mayManage) getTeam(signal).then(setTeam).catch(() => undefined);
+    getOnline(signal).then(setPeople).catch(() => undefined);
     if (mayConfigure) getActivity(signal).then((p) => setActivity(p.events)).catch(() => undefined);
     try {
       setFleet(await getFleet(signal));
@@ -128,7 +129,7 @@ export function FleetPage() {
   const online = robots.filter((r) => presence && robotState(presence, r.slot, net).tone === "good").length;
   const site = sites[Math.min(siteIdx, Math.max(0, sites.length - 1))] ?? null;
   const cam = presence?.robot_cam;
-  const activeMembers = team?.members.filter((m) => m.active) ?? [];
+  const here = people?.online ?? [];
   const withPlan = sites.filter((s) => s.has_plan).length;
 
   const steps: { done: boolean; label: string; hint: string; go?: () => void; href?: string }[] =
@@ -162,16 +163,17 @@ export function FleetPage() {
         {/* The people and the two things to do next, grouped in one card (the mockup). Adding a
             robot is not here: the tile in the robot grid does that, once is enough. */}
         <div className="ml-auto flex animate-rise flex-wrap items-center gap-2 rounded-2xl border border-line bg-panel p-1.5 shadow-card">
-          {activeMembers.length > 1 && (
-            <div className="flex items-center gap-2 px-2 text-[13px] font-semibold text-muted">
+          {here.length > 0 && (
+            <div className="flex items-center gap-2 px-2 text-[13px] font-semibold text-muted"
+              title={here.map((m) => m.name).join(", ")}>
               <div className="flex">
-                {activeMembers.slice(0, 4).map((m, i) => (
+                {here.slice(0, 4).map((m, i) => (
                   <span key={m.id} style={{ zIndex: 10 - i }} className="-ml-2 rounded-full border-2 border-panel first:ml-0">
-                    <Avatar id={m.id} name={m.name || m.email} color={m.color} size={28} />
+                    <Avatar id={m.id} name={m.name} color={m.color} size={28} />
                   </span>
                 ))}
               </div>
-              {activeMembers.length} people
+              {here.length === 1 && here[0].id === me.user.id ? "Only you online" : `${here.length} online`}
             </div>
           )}
           {mayManage && (
@@ -195,14 +197,11 @@ export function FleetPage() {
         <Kpi delay={60} icon={<IconBuildingWarehouse size={17} />} tint="info" label="Sites"
           value={fleet ? sites.length : "—"} unit={sites.length ? `${withPlan} with a floor plan` : undefined}
           fill={sites.length ? withPlan / sites.length : 0} />
-        {team ? (
-          <Kpi delay={120} icon={<IconUsers size={17} />} tint="warn" label="Team"
-            value={activeMembers.length} unit={team.invitations.length ? `+${team.invitations.length} invited` : "active"}
-            fill={Math.min(1, activeMembers.length / 5)} />
-        ) : (
-          <Kpi delay={120} icon={<IconUserCheck size={17} />} tint="warn" label="Your access"
-            value={me.role[0].toUpperCase() + me.role.slice(1)} />
-        )}
+        {/* Who has Pilot open, out of the whole team: a full bar is everyone here. */}
+        <Kpi delay={120} icon={<IconUsers size={17} />} tint="warn" label="Team online"
+          value={people ? here.length : "—"}
+          unit={people ? `of ${people.members}${team?.invitations.length ? ` · +${team.invitations.length} invited` : ""}` : undefined}
+          fill={people?.members ? here.length / people.members : 0} />
         <Kpi delay={180} icon={<IconVideo size={17} />} tint="bad" label="Live video"
           value={cam?.live ? `${cam.fps ? Math.round(cam.fps) : "—"}` : "Off"} unit={cam?.live ? "fps" : undefined}
           fill={cam?.live && cam.fps ? Math.min(1, cam.fps / 15) : 0} />
