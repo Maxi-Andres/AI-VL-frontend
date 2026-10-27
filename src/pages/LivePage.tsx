@@ -11,6 +11,7 @@ import {
 } from "../api/backend";
 import { VideoStage } from "../components/live/VideoStage";
 import { RobotCameraStage } from "../components/live/RobotCameraStage";
+import { ClassChips } from "../components/live/ClassChips";
 import { YoloPanel } from "../components/live/YoloPanel";
 import { VLM_IMG_DEFAULT, VlmPanel } from "../components/live/VlmPanel";
 import { CommandPanel } from "../components/live/CommandPanel";
@@ -253,7 +254,10 @@ export function LivePage() {
     objects: robotObjects,
     getLastFrameBlob,
     sendConfig: sendViewConfig,
-  } = useRobotCameraView(viewing, yoloEnabled && !pairsLocally, applyServerConfig, cmdRobot);
+  } = useRobotCameraView(viewing, yoloEnabled && !pairsLocally, applyServerConfig, cmdRobot,
+    // The boxes the server computes on the robot's frames carry their inference time: the
+    // readings (inference, processed fps) come from them as they do from this page's own.
+    (det) => onResult({ type: "detections", objects: det.objects ?? [], elapsed_ms: det.elapsed_ms, n: det.n }));
 
   // The element showing the robot picture on the H.264 transports, or null on MJPEG (whose
   // picture IS the view socket's JPEG). The one place that answers "what is on screen".
@@ -701,12 +705,13 @@ export function LivePage() {
       ? videoDetail ? t("Robot camera · {detail}", { detail: videoDetail }) : t("Robot camera")
       : t("View only · mirroring the session");
   // Boxes on screen, counted per class, for the strip under the video.
+  // Most first, then by name: a stable order, so the chips do not swap places every frame.
   const perClass = Object.values(objects.reduce<Record<string, { label: string; n: number; color: string }>>((acc, o) => {
     const k = o.type;
     acc[k] ??= { label: k, n: 0, color: colorForObject(o) };
     acc[k].n += 1;
     return acc;
-  }, {}));
+  }, {})).sort((a, b) => b.n - a.n || a.label.localeCompare(b.label));
 
   const overlay = (
     <>
@@ -827,15 +832,7 @@ export function LivePage() {
           <Reading label={t("YOLO inference")} value={yoloEnabled && inferMs ? inferMs : "—"} unit={yoloEnabled && inferMs ? "ms" : undefined} />
           <Reading label={t("Objects")} value={yoloEnabled ? String(objects.length) : "—"} />
           <Reading label={t("Model")} value={yoloEnabled ? `${yoloModel.replace(/\.pt$/, "")} · ${imgsz}px` : t("Detection off")} />
-          <span className="flex-1" />
-          <div className="flex flex-wrap gap-1.5">
-            {perClass.map((c) => (
-              <span key={c.label} className="flex items-center gap-1.5 rounded-full bg-subtle px-2.5 py-1 text-xs font-bold">
-                <span className="size-2 rounded-sm" style={{ background: c.color }} />
-                {c.label} ×{c.n}
-              </span>
-            ))}
-          </div>
+          <ClassChips classes={perClass} className="ml-auto max-w-full flex-1 justify-end" />
         </div>
       </div>
 

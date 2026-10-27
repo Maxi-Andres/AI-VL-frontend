@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { WS_VIEW_URL } from "../config";
-import type { ConfigState, DetectedObject, ViewMessage, YoloConfig } from "../types";
+import type {
+  DetMessage, ConfigState, DetectedObject, ViewMessage, YoloConfig } from "../types";
 
 /**
  * Display the robot camera (or any /ws/view mirror) on a client that is NOT the
@@ -36,6 +37,8 @@ export function useRobotCameraView(
   enabled: boolean,
   onConfig?: (state: ConfigState) => void,
   resetKey = "",
+  /** Each detection result as it arrives (its inference time too, for the readings). */
+  onDetection?: (det: DetMessage) => void,
 ) {
   const [frameUrl, setFrameUrl] = useState("");
   const [connected, setConnected] = useState(false);
@@ -45,6 +48,8 @@ export function useRobotCameraView(
   enabledRef.current = enabled;
   const onConfigRef = useRef(onConfig);
   onConfigRef.current = onConfig;
+  const onDetectionRef = useRef(onDetection);
+  onDetectionRef.current = onDetection;
   const lastBlobRef = useRef<Blob | null>(null);
   const urlRef = useRef<string>(""); // current object URL, revoked on replace/cleanup
 
@@ -106,7 +111,10 @@ export function useRobotCameraView(
       }
       try {
         const m = JSON.parse(ev.data) as ViewMessage;
-        if (m.type === "det") setObjects(m.objects ?? []);
+        if (m.type === "det") {
+          setObjects(m.objects ?? []);
+          onDetectionRef.current?.(m);
+        }
         else if (m.type === "config") onConfigRef.current?.(m.state);
       } catch {
         /* ignore malformed messages */

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { IconCheck, IconScan, IconSearch, IconX } from "@tabler/icons-react";
+import { ClassChips } from "./ClassChips";
 import { Switch } from "../ui/Switch";
 import { Segmented } from "../ui/Segmented";
 import { msg, useT } from "../../i18n";
@@ -108,14 +109,13 @@ export function YoloPanel({
               <Stat label={t("Inference")} value={now.inferMs ?? "—"} unit={now.inferMs ? "ms" : undefined} />
               <Stat label={t("Processed")} value={now.fps ?? "—"} unit={now.fps ? "fps" : undefined} />
             </div>
-            <div className="mt-2.5 flex min-h-[26px] flex-wrap gap-1.5">
-              {now.perClass.length ? now.perClass.map((c) => (
-                <span key={c.label} className="flex animate-rise items-center gap-1.5 rounded-full bg-subtle px-2.5 py-1 text-xs font-bold">
-                  <span className="size-2 rounded-sm" style={{ background: c.color }} />
-                  {c.label}<span className="text-muted">×{c.n}</span>
-                </span>
-              )) : <span className="self-center text-xs text-dim">{classes.length ? t("Nothing in view of the chosen classes.") : t("Nothing in view.")}</span>}
-            </div>
+            {now.perClass.length ? (
+              <ClassChips classes={now.perClass} className="mt-2.5" />
+            ) : (
+              <p className="m-0 mt-2.5 flex h-[26px] items-center text-xs text-dim">
+                {classes.length ? t("Nothing in view of the chosen classes.") : t("Nothing in view.")}
+              </p>
+            )}
           </div>
         </div>
       </div>
