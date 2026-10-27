@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { addMessage, deleteChat, getChat, listChats } from "../api/chats";
+import { rememberPref } from "../lib/prefs";
 import type { ChatMessage, ChatSummary, NewMessage } from "../api/chats";
 
 const LAST = "pilot.chat"; // the conversation this browser had open last
@@ -32,8 +33,7 @@ export function useChats(enabled: boolean) {
     currentRef.current = id;
     setCurrent(id);
     try {
-      if (id) localStorage.setItem(LAST, id);
-      else localStorage.removeItem(LAST);
+      rememberPref(LAST, id);
     } catch {
       /* private mode */
     }
@@ -81,7 +81,7 @@ export function useChats(enabled: boolean) {
           currentRef.current = chat.id; // the chat this first message made; no reload
           setCurrent(chat.id);
           try {
-            localStorage.setItem(LAST, chat.id);
+            rememberPref(LAST, chat.id);
           } catch {
             /* private mode */
           }

@@ -46,7 +46,13 @@ export interface Fleet {
   satellite: string | null;
 }
 
-/** A failed response as an error the person can read (the backend writes `detail` for people). */
+/** Said when the server does not know a route this page uses: the app was updated and the
+ * server not restarted, so the page is newer than the server behind it. */
+export const OUTDATED_SERVER = "This server is running an older version of Pilot. Restart it to finish the update.";
+
+/** A failed response as an error the person can read (the backend writes `detail` for people).
+ * A route the server has never heard of — 405, or FastAPI's bare "Not Found" (ours always say
+ * what was not found) — means an outdated server, and says so instead of an HTTP phrase. */
 export async function check(r: Response): Promise<Response> {
   if (r.ok) return r;
   let message = `Something went wrong (${r.status}).`;
@@ -57,6 +63,7 @@ export async function check(r: Response): Promise<Response> {
   } catch {
     /* keep the generic message */
   }
+  if (r.status === 405 || (r.status === 404 && message === "Not Found")) message = OUTDATED_SERVER;
   throw new AuthError(r.status, message);
 }
 

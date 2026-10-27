@@ -1,6 +1,7 @@
 // The person's theme choice: light, dark, or follow the operating system. Kept per browser
 // (a control room may run dark while the same person's laptop is light), applied as
 // <html data-theme="dark"> — index.css re-points every colour token from there.
+import { rememberPref } from "./prefs";
 import { useSyncExternalStore } from "react";
 export type ThemeChoice = "light" | "dark" | "system";
 
@@ -29,7 +30,7 @@ export function applyTheme(choice: ThemeChoice): void {
 
 export function saveTheme(choice: ThemeChoice): void {
   try {
-    localStorage.setItem(KEY, choice);
+    rememberPref(KEY, choice);
   } catch {
     /* private mode: the choice lasts this page only */
   }

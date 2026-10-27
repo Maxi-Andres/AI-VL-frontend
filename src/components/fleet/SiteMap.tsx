@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { rememberPref } from "../../lib/prefs";
 import { MAP_TILES, SATELLITE_ATTRIBUTION } from "../../config";
 
 // A site's location on a street map. Read-only by default; with `onPick`, a click moves the
@@ -89,7 +90,7 @@ export function SiteMap({ lat, lon, onPick, focus = 0, satellite = null, classNa
   const pick = (l: Layer) => {
     setLayer(l);
     try {
-      localStorage.setItem(LAYER_KEY, l);
+      rememberPref(LAYER_KEY, l);
     } catch {
       /* a private window: the choice lasts this page only */
     }

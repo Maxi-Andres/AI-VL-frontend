@@ -7,6 +7,7 @@ import type { VoicePhase } from "../types";
 import { useAudioRecorder } from "./useAudioRecorder";
 import { useRobotEar } from "./useRobotEar";
 import { useSpeech } from "./useSpeech";
+import { rememberPref } from "../lib/prefs";
 import { useWakeWord } from "./useWakeWord";
 
 /**
@@ -383,14 +384,14 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
     setVoiceMode((v) => {
       const next = !v;
       if (typeof localStorage !== "undefined")
-        localStorage.setItem(LS_VOICE, next ? "1" : "0");
+        rememberPref(LS_VOICE, next ? "1" : "0");
       return next;
     });
   }, []);
 
   const setListenMode = useCallback((m: ListenMode) => {
     setListenModeState(m);
-    if (typeof localStorage !== "undefined") localStorage.setItem(LS_LISTEN, m);
+    rememberPref(LS_LISTEN, m);
   }, []);
 
   // The mic button: one question, sent when the speaker stops.
@@ -411,7 +412,7 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
     setSpokenMode((v) => {
       const next = !v;
       if (typeof localStorage !== "undefined")
-        localStorage.setItem(LS_SPOKEN, next ? "1" : "0");
+        rememberPref(LS_SPOKEN, next ? "1" : "0");
       return next;
     });
   }, []);
@@ -420,7 +421,7 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
     setFillerMode((v) => {
       const next = !v;
       if (typeof localStorage !== "undefined")
-        localStorage.setItem(LS_FILLER, next ? "1" : "0");
+        rememberPref(LS_FILLER, next ? "1" : "0");
       return next;
     });
   }, []);

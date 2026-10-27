@@ -5,6 +5,7 @@
 // Drive's robot speaker did not read it at all: it sent no voice, so the server used its
 // default (Daniela) whatever was picked on Live (reported 2026-10-16). Now a change is seen
 // at once by every page that uses it, and by other tabs through the `storage` event.
+import { rememberPref } from "./prefs";
 import { useSyncExternalStore } from "react";
 
 const KEY = "aivl.voiceURI";
@@ -28,8 +29,7 @@ export function getVoiceChoice(): string | null {
 export function setVoiceChoice(uri: string): void {
   current = uri || null;
   try {
-    if (current) localStorage.setItem(KEY, current);
-    else localStorage.removeItem(KEY);
+    rememberPref(KEY, current || null);
   } catch {
     /* not remembered across reloads, still shared within this one */
   }

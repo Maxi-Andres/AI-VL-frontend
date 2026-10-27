@@ -7,6 +7,7 @@ import {
   IconBone,
   IconCamera,
   IconChartLine,
+  IconDatabase,
   IconGitBranch,
   IconInfoCircle,
   IconPlugConnected,
@@ -23,6 +24,7 @@ import { getFleet } from "../api/fleet";
 import { useCan } from "../auth/permissions";
 import { useRobot } from "../components/layout/RobotContext";
 import { ActivitySettings } from "../components/settings/ActivitySettings";
+import { BackupSettings } from "../components/settings/BackupSettings";
 import { ProfileSettings } from "../components/settings/ProfileSettings";
 import { RobotSettings } from "../components/settings/RobotSettings";
 import { TeamSettings } from "../components/settings/TeamSettings";
@@ -41,6 +43,7 @@ const NAV_ICON: Record<string, typeof IconRobot> = {
   "Profile": IconUserCircle,
   "Team & roles": IconUsers,
   "Activity": IconActivity,
+  "Backups": IconDatabase,
   "About these values": IconInfoCircle,
   "Which code runs where": IconGitBranch,
   "Connection": IconPlugConnected,
@@ -178,6 +181,7 @@ export function SettingsPage() {
             <ProfileSettings />
             {can("manage_users") && <TeamSettings />}
             {mayConfigure && <ActivitySettings />}
+            {can("manage_org") && <BackupSettings />}
           </div>
           {mayConfigure && (
             <>

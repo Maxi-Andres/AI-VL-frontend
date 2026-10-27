@@ -46,6 +46,7 @@ const SECTIONS: { id: string; label: string; perm?: Permission }[] = [
   { id: "profile", label: "Profile" },
   { id: "team", label: "Team & roles", perm: "manage_users" },
   { id: "activity", label: "Activity", perm: "configure" },
+  { id: "backups", label: "Backups", perm: "manage_org" },
   { id: "robot-connection", label: "Connection", perm: "configure" },
   { id: "robot-camera-stream", label: "Camera stream", perm: "configure" },
   { id: "robot-robot-video", label: "Robot video", perm: "configure" },

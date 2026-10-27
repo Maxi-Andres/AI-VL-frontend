@@ -1,7 +1,7 @@
 // The team: members, invitations, roles. Managing it needs "manage_users" (admins, owners);
 // joining through an invitation is public — the token in the link is the credential.
 import { backendFetch } from "./backend";
-import { AuthError } from "./auth";
+import { check } from "./fleet";
 import type { Me, Role } from "./auth";
 
 export interface Member {
@@ -30,18 +30,6 @@ export interface Team {
   invitations: Invitation[];
 }
 
-async function check(r: Response): Promise<Response> {
-  if (r.ok) return r;
-  let message = `Something went wrong (${r.status}).`;
-  try {
-    const body = (await r.json()) as { detail?: unknown };
-    if (typeof body.detail === "string") message = body.detail;
-    else if (Array.isArray(body.detail) && body.detail[0]?.msg) message = String(body.detail[0].msg);
-  } catch {
-    /* keep the generic message */
-  }
-  throw new AuthError(r.status, message);
-}
 
 const json = (method: string, body: unknown): RequestInit => ({
   method,

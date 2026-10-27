@@ -4,6 +4,16 @@ import { getAuthState, getMe, setUp, signIn, signOut } from "../api/auth";
 import { acceptInvitation, completePasswordReset } from "../api/team";
 import type { Me, SetupInput } from "../api/auth";
 import { onSignedOut } from "./signedOut";
+import { loadPrefs } from "../lib/prefs";
+import { applyTheme, savedTheme } from "../lib/theme";
+
+/** Signed in: the person's own preferences into this browser first (theme, voice, volume…),
+ * so the app opens the way they left it on any computer. */
+async function arrive(me: Me): Promise<Me> {
+  await loadPrefs(me.user.id);
+  applyTheme(savedTheme());
+  return me;
+}
 
 /**
  * Who is using the app. The backend is the authority — it checks the session and the role on
@@ -49,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const state = await getAuthState(ctl.signal);
         if (state.setup_required) return setStatus({ kind: "setup" });
         const me = await getMe(ctl.signal);
+        if (me) await arrive(me);
         setStatus(me ? { kind: "signed-in", me }
           : { kind: "signed-out", orgName: state.org_name, expired: false });
       } catch (e) {
@@ -76,18 +87,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const doSignIn = useCallback(async (email: string, password: string, remember: boolean) => {
-    const me = await signIn(email, password, remember);
+    const me = await arrive(await signIn(email, password, remember));
     setStatus({ kind: "signed-in", me });
   }, []);
 
   const doSetUp = useCallback(async (input: SetupInput) => {
-    const me = await setUp(input);
+    const me = await arrive(await setUp(input));
     setStatus({ kind: "signed-in", me });
   }, []);
 
   const doAccept = useCallback(
     async (token: string, name: string, password: string, remember: boolean) => {
-      const me = await acceptInvitation(token, name, password, remember);
+      const me = await arrive(await acceptInvitation(token, name, password, remember));
       // Leave /invite#token=… behind: the link is spent, and the app opens on Live.
       history.replaceState(null, "", "/");
       setStatus({ kind: "signed-in", me });
@@ -96,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const doReset = useCallback(async (token: string, password: string, remember: boolean) => {
-    const me = await completePasswordReset(token, password, remember);
+    const me = await arrive(await completePasswordReset(token, password, remember));
     history.replaceState(null, "", "/");
     setStatus({ kind: "signed-in", me });
   }, []);

@@ -9,6 +9,7 @@ import { useRobot } from "../components/layout/RobotContext";
 import { speakable } from "../lib/speakable";
 import { effectiveVoice, useVoiceChoice, voiceLabel } from "../lib/voiceChoice";
 import { speechVolume } from "../lib/speechVolume";
+import { rememberPref } from "../lib/prefs";
 import { SpeechQueue, type Player } from "../lib/speechQueue";
 
 /**
@@ -116,7 +117,7 @@ export function useSpeech() {
   const setOutput = useCallback((next: SpeechOutput) => {
     setOutputState(next);
     setRobotError(null);
-    if (typeof localStorage !== "undefined") localStorage.setItem(LS_OUTPUT, next);
+    rememberPref(LS_OUTPUT, next);
   }, []);
 
   /**

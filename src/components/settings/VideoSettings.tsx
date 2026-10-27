@@ -183,6 +183,9 @@ export function VideoSettings() {
   const { robot } = useRobot();
   const [state, setState] = useState<RobotVideoState | null>(null);
   const [draft, setDraft] = useState<Record<string, number>>({});
+  // The values as the robot gave them: what "changed" is measured against, so the save bar
+  // shows only once something was actually moved.
+  const [seed, setSeed] = useState<Record<string, number>>({});
   // Which knobs this robot's relay actually reports. Anything outside it is unknown, not 0.
   const [known, setKnown] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState<Status | null>(null);
@@ -233,6 +236,7 @@ export function VideoSettings() {
             }
           }
           setDraft(next);
+          setSeed(next);
           setKnown(seen);
         })
         .catch(() => {});
@@ -276,7 +280,10 @@ export function VideoSettings() {
           ? `Saved. ${waiting.join(", ")} apply when the video service restarts`
           : persist ? "Applied and saved to the robot" : "Applied (not saved)",
       });
+      setSeed(draft); // what is on the robot now: nothing left to apply
       loadStatus();
+      // The result stays a moment, then the bar goes with nothing left to do.
+      window.setTimeout(() => setStatus((st) => (st && st.tone !== "error" && st.tone !== "busy" ? null : st)), 2500);
     } else {
       setStatus({ tone: "error", text: res.error ?? "the robot refused it" });
     }
@@ -293,6 +300,7 @@ export function VideoSettings() {
   const saved = state?.saved ?? {};
   const limits = state?.limits ?? {};
   const reachable = state?.ok !== false;
+  const changed = Object.keys(draft).filter((k) => draft[k] !== seed[k]);
 
   return (
     <div className="grid gap-4 leading-relaxed">
@@ -441,20 +449,35 @@ export function VideoSettings() {
         );
       })}
 
-      {/* Always in reach while scrolling the knobs, like a form's save bar. */}
-      <div className="sticky bottom-4 z-10 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl bg-fg px-4 py-3 text-bg shadow-lift">
-        <span className="min-w-0 flex-1 text-[12.5px] opacity-80">
-          <strong>Apply</strong> changes the running publisher only — a restart brings the saved
-          values back. <strong>Apply and save</strong> also writes the robot&apos;s <code>video.env</code>.
+      {/* The save bar, only once something was changed (or while a result is showing), always
+          in reach while scrolling the knobs. */}
+      {(changed.length > 0 || busy || status) && (
+      <div className="sticky bottom-4 z-10 flex animate-rise flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl bg-fg px-4 py-3 text-bg shadow-lift">
+        <span className="min-w-0 flex-1 text-[12.5px]">
+          {changed.length > 0 ? (
+            <>
+              <strong>{changed.length === 1 ? "1 unsaved change" : `${changed.length} unsaved changes`}</strong>
+              <span className="opacity-75"> · Apply changes the running video only; Apply and save also writes the robot&apos;s <code>video.env</code>.</span>
+            </>
+          ) : <span className="opacity-75">Nothing left to apply.</span>}
         </span>
         <StatusText status={status} className="text-xs" />
-        <Button variant="secondary" className="!border-transparent !bg-bg/15 !text-bg" disabled={busy || !reachable} onClick={() => apply(false)}>
-          Apply
-        </Button>
-        <Button variant="primary" disabled={busy || !reachable} onClick={() => apply(true)}>
-          Apply and save
-        </Button>
+        {changed.length > 0 && (
+          <>
+            <button type="button" disabled={busy} onClick={() => { setDraft(seed); setStatus(null); }}
+              className="cursor-pointer rounded-lg px-2.5 py-1.5 text-[12.5px] font-bold opacity-80 hover:opacity-100 disabled:opacity-40">
+              Discard
+            </button>
+            <Button variant="secondary" className="!border-transparent !bg-bg/15 !text-bg" disabled={busy || !reachable} onClick={() => apply(false)}>
+              Apply
+            </Button>
+            <Button variant="primary" disabled={busy || !reachable} onClick={() => apply(true)}>
+              Apply and save
+            </Button>
+          </>
+        )}
       </div>
+      )}
     </div>
   );
 }
