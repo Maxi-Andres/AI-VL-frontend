@@ -46,6 +46,9 @@ from pathlib import Path
 VARIANT = "g1_29dof_mode_15_brainco_hand"
 # The lock-waist body (mode_machine 6): these have no motor on this robot.
 LOCKED = ("waist_roll_joint", "waist_pitch_joint")
+# Links drawn without their visual: the maker's lettering on the chest (asked 2026-10-27). The
+# link and its joint stay, so the tree is still Unitree's.
+NO_VISUAL = ("logo_link",)
 # Faces meeting at less than this are shaded as one smooth surface; sharper meets stay an edge.
 CREASE_DEGREES = 35
 OUT = Path(__file__).resolve().parent.parent / "public" / "g1"
@@ -127,6 +130,9 @@ def main() -> int:
     for link in root.findall("link"):
         for col in link.findall("collision"):
             link.remove(col)
+        if link.get("name") in NO_VISUAL:
+            for vis in link.findall("visual"):
+                link.remove(vis)
     for name in LOCKED:
         joint = root.find(f"joint[@name='{name}']")
         if joint is None:

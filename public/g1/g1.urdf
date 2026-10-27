@@ -349,13 +349,6 @@
       <mass value="0.001" />
       <inertia ixx="1e-7" ixy="0" ixz="0" iyy="1e-7" iyz="0" izz="1e-7" />
     </inertial>
-    <visual>
-      <origin xyz="0 0 0" rpy="0 0 0" />
-      <geometry>
-        <mesh filename="meshes/logo_link.glb" />
-      </geometry>
-      <material name="dark" />
-    </visual>
   </link>
   <link name="head_link">
     <inertial>
