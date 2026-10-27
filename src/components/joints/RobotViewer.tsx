@@ -142,9 +142,10 @@ const COLORS = {
 };
 
 // The floor fades out from the robot's feet instead of ending in a hard square: alpha falls from
-// 1 to 0 between these distances from the origin (the grid is 4 m across). Same on both themes.
-const FADE_FROM = 0.6;
-const FADE_TO = 2.0;
+// 1 to 0 between these distances from the origin — about 8 of the 25 cm cells each way before it
+// is gone (the grid is 6 m across, so its edge is never reached). Same on both themes.
+const FADE_FROM = 0.8;
+const FADE_TO = 2.7;
 
 /**
  * Make a grid line material fade with distance from the origin (in the grid's own plane). The
@@ -231,7 +232,7 @@ export function RobotViewer({
         grid.dispose();
       }
       const g = GRID[isDark() ? "dark" : "light"];
-      grid = new GridHelper(4, 16, g.major, g.minor);
+      grid = new GridHelper(6, 24, g.major, g.minor);
       fadeOut(grid.material as LineBasicMaterial);
       scene.add(grid);
       dirtyRef.current = true;
