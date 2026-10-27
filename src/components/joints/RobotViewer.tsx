@@ -522,7 +522,7 @@ export function RobotViewer({
   const now = Date.now();
   const stopped = liveStalls(stalls ?? [], now);
   return (
-    <div className="relative h-full min-h-[320px] w-full overflow-hidden rounded-2xl border border-line bg-[radial-gradient(ellipse_at_50%_32%,#ffffff,#eef1f5_55%,#dde2ea)] shadow-card dark:bg-[radial-gradient(ellipse_at_50%_32%,#1b2130,#10131a_60%,#0a0c11)]">
+    <div className="relative h-full min-h-[320px] w-full overflow-hidden rounded-2xl border border-line bg-[radial-gradient(ellipse_at_50%_32%,#ffffff,#eceff3_55%,#cbd1db)] shadow-card dark:bg-[radial-gradient(ellipse_at_50%_32%,#1b2130,#10131a_60%,#0a0c11)]">
       <div ref={hostRef} className="absolute inset-0" />
       {!loaded && !loadError && (
         <div className="absolute inset-0 grid place-items-center text-sm text-muted">

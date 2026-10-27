@@ -562,6 +562,21 @@ export function ControlPage() {
     </button>
   );
 
+  // Search and fold-all over the actions: the side panel's and the cockpit drawer's.
+  const actionTools = (glass: boolean) => (
+    <div className="flex gap-2 p-3 pb-2">
+      <label className={`flex h-9 flex-1 items-center gap-2 rounded-lg border border-line px-2.5 focus-within:border-accent ${glass ? "bg-bg/70" : "bg-bg"}`}>
+        <IconSearch size={15} className="text-dim" />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("Search actions…")}
+          className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-dim" />
+      </label>
+      <button type="button" title={t("Fold every group")} onClick={() => setCollapsed(new Set(groupTitles))}
+        className={`grid size-9 cursor-pointer place-items-center rounded-lg border border-line text-muted transition hover:text-fg ${glass ? "bg-bg/70" : ""}`}>
+        <IconFold size={16} />
+      </button>
+    </div>
+  );
+
   const actionPad = (glass: boolean) => (
     <ActionPad
       skills={skills}
@@ -723,11 +738,14 @@ export function ControlPage() {
                 {speedSeg}
                 {stopButton(true)}
               </div>
-              <aside className={`cockpit-glass absolute top-14 right-3 bottom-3 z-10 flex w-[380px] flex-col overflow-hidden rounded-2xl transition-transform duration-300 ${drawer ? "" : "translate-x-[calc(100%+24px)]"}`}>
+              {/* As tall as its content, up to the bottom of the screen: with every group folded it
+                  shrinks to the list instead of a mostly empty glass column. */}
+              <aside className={`cockpit-glass absolute top-14 right-3 z-10 flex max-h-[calc(100%-68px)] w-[380px] flex-col overflow-hidden rounded-2xl transition-transform duration-300 ${drawer ? "" : "translate-x-[calc(100%+24px)]"}`}>
                 <div className="flex items-center gap-2 border-b border-line px-4 py-3 text-sm font-extrabold">
                   <IconBolt size={16} className="text-accent" />{t("All actions")}
                 </div>
-                <div className="min-h-0 flex-1 overflow-y-auto p-3">{actionPad(true)}</div>
+                {actionTools(true)}
+                <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">{actionPad(true)}</div>
               </aside>
             </>
           )}
@@ -762,17 +780,7 @@ export function ControlPage() {
 
         {tab === "actions" && (
           <>
-            <div className="flex gap-2 p-3 pb-2">
-              <label className="flex h-9 flex-1 items-center gap-2 rounded-lg border border-line bg-bg px-2.5 focus-within:border-accent">
-                <IconSearch size={15} className="text-dim" />
-                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("Search actions…")}
-                  className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-dim" />
-              </label>
-              <button type="button" title={t("Fold every group")} onClick={() => setCollapsed(new Set(groupTitles))}
-                className="grid size-9 cursor-pointer place-items-center rounded-lg border border-line text-muted transition hover:text-fg">
-                <IconFold size={16} />
-              </button>
-            </div>
+            {actionTools(false)}
             {!supported ? (
               <p className="m-0 px-4 pb-2 text-xs text-bad-fg">{t("“{robot}” is not supported by the executor yet. Pick a Go2 or a G1 in the header.", { robot })}</p>
             ) : !armed ? (
