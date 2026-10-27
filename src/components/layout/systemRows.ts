@@ -35,7 +35,7 @@ export function systemRows(p: Presence): SystemRow[] {
   const cam = p.robot_cam;
   const ex = p.executor;
   const vlm = p.iacore.online ? p.iacore.vlm : null;
-  const gpu = p.iacore.online ? p.iacore.gpu : null;
+  const gpus = p.iacore.online ? p.iacore.gpus : null;
   const rows: SystemRow[] = [
     {
       key: "ai", icon: IconBrain, label: t("AI engine"), service: true,
@@ -70,15 +70,30 @@ export function systemRows(p: Presence): SystemRow[] {
           : { tone: "good" as const, state: t("Ready"), detail: t("Running; no robot camera is streaming right now.") }),
     },
   );
-  if (gpu && gpu.total_mb > 0) {
+  // No card at all is worth saying (everything runs on the processor, much slower); a card whose
+  // driver gives no memory figure (Intel) is named without one; unknown (older iacore) shows nothing.
+  if (gpus && gpus.length === 0) {
+    rows.push({
+      key: "gpu", icon: IconCpu, label: t("GPU"), service: false, tone: "warn", state: t("None found"),
+      detail: t("No graphics card found: detection and the vision assistant run on the processor, much slower."),
+    });
+  }
+  for (const [i, gpu] of (gpus ?? []).entries()) {
+    if (!gpu.total_mb || gpu.used_mb === null) {
+      rows.push({
+        key: `gpu-${i}`, icon: IconCpu, label: t("GPU"), service: false, tone: "idle", state: t("Found"),
+        detail: t("{name} · its driver does not report memory use.", { name: gpu.name }),
+      });
+      continue;
+    }
     const used = gpu.used_mb / gpu.total_mb;
     rows.push({
-      key: "gpu", icon: IconCpu, label: t("GPU memory"), service: false, meter: used,
+      key: `gpu-${i}`, icon: IconCpu, label: t("GPU memory"), service: false, meter: used,
       tone: used >= GPU_BAD ? "bad" : used >= GPU_WARN ? "warn" : "good",
       state: `${(gpu.used_mb / 1024).toFixed(1)} / ${(gpu.total_mb / 1024).toFixed(1)} GB`,
       detail: used >= GPU_WARN
         ? t("{pct}% used — nearly full: fullscreen video or a bigger model can freeze this machine.", { pct: Math.round(used * 100) })
-        : t("{pct}% used{name}", { pct: Math.round(used * 100), name: gpu.name ? ` · ${gpu.name}` : "" }),
+        : t("{pct}% used{name}", { pct: Math.round(used * 100), name: ` · ${gpu.name}` }),
     });
   }
   return rows;

@@ -161,8 +161,9 @@ export interface Presence {
     /** The VLM server (its own process: llama-server or Ollama). Null/absent when iacore is
      * down or too old to tell. */
     vlm?: { online: boolean; backend?: string } | null;
-    /** The whole GPU, every process on it. Null without an NVIDIA card. */
-    gpu?: { used_mb: number; total_mb: number; name?: string } | null;
+    /** The graphics cards the AI can use (NVIDIA; AMD or Intel when there is no NVIDIA), with
+     * their memory where the driver tells it. [] = none found; null/absent = cannot tell. */
+    gpus?: { vendor: string; name: string; used_mb: number | null; total_mb: number | null }[] | null;
   };
 }
 

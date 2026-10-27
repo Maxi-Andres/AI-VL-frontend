@@ -29,6 +29,12 @@ export const LAYOUT: Record<string, string> = {
   "The camera bridge is not running on this server.": "El puente de la cámara no está corriendo en este servidor.",
   "Running; no robot camera is streaming right now.": "Corriendo; ninguna cámara de robot está transmitiendo ahora.",
   "GPU memory": "Memoria de la GPU",
+  "GPU": "GPU",
+  "None found": "No encontrada",
+  "No graphics card found: detection and the vision assistant run on the processor, much slower.":
+    "No se encontró placa de video: la detección y el asistente visual corren en el procesador, mucho más lentos.",
+  "Found": "Encontrada",
+  "{name} · its driver does not report memory use.": "{name} · su driver no informa el uso de memoria.",
   "{pct}% used — nearly full: fullscreen video or a bigger model can freeze this machine.":
     "{pct}% en uso — casi llena: el video en pantalla completa o un modelo más grande pueden congelar esta máquina.",
   "{pct}% used{name}": "{pct}% en uso{name}",
