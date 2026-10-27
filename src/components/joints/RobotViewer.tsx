@@ -6,6 +6,7 @@ import {
   GridHelper,
   Group,
   HemisphereLight,
+  LineBasicMaterial,
   Mesh,
   MeshStandardMaterial,
   type Object3D,
@@ -123,7 +124,7 @@ const HAND_DISTANCE = 0.45;
 // The floor grid follows the app's theme; the backdrop is CSS behind a transparent canvas.
 const GRID = {
   light: { major: "#c3cad5", minor: "#dde2e9" },
-  dark: { major: "#262a36", minor: "#1a1d26" },
+  dark: { major: "#323848", minor: "#232733" },
 };
 const isDark = () => document.documentElement.dataset.theme === "dark";
 
@@ -139,6 +140,31 @@ const COLORS = {
     critical: new Color("#ef4444"),
   },
 };
+
+// The floor fades out from the robot's feet instead of ending in a hard square: alpha falls from
+// 1 to 0 between these distances from the origin (the grid is 4 m across). Same on both themes.
+const FADE_FROM = 0.6;
+const FADE_TO = 2.0;
+
+/**
+ * Make a grid line material fade with distance from the origin (in the grid's own plane). The
+ * distance is taken per fragment from the interpolated position: both ends of every grid line sit
+ * on the grid's edge, so a distance computed per vertex said "far" all along the line and the
+ * whole floor vanished.
+ */
+function fadeOut(material: LineBasicMaterial) {
+  material.transparent = true;
+  material.depthWrite = false;
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying vec2 vFloorXZ;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvFloorXZ = position.xz;");
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", "#include <common>\nvarying vec2 vFloorXZ;")
+      .replace("#include <opaque_fragment>",
+        `#include <opaque_fragment>\ngl_FragColor.a *= 1.0 - smoothstep(${FADE_FROM.toFixed(2)}, ${FADE_TO.toFixed(2)}, length(vFloorXZ));`);
+  };
+}
 
 interface Part {
   mesh: Mesh;
@@ -206,6 +232,7 @@ export function RobotViewer({
       }
       const g = GRID[isDark() ? "dark" : "light"];
       grid = new GridHelper(4, 16, g.major, g.minor);
+      fadeOut(grid.material as LineBasicMaterial);
       scene.add(grid);
       dirtyRef.current = true;
     };
@@ -522,7 +549,7 @@ export function RobotViewer({
   const now = Date.now();
   const stopped = liveStalls(stalls ?? [], now);
   return (
-    <div className="relative h-full min-h-[320px] w-full overflow-hidden rounded-2xl border border-line bg-[radial-gradient(ellipse_at_50%_32%,#ffffff,#eceff3_55%,#cbd1db)] shadow-card dark:bg-[radial-gradient(ellipse_at_50%_32%,#1b2130,#10131a_60%,#0a0c11)]">
+    <div className="relative h-full min-h-[320px] w-full overflow-hidden rounded-2xl border border-line bg-[radial-gradient(ellipse_at_center,#ffffff,#eceff3_55%,#cbd1db)] shadow-card dark:bg-[radial-gradient(ellipse_at_center,#1b2130,#10131a_60%,#0a0c11)]">
       <div ref={hostRef} className="absolute inset-0" />
       {!loaded && !loadError && (
         <div className="absolute inset-0 grid place-items-center text-sm text-muted">

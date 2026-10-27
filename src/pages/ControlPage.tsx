@@ -597,11 +597,12 @@ export function ControlPage() {
   const openBtn = "bg-accent text-on-accent shadow-card";
 
   // Arm lives in the page's top bar and again in the cockpit's, the same button in both.
+  // Everything on the video's top row is 36 px tall, the size of its square buttons.
   const armButton = (small: boolean) => (
     <button type="button" aria-pressed={armed} onClick={() => setArmed((a) => !a)}
       title={t("While disarmed the robot never moves (Start on a gamepad)")}
       className={`flex cursor-pointer items-center gap-2 font-bold transition active:scale-[0.97] ${
-        small ? "rounded-lg px-3 py-1.5 text-[12px]" : "rounded-xl px-4 py-2 text-[13px] shadow-card"} ${
+        small ? "h-9 rounded-lg px-3 text-[12px]" : "rounded-xl px-4 py-2 text-[13px] shadow-card"} ${
         armed ? "bg-accent text-on-accent" : "bg-fg text-bg"}`}>
       <IconPlayerPlayFilled size={small ? 12 : 14} />
       {armed ? t("Armed") : t("Arm to drive")}
@@ -659,19 +660,19 @@ export function ControlPage() {
           {/* Top: state chips, video settings, fullscreen */}
           {/* z-20: the video menu that drops from this bar must land over the actions drawer. */}
           <div className="absolute inset-x-3 top-3 z-20 flex items-center gap-2">
-            <span className="on-video flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11.5px] font-extrabold tracking-wider">
+            <span className="on-video flex h-9 items-center gap-1.5 rounded-lg px-3 text-[11.5px] font-extrabold tracking-wider">
               <span className={`size-2 rounded-full ${live ? "animate-pulse bg-[#ff5a5f]" : "bg-dim"}`} />
               {live ? t("LIVE") : t("NO VIDEO")}
             </span>
             {cockpit && armButton(true)}
             {posing && (
-              <span className="rounded-lg bg-accent/85 px-2.5 py-1 text-[11.5px] font-bold text-on-accent"
+              <span className="flex h-9 items-center rounded-lg bg-accent/85 px-3 text-[11.5px] font-bold text-on-accent"
                 title={t("Pose is on: the sticks tilt the body instead of walking. Turn Pose off (or press Stop) to walk again.")}>
                 {t("Pose: sticks tilt")}
               </span>
             )}
             {pad && (
-              <span className="on-video flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11.5px] font-semibold" title={`Gamepad: ${pad.id}`}>
+              <span className="on-video flex h-9 items-center gap-1.5 rounded-lg px-3 text-[11.5px] font-semibold" title={`Gamepad: ${pad.id}`}>
                 <IconDeviceGamepad2 size={14} />Gamepad
               </span>
             )}

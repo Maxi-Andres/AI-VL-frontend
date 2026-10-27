@@ -717,11 +717,11 @@ export function LivePage() {
     <>
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/35 via-transparent to-black/35" />
       <div className="absolute top-3 left-3 z-10 flex max-w-[70%] flex-wrap items-center gap-2">
-        <span className="on-video flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11.5px] font-extrabold tracking-wider">
+        <span className="on-video flex h-9 items-center gap-1.5 rounded-lg px-3 text-[11.5px] font-extrabold tracking-wider">
           <span className={`size-2 rounded-full ${live ? "animate-pulse bg-[#ff5a5f]" : "bg-dim"}`} />
           {live ? t("LIVE") : source === "own" ? t("CAMERA OFF") : t("CONNECTING")}
         </span>
-        <span className="on-video truncate rounded-lg px-2.5 py-1 text-[11.5px] font-semibold">{sourceText}</span>
+        <span className="on-video flex h-9 min-w-0 items-center rounded-lg px-3 text-[11.5px] font-semibold"><span className="truncate">{sourceText}</span></span>
       </div>
       <div className="absolute top-3 right-14 z-10">
         <button type="button" disabled={!mayAnalyze} onClick={() => setYoloEnabled(!yoloEnabled)}
