@@ -4,6 +4,8 @@ import {
   IconAlertCircle,
   IconArrowLeft,
   IconArrowRight,
+  IconBrandGoogle,
+  IconBrandWindows,
   IconBuilding,
   IconCheck,
   IconCopy,
@@ -19,7 +21,7 @@ import {
   IconUser,
   IconUsers,
 } from "@tabler/icons-react";
-import { AuthError } from "../api/auth";
+import { AuthError, getAuthState, ssoStartUrl, type SsoOption } from "../api/auth";
 import { lookupInvitation, lookupPasswordReset, type InvitationInfo, type ResetInfo } from "../api/team";
 import { ROLES } from "./roles";
 import { PASSWORD_MIN, passwordStrength } from "../lib/password";
@@ -179,6 +181,63 @@ function ErrorNote({ text, shakeKey }: { text: string; shakeKey: number }) {
 }
 
 // --------------------------------------------------------------------------- //
+// Single sign-on (sso.py): the button, and what the sign-in page says when it comes back failed
+// --------------------------------------------------------------------------- //
+/** The company's single sign-on option, read once (null while unknown or when it is off). */
+function useSso(): SsoOption | null {
+  const [sso, setSso] = useState<SsoOption | null>(null);
+  useEffect(() => {
+    const ctl = new AbortController();
+    getAuthState(ctl.signal).then((s) => setSso(s.sso ?? null)).catch(() => undefined);
+    return () => ctl.abort();
+  }, []);
+  return sso;
+}
+
+// Why the provider's round trip ended back here (?sso_error=… from the backend).
+const SSO_ERRORS: Record<string, string> = {
+  off: msg("Single sign-on is not turned on for this workspace."),
+  provider: msg("The identity provider could not be reached or refused the request. Try again, or sign in with your password."),
+  expired: msg("That sign-in took too long or was started in another browser. Try again."),
+  cancelled: msg("Sign-in was cancelled."),
+  token: msg("The identity provider's answer could not be verified. Ask an admin to check the single sign-on settings."),
+  no_email: msg("Your account at the identity provider has no verified email address."),
+  no_account: msg("{email} has no account here. Ask an admin of your workspace to invite you."),
+  linked_elsewhere: msg("{email} is already linked to another account at the identity provider."),
+  disabled: msg("Your access to this workspace was switched off. Ask an admin."),
+};
+
+/** The failure the provider's round trip came back with, once; the address bar is cleaned so a
+ * reload does not show it again. Kept in English, translated where shown. */
+function takeSsoError(): { text: string; email: string } | null {
+  const q = new URLSearchParams(location.search);
+  const reason = q.get("sso_error");
+  if (!reason) return null;
+  history.replaceState(null, "", location.pathname + location.hash);
+  return { text: SSO_ERRORS[reason] ?? SSO_ERRORS.provider, email: q.get("email") ?? "" };
+}
+
+function SsoButton({ sso, remember, children }: { sso: SsoOption; remember: boolean; children: ReactNode }) {
+  const [going, setGoing] = useState(false);
+  const Icon = sso.provider === "microsoft" ? IconBrandWindows : sso.provider === "google" ? IconBrandGoogle : IconKey;
+  return (
+    <a href={ssoStartUrl(remember)} onClick={() => setGoing(true)}
+      className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl bg-[#0f1623] text-[14px] font-bold text-white shadow-[0_8px_20px_-10px_rgba(15,22,35,.7)] transition hover:-translate-y-px active:scale-[0.99]">
+      {going ? <IconLoader2 size={18} className="animate-spin" /> : <Icon size={18} />}
+      {children}
+    </a>
+  );
+}
+
+function OrLine({ children }: { children: ReactNode }) {
+  return (
+    <div className="my-5 flex items-center gap-3 text-xs font-semibold text-dim">
+      <span className="h-px flex-1 bg-[#e3e6ec]" />{children}<span className="h-px flex-1 bg-[#e3e6ec]" />
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------- //
 // Sign in
 // --------------------------------------------------------------------------- //
 export function SignInScreen({ orgName, expired }: { orgName: string | null; expired: boolean }) {
@@ -191,6 +250,12 @@ export function SignInScreen({ orgName, expired }: { orgName: string | null; exp
   const [error, setError] = useState<string | null>(null);
   const [tries, setTries] = useState(0);
   const [forgot, setForgot] = useState(false);
+  const sso = useSso();
+  const [ssoError] = useState(takeSsoError);
+  // With single sign-on on, the password is the way in when the provider is down: one click
+  // away instead of the first thing on the page.
+  const [withPassword, setWithPassword] = useState(false);
+  const showForm = !sso || withPassword;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -218,14 +283,34 @@ export function SignInScreen({ orgName, expired }: { orgName: string | null; exp
       </h1>
       <p className="mt-1.5 mb-7 text-muted">{t("Welcome back. Use your work account.")}</p>
 
-      {expired && !error && (
+      {expired && !error && !ssoError && (
         <div className="mb-4 rounded-xl bg-[#e4f5f2] px-3.5 py-3 text-[13px] font-semibold text-[#14695f]">
           {t("Your session ended. Sign in again to continue.")}
         </div>
       )}
       {error && <ErrorNote text={error} shakeKey={tries} />}
+      {ssoError && !error && <ErrorNote text={t(ssoError.text, { email: ssoError.email })} shakeKey={0} />}
 
-      <form onSubmit={submit} noValidate>
+      {sso && (
+        <>
+          <SsoButton sso={sso} remember={remember}>{t("Sign in with {provider}", { provider: t(sso.label) })}</SsoButton>
+          {!withPassword && (
+            <label className="mt-4 flex cursor-pointer items-center gap-2.5 text-[13px] text-muted select-none">
+              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)}
+                className="size-4 accent-[#0f1623]" />
+              {t("Keep me signed in on this device for 30 days")}
+            </label>
+          )}
+          <OrLine>
+            {withPassword ? t("or with your email") : (
+              <button type="button" onClick={() => setWithPassword(true)}
+                className="cursor-pointer font-bold text-accent hover:underline">{t("Sign in with email and password")}</button>
+            )}
+          </OrLine>
+        </>
+      )}
+
+      {showForm && <form onSubmit={submit} noValidate>
         <Field label={t("Work email")} icon={<IconMail size={18} />} type="email" autoComplete="username"
           autoFocus required placeholder={t("name@company.com")} value={email}
           onChange={(e) => setEmail(e.target.value)} />
@@ -244,7 +329,7 @@ export function SignInScreen({ orgName, expired }: { orgName: string | null; exp
         <PrimaryButton type="submit" busy={busy} disabled={!email || !password}>
           {busy ? t("Signing in…") : t("Sign in")}
         </PrimaryButton>
-      </form>
+      </form>}
       <p className="mt-6 text-center text-xs text-dim">
         {t("No account yet? Ask your workspace admin for an invitation.")}
       </p>
@@ -457,6 +542,8 @@ export function InviteScreen() {
   const [error, setError] = useState<string | null>(null);
   const [tries, setTries] = useState(0);
 
+  const sso = useSso();
+
   useEffect(() => {
     if (!token) return;
     let live = true;
@@ -545,6 +632,16 @@ export function InviteScreen() {
         <div className="mb-6 rounded-xl bg-bg px-3.5 py-3 text-[13px] text-muted">{t(role.summary)}</div>
       )}
       {error && <ErrorNote text={error} shakeKey={tries} />}
+      {sso && (
+        <>
+          {/* The provider signs in the address this invitation is for, and that is what joins. */}
+          <SsoButton sso={sso} remember={remember}>{t("Join with {provider}", { provider: t(sso.label) })}</SsoButton>
+          <p className="mt-2 text-center text-xs text-dim">
+            {t("Use the {provider} account for {email}.", { provider: t(sso.label), email: info.email })}
+          </p>
+          <OrLine>{t("or create a password")}</OrLine>
+        </>
+      )}
       <form onSubmit={submit} noValidate>
         <Field label={t("Work email")} icon={<IconMail size={18} />} value={info.email} readOnly
           className="text-muted" autoComplete="username" />

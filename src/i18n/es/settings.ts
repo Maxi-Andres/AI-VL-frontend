@@ -350,4 +350,37 @@ export const SETTINGS: Record<string, string> = {
   "Apply changes the running video only; Apply and save also writes the robot's {file}.":
     "Aplicar cambia solo el video en curso; Aplicar y guardar además escribe el {file} del robot.",
   "Nothing left to apply.": "No queda nada por aplicar.",
+
+  // Settings → Single sign-on
+  "Single sign-on": "Inicio de sesión único",
+  "Other (OIDC)": "Otro (OIDC)",
+  "Could not read the single sign-on settings.": "No se pudo leer la configuración del inicio de sesión único.",
+  "Could not save the single sign-on settings.": "No se pudo guardar la configuración del inicio de sesión único.",
+  "Your team signs in with their work account instead of a Pilot password. Only people you invite get in; the password keeps working as the way in when the provider is down.":
+    "Tu equipo inicia sesión con su cuenta de trabajo en lugar de una contraseña de Pilot. Solo entran las personas que invites; la contraseña sigue sirviendo para entrar cuando el proveedor no responde.",
+  "Provider": "Proveedor",
+  "Redirect URI": "URI de redirección",
+  "Register this exact address at the provider.": "Registra exactamente esta dirección en el proveedor.",
+  "The provider only accepts https addresses (or localhost). Pilot needs a name with a certificate, picked as the address people reach it on (Team & roles, when you invite someone).":
+    "El proveedor solo acepta direcciones https (o localhost). Pilot necesita un nombre con certificado, elegido como la dirección por la que se llega a él (Equipo y roles, al invitar a alguien).",
+  "Directory (tenant) ID": "Id. de directorio (inquilino)",
+  "In Microsoft Entra: Overview. The tenant's domain works too (silk-technologies.com).":
+    "En Microsoft Entra: Información general. También sirve el dominio del inquilino (silk-technologies.com).",
+  "Issuer URL": "URL del emisor",
+  "The address before /.well-known/openid-configuration.": "La dirección antes de /.well-known/openid-configuration.",
+  "Application (client) ID": "Id. de aplicación (cliente)",
+  "Client ID": "Id. de cliente",
+  "Client secret": "Secreto de cliente",
+  "Certificates & secrets → New client secret: copy its Value (shown only once). It expires; put the new one here before it does.":
+    "Certificados y secretos → Nuevo secreto de cliente: copia su Valor (se muestra una sola vez). Vence; pon el nuevo aquí antes de que venza.",
+  "Saved — leave empty to keep it": "Guardado — déjalo vacío para conservarlo",
+  "Offer it on the sign-in page": "Ofrecerlo en la pantalla de inicio de sesión",
+  "In the Microsoft Entra admin center: {path}, any name (\"Silk Pilot\"), single tenant.":
+    "En el centro de administración de Microsoft Entra: {path}, cualquier nombre (\"Silk Pilot\"), un solo inquilino.",
+  "App registrations → New registration": "Registros de aplicaciones → Nuevo registro",
+  "Redirect URI: platform {web}, the address above.": "URI de redirección: plataforma {web}, la dirección de arriba.",
+  "Copy the Application (client) ID and the Directory (tenant) ID from its Overview.":
+    "Copia el Id. de aplicación (cliente) y el Id. de directorio (inquilino) desde su Información general.",
+  "Create a client secret and paste its Value here, then turn this on and save: Pilot checks with Microsoft before saving.":
+    "Crea un secreto de cliente y pega su Valor aquí; después actívalo y guarda: Pilot lo comprueba con Microsoft antes de guardar.",
 };

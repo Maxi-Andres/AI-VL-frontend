@@ -1,6 +1,7 @@
 // Sign-in, first-run setup and the current user. The session lives in an httpOnly cookie the
 // backend sets: this code never sees or stores a token, and nothing here touches localStorage.
 import { backendFetch } from "./backend";
+import { BACKEND_URL } from "../config";
 import { t } from "../i18n";
 
 export type Role = "viewer" | "operator" | "admin" | "owner";
@@ -12,9 +13,23 @@ export interface Me {
   permissions: string[];
 }
 
+/** The company's single sign-on, when an owner turned it on: "Sign in with {label}". */
+export interface SsoOption {
+  provider: "microsoft" | "google" | "oidc";
+  label: string;
+}
+
 export interface AuthState {
   setup_required: boolean;
   org_name: string | null;
+  /** Absent from an older gateway; null when single sign-on is off. */
+  sso?: SsoOption | null;
+}
+
+/** Where the single sign-on button goes: the backend sends the browser on to the identity
+ * provider, and the provider sends it back signed in (sso.py). A navigation, not a fetch. */
+export function ssoStartUrl(remember: boolean): string {
+  return `${BACKEND_URL}/api/auth/sso/start?remember=${remember ? 1 : 0}`;
 }
 
 /** An error the user should read as-is (the backend writes them for people). */

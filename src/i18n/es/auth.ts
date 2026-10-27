@@ -98,4 +98,28 @@ export const AUTH: Record<string, string> = {
   // A page the role may not open
   "Not available for your role": "No disponible para tu rol",
   "You are signed in as {role}. Ask an admin of {org} if you need access to this page.": "Iniciaste sesión como {role}. Si necesitas acceso a esta página, pídeselo a un administrador de {org}.",
+
+  // Single sign-on on the sign-in and invitation screens
+  "Single sign-on is not turned on for this workspace.": "El inicio de sesión único no está activado en este espacio de trabajo.",
+  "The identity provider could not be reached or refused the request. Try again, or sign in with your password.":
+    "No se pudo llegar al proveedor de identidad o rechazó el pedido. Vuelve a intentarlo o inicia sesión con tu contraseña.",
+  "That sign-in took too long or was started in another browser. Try again.":
+    "Ese inicio de sesión tardó demasiado o se empezó en otro navegador. Vuelve a intentarlo.",
+  "Sign-in was cancelled.": "Se canceló el inicio de sesión.",
+  "The identity provider's answer could not be verified. Ask an admin to check the single sign-on settings.":
+    "No se pudo verificar la respuesta del proveedor de identidad. Pide a un administrador que revise la configuración del inicio de sesión único.",
+  "Your account at the identity provider has no verified email address.":
+    "Tu cuenta en el proveedor de identidad no tiene una dirección de correo verificada.",
+  "{email} has no account here. Ask an admin of your workspace to invite you.":
+    "{email} no tiene cuenta aquí. Pide a un administrador de tu espacio de trabajo que te invite.",
+  "{email} is already linked to another account at the identity provider.":
+    "{email} ya está vinculado a otra cuenta del proveedor de identidad.",
+  "Your access to this workspace was switched off. Ask an admin.":
+    "Tu acceso a este espacio de trabajo está desactivado. Consulta a un administrador.",
+  "Sign in with {provider}": "Iniciar sesión con {provider}",
+  "or with your email": "o con tu correo",
+  "Sign in with email and password": "Iniciar sesión con correo y contraseña",
+  "Join with {provider}": "Unirme con {provider}",
+  "Use the {provider} account for {email}.": "Usa la cuenta de {provider} de {email}.",
+  "or create a password": "o crea una contraseña",
 };

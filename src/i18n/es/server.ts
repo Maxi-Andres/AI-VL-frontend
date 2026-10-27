@@ -55,4 +55,15 @@ export const SERVER: Record<string, string> = {
 
   // chats.py
   "No such chat.": "No existe esa conversación.",
+
+  // sso.py
+  "Give your Microsoft Entra tenant: its Directory (tenant) ID or its domain.":
+    "Indica tu inquilino de Microsoft Entra: su Id. de directorio (inquilino) o su dominio.",
+  "That does not look like a tenant ID or a domain.": "Eso no parece un Id. de inquilino ni un dominio.",
+  "Give the issuer as https://… — the address before /.well-known/openid-configuration.":
+    "Indica el emisor como https://… — la dirección antes de /.well-known/openid-configuration.",
+  "Unknown identity provider.": "Proveedor de identidad desconocido.",
+  "Turning it on needs the client ID and a client secret.": "Para activarlo hacen falta el Id. de cliente y un secreto de cliente.",
+  "The identity provider did not answer for that tenant or issuer. Check it and try again.":
+    "El proveedor de identidad no respondió para ese inquilino o emisor. Revísalo y vuelve a intentarlo.",
 };
