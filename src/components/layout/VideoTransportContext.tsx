@@ -46,6 +46,11 @@ interface VideoTransportValue {
   intraCanvasRef: React.RefObject<HTMLCanvasElement | null> | null;
   /** MJPEG is retired for the selected robot: the switch shows it struck through. */
   mjpegRetired: boolean;
+  /**
+   * Frames are arriving on the H.264 path picked (the last second's rate is above zero).
+   * Always false on MJPEG, whose frames only the view socket sees (useRobotCameraView).
+   */
+  receiving: boolean;
 }
 
 /**
@@ -159,6 +164,8 @@ export function VideoTransportProvider({ children }: { children: ReactNode }) {
         connected: transport === "intra" ? intra.connected : connected,
         intraCanvasRef: transport === "intra" ? intraCanvasRef : null,
         mjpegRetired,
+        receiving: transport === "intra" ? (intra.stats?.fps ?? 0) > 0
+          : transport === "h264" ? connected && (stats?.fps ?? 0) > 0 : false,
       }}
     >
       {children}

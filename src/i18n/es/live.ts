@@ -37,6 +37,7 @@ export const LIVE: Record<string, string> = {
   "View only · mirroring the session": "Solo ver · reflejando la sesión",
   "CAMERA OFF": "CÁMARA APAGADA",
   "CONNECTING": "CONECTANDO",
+  // "NO VIDEO" is in drive.ts.
   "Live detection on/off — off keeps the GPU idle": "Detección en vivo sí/no — apagada deja la GPU en reposo",
   "Live detection": "Detección en vivo",
   "Start camera": "Iniciar cámara",

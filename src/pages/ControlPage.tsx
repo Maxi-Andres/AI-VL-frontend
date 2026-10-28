@@ -171,7 +171,7 @@ export function ControlPage() {
     true, false, undefined, robot);
   // The view socket stays connected on either transport: it still carries the shared config
   // and the detection boxes. Only the PICTURE moves.
-  const { transport, stream: h264Stream, intraCanvasRef } = useVideoTransport();
+  const { transport, stream: h264Stream, intraCanvasRef, receiving } = useVideoTransport();
   const videoRef = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     const el = videoRef.current;
@@ -539,7 +539,8 @@ export function ControlPage() {
     const skill = PAD_SKILLS[index]?.find((n) => n in skills && !unsendable.has(n));
     return skill ? [{ button, action: pretty(skill, skills[skill]) }] : [];
   });
-  const live = !!(frameUrl || (transport === "h264" && h264Stream) || transport === "intra");
+  // LIVE only while pictures arrive: an open H.264 path with no frames on it is not live.
+  const live = transport === "mjpeg" ? !!frameUrl : receiving;
 
   const speedSeg = (
     <Segmented className="flex rounded-lg bg-subtle p-0.5" title={t("Speed preset (LB / RB on a gamepad)")}
@@ -556,7 +557,7 @@ export function ControlPage() {
 
   const stopButton = (big: boolean) => (
     <button type="button" onClick={estop} title={t("Emergency stop (Back on a gamepad)")}
-      className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-[#e5484e] to-[#c42f35] font-extrabold tracking-[0.06em] text-white shadow-[0_8px_20px_-8px_rgba(217,63,69,0.7)] transition active:scale-[0.97] ${
+      className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-[#e5484e] to-[#c42f35] font-extrabold tracking-[0.06em] text-white transition active:scale-[0.97] ${
         big ? "px-5 py-2.5 text-sm" : "px-4 py-2 text-[13px]"}`}>
       <IconPlayerStopFilled size={16} />{t("STOP")}
     </button>

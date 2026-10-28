@@ -234,7 +234,7 @@ export function LivePage() {
   // Only for the robot source — a session mirror has no mediamtx path behind it.
   // Transport comes from the app-wide context: Drive and Live must not disagree about
   // which path is under test, or the comparison between them means nothing.
-  const { transport, stream: h264Stream, intraCanvasRef, detail: videoDetail } = useVideoTransport();
+  const { transport, stream: h264Stream, intraCanvasRef, detail: videoDetail, receiving } = useVideoTransport();
 
   // WHO PAIRS A FRAME WITH ITS BOXES (PLAN_YOLO_FRAME_PAIRING.md §3.2 and §7: what you see is
   // what gets analysed). On MJPEG the picture comes through the backend, so the backend holds
@@ -698,7 +698,8 @@ export function LivePage() {
   }
 
   const variants = options.scopes[scope]?.variants ?? [];
-  const live = source === "own" ? active : robotViewConnected;
+  // LIVE only while pictures arrive — a connected socket with nothing on it is not live.
+  const live = source === "own" ? active : transport === "mjpeg" ? !!robotFrameUrl : receiving;
   const sourceText = source === "own"
     ? facing === "environment" ? t("My camera · rear") : t("My camera · front")
     : source === "robot"
@@ -719,7 +720,7 @@ export function LivePage() {
       <div className="absolute top-3 left-3 z-10 flex max-w-[70%] flex-wrap items-center gap-2">
         <span className="on-video flex h-9 items-center gap-1.5 rounded-lg px-3 text-[11.5px] font-extrabold tracking-wider">
           <span className={`size-2 rounded-full ${live ? "animate-pulse bg-[#ff5a5f]" : "bg-dim"}`} />
-          {live ? t("LIVE") : source === "own" ? t("CAMERA OFF") : t("CONNECTING")}
+          {live ? t("LIVE") : source === "own" ? t("CAMERA OFF") : robotViewConnected ? t("NO VIDEO") : t("CONNECTING")}
         </span>
         <span className="on-video flex h-9 min-w-0 items-center rounded-lg px-3 text-[11.5px] font-semibold"><span className="truncate">{sourceText}</span></span>
       </div>
