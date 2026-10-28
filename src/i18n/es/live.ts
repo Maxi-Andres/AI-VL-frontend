@@ -224,6 +224,7 @@ export const LIVE: Record<string, string> = {
   "Didn't catch that — say \"robot\" to try again": "No se entendió — di \"robot\" para intentar de nuevo",
   "Microphone error: {error}": "Error del micrófono: {error}",
   "Bender heard: “{text}”": "Bender oyó: “{text}”",
+  "Stopped — say your question": "Me callé — decí tu pregunta",
   "This browser cannot listen for a wake word — choose “Just speak”": "Este navegador no puede escuchar una palabra de activación — elige “Solo habla”",
   "the robot did not take the audio": "el robot no tomó el audio",
   // Robot mic, conversations, robot volume

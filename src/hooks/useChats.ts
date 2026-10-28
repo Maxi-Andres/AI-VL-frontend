@@ -6,6 +6,36 @@ import { t } from "../i18n";
 
 const LAST = "pilot.chat"; // the conversation this browser had open last
 
+/** The conversation this browser had open last (null: none, or a new one not saved yet). */
+export function lastChat(): string | null {
+  try {
+    return localStorage.getItem(LAST);
+  } catch {
+    return null; // private mode
+  }
+}
+
+// A message saved outside the chat view (a question spoken on another page, maybe in another tab)
+// is announced here, so a Live page showing that conversation reloads it.
+const SAVED = "pilot.chat-saved";
+
+/** Tell this browser's other pages that conversation `id` has a new message. */
+export function announceSaved(id: string): void {
+  if (typeof BroadcastChannel === "undefined") return;
+  const ch = new BroadcastChannel(SAVED);
+  ch.postMessage(id);
+  ch.close();
+}
+
+/** Remember `id` as the conversation open in this browser. */
+export function rememberChat(id: string | null): void {
+  try {
+    rememberPref(LAST, id);
+  } catch {
+    /* private mode */
+  }
+}
+
 /**
  * The person's conversations with the vision assistant, kept on the server: the list, the one
  * open, and what it said. A new chat exists only once its first message is saved. `version`
@@ -35,11 +65,7 @@ export function useChats(enabled: boolean) {
   const open = useCallback(async (id: string | null, signal?: AbortSignal) => {
     currentRef.current = id;
     setCurrent(id);
-    try {
-      rememberPref(LAST, id);
-    } catch {
-      /* private mode */
-    }
+    rememberChat(id);
     if (!id) {
       setHistory([]);
       setVersion((v) => v + 1);
@@ -63,18 +89,24 @@ export function useChats(enabled: boolean) {
     const ctl = new AbortController();
     refresh(ctl.signal)
       .then((list) => {
-        let last: string | null = null;
-        try {
-          last = localStorage.getItem(LAST);
-        } catch {
-          /* private mode */
-        }
+        const last = lastChat();
         const pick = list.find((c) => c.id === last)?.id ?? list[0]?.id ?? null;
         return open(pick, ctl.signal);
       })
       .catch(() => undefined);
     return () => ctl.abort();
   }, [enabled, refresh, open]);
+
+  // Saved elsewhere into the conversation open here: show it (and send it as context).
+  useEffect(() => {
+    if (!enabled || typeof BroadcastChannel === "undefined") return;
+    const ch = new BroadcastChannel(SAVED);
+    ch.onmessage = (e) => {
+      if (e.data === currentRef.current) void open(currentRef.current);
+      else void refresh().catch(() => undefined);
+    };
+    return () => ch.close();
+  }, [enabled, open, refresh]);
 
   const save = useCallback((msg: NewMessage) => {
     queue.current = queue.current.then(async () => {
@@ -89,11 +121,7 @@ export function useChats(enabled: boolean) {
         if (currentRef.current !== chat.id) {
           currentRef.current = chat.id; // the chat this first message made; no reload
           setCurrent(chat.id);
-          try {
-            rememberPref(LAST, chat.id);
-          } catch {
-            /* private mode */
-          }
+          rememberChat(chat.id);
         }
         setError(null);
         await refresh();

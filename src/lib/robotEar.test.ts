@@ -34,6 +34,14 @@ describe("earEvent", () => {
   });
 });
 
+describe("cutting the robot off", () => {
+  it("is a barge, with the new request or none", () => {
+    const v = earEvent(EAR_OFF, { type: "listening" }).view;
+    expect(earEvent(v, { type: "barge", text: "" }).action).toEqual({ kind: "barge", text: "" });
+    expect(earEvent(v, { type: "barge", text: "qué hora es" }).action).toEqual({ kind: "barge", text: "qué hora es" });
+  });
+});
+
 describe("robots with a mic", () => {
   it("is the G1 only: the Go2's mic is reachable over WebRTC alone", () => {
     expect(ROBOTS_WITH_MIC.has("g1")).toBe(true);

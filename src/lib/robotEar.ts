@@ -14,7 +14,12 @@ export interface EarView {
   error: string | null;
 }
 
-export type EarAction = { kind: "command"; text: string } | { kind: "wake" } | null;
+// "barge": its name while the robot talks — stop talking, then answer `text` (or, empty, "¿Sí?").
+export type EarAction =
+  | { kind: "command"; text: string }
+  | { kind: "wake" }
+  | { kind: "barge"; text: string }
+  | null;
 
 export const EAR_OFF: EarView = { state: "off", heard: "", error: null };
 
@@ -35,6 +40,8 @@ export function earEvent(view: EarView, raw: unknown): { view: EarView; action: 
       return { view: { ...view, state: "listening", heard: text }, action: null };
     case "wake":
       return { view: { ...view, state: "listening" }, action: { kind: "wake" } };
+    case "barge":
+      return { view: { ...view, state: "listening" }, action: { kind: "barge", text } };
     case "command":
       return text
         ? { view: { ...view, state: "listening" }, action: { kind: "command", text } }

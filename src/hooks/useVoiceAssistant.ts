@@ -42,6 +42,9 @@ const LS_LISTEN = "aivl.listenMode";
 const NOT_A_QUESTION = /^(\W*|gracias\W*|subt[ií]tulos.*|thank you\W*|\.+)$/i;
 // Said by the robot on a bare "Bender": it heard its name and waits for the question.
 const WAKE_ACK = "¿Sí?";
+// The robot's name in its own answer ("Soy Bender…"): heard through its mic, it would cut itself
+// off, so that answer is not interruptible. Same spelling as iacore's ear_common.WAKE.
+const SAYS_NAME = /\bb[eé]nd[eé]r\b/i;
 
 // Short "thinking" fillers spoken while the VLM works, so a slow answer isn't
 // preceded by dead air. These are SPOKEN CONTENT (audio for the end user), not UI
@@ -115,6 +118,10 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
   const askPromptStreamRef = useRef(askPromptStream);
   askPromptStreamRef.current = askPromptStream;
   const busyRef = useRef(false); // one command at a time
+  // A request from the robot's ear that came while another was still being answered: asked
+  // as soon as that one ends (it used to be dropped).
+  const nextRequest = useRef<string | null>(null);
+  const [saysName, setSaysName] = useState(false);
   const { robot } = useRobot();
   const robotMic = ROBOTS_WITH_MIC.has(robot);
   const [robotEar, setRobotEar] = useState(() => readFlag(LS_ROBOT_EAR));
@@ -161,6 +168,8 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
   const answerText = useCallback(async (text: string): Promise<boolean> => {
     let spoke = false;
     let fillerTimer: ReturnType<typeof setTimeout> | null = null;
+    let said = "";
+    setSaysName(false);
     try {
       setPhase("thinking");
       setStatus(t("Thinking…"));
@@ -194,6 +203,8 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
           }
         }
         stream?.push(piece);
+        said += piece;
+        if (SAYS_NAME.test(said)) setSaysName(true);
       });
       stream?.end();
     } finally {
@@ -315,8 +326,12 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
   }, []);
 
   // A "Bender, …" command from the robot's own microphone: the same answer, no recording here.
+  const handleEarCommandRef = useRef<(text: string) => Promise<void>>(async () => {});
   const handleEarCommand = useCallback(async (text: string) => {
-    if (busyRef.current) return;
+    if (busyRef.current) {
+      nextRequest.current = text;
+      return;
+    }
     busyRef.current = true;
     ackDone(); // the question is in: whatever the answer says mutes the ear as usual
     speech.cancel(); // a new question interrupts a spoken answer
@@ -328,23 +343,38 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
       setStatus(t("Voice error: {error}", { error: e instanceof Error ? e.message : String(e) }));
     } finally {
       busyRef.current = false;
-      if (!spoke) setPhase(voiceModeRef.current || robotEarRef.current ? "listening" : "off");
+      const next = nextRequest.current;
+      nextRequest.current = null;
+      if (next) void handleEarCommandRef.current(next);
+      else if (!spoke) setPhase(voiceModeRef.current || robotEarRef.current ? "listening" : "off");
     }
   }, [speech, answerText, ackDone]);
+  handleEarCommandRef.current = handleEarCommand;
+
+  // "¿Sí?" after a bare "Bender": the ear stays open for the question (see `acking`).
+  const acknowledge = () => {
+    setAcking(true);
+    // A stopped or failed playback may never call back: never stay unmuted past a few s.
+    clearTimeout(ackTimer.current);
+    ackTimer.current = setTimeout(() => setAcking(false), 4000);
+    speech.speak(WAKE_ACK, undefined, ackDone);
+  };
 
   const ear = useRobotEar({
     url: robotEarUrl(robot),
     enabled: robotEar && robotMic,
     muted: speech.speaking && !acking,
+    // "Bender" while it talks cuts it off (2026-10-28) — unless the answer says "Bender" itself.
+    barge: !saysName,
     onCommand: (text) => void handleEarCommand(text),
     onWake: () => {
-      if (spokenModeRef.current && !busyRef.current) {
-        setAcking(true);
-        // A stopped or failed playback may never call back: never stay unmuted past a few s.
-        clearTimeout(ackTimer.current);
-        ackTimer.current = setTimeout(() => setAcking(false), 4000);
-        speech.speak(WAKE_ACK, undefined, ackDone);
-      }
+      if (spokenModeRef.current && !busyRef.current) acknowledge();
+    },
+    onBarge: (text) => {
+      speech.cancel(); // what was still to come of that answer is dropped too (speechQueue)
+      setStatus(text ? t("Bender heard: “{text}”", { text }) : t("Stopped — say your question"));
+      if (text) void handleEarCommand(text);
+      else if (spokenModeRef.current) acknowledge();
     },
   });
 
