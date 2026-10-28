@@ -52,6 +52,10 @@ export const SERVER: Record<string, string> = {
   "This site has no plan.": "Este sitio no tiene plano.",
   "Give the robot a name and a type.": "Ponle al robot un nombre y un tipo.",
   "No such robot.": "No existe ese robot.",
+  "No such memory.": "No existe ese recuerdo.",
+  "This memory has no picture.": "Ese recuerdo no tiene imagen.",
+  "Write what to remember.": "Escribe qué hay que recordar.",
+  "Not a JPEG or PNG picture, or too big.": "No es una imagen JPEG o PNG, o es demasiado grande.",
 
   // chats.py
   "No such chat.": "No existe esa conversación.",

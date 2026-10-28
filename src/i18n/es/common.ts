@@ -4,6 +4,8 @@ export const COMMON: Record<string, string> = {
   "Live": "En vivo",
   "Drive": "Manejar",
   "Joints": "Articulaciones",
+  "Memory": "Memoria",
+  "All": "Todo",
   "Settings": "Configuración",
   "Profile": "Perfil",
   "Team & roles": "Equipo y roles",

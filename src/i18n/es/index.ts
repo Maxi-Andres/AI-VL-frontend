@@ -8,6 +8,7 @@ import { FLEET } from "./fleet";
 import { JOINTS } from "./joints";
 import { LAYOUT } from "./layout";
 import { LIVE } from "./live";
+import { MEMORY } from "./memory";
 import { SERVER } from "./server";
 import { SETTINGS } from "./settings";
 
@@ -18,6 +19,7 @@ export const ES: Record<string, string> = {
   ...LIVE,
   ...DRIVE,
   ...JOINTS,
+  ...MEMORY,
   ...SETTINGS,
   ...AUTH,
   ...SERVER,

@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  IconBrain,
   IconBroadcast,
   IconBuildingWarehouse,
   IconLayoutGrid,
@@ -39,6 +40,7 @@ const PAGES: { to: string; label: string; icon: typeof IconBroadcast; perm?: Per
   { to: "/live", label: msg("Live"), icon: IconBroadcast },
   { to: "/drive", label: msg("Drive"), icon: IconSteeringWheel, perm: "operate" },
   { to: "/joints", label: msg("Joints"), icon: IconMan },
+  { to: "/memory", label: msg("Memory"), icon: IconBrain },
   { to: "/settings", label: msg("Settings"), icon: IconSettings },
 ];
 

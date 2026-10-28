@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
 import {
+  IconBrain,
   IconBroadcast,
   IconLayoutGrid,
   IconMan,
@@ -26,6 +27,7 @@ const TABS: { to: string; label: string; icon: typeof IconBroadcast; perm?: Perm
   { to: "/live", label: msg("Live"), icon: IconBroadcast },
   { to: "/drive", label: msg("Drive"), icon: IconSteeringWheel, perm: "operate" },
   { to: "/joints", label: msg("Joints"), icon: IconMan },
+  { to: "/memory", label: msg("Memory"), icon: IconBrain },
   // Everyone has Settings: Profile is there. The team and the robot sections show by role.
   { to: "/settings", label: msg("Settings"), icon: IconSettings },
 ];

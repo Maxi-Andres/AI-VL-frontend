@@ -98,7 +98,6 @@ export const SETTINGS: Record<string, string> = {
   "Create invitation link": "Crear enlace de invitación",
 
   // --- Activity
-  "All": "Todo",
   "Access": "Accesos",
   "Could not load the activity.": "No se pudo cargar la actividad.",
   "Who changed what: robots, sites, the team, access. Sign-ins are recorded but left out of this list.":
