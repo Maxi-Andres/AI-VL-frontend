@@ -18,6 +18,7 @@ import {
   IconSparkles,
   IconTrash,
   IconVolume,
+  IconWorldSearch,
   IconVolumeOff,
 } from "@tabler/icons-react";
 import type { ChatMessage, ChatSummary, NewMessage } from "../../api/chats";
@@ -117,6 +118,8 @@ interface Props {
   canAsk: boolean;
   busy: boolean;
   status: string;
+  /** The question being answered is being searched on the web first. */
+  searching?: boolean;
   output: string;
   /** Free-prompt text (controlled here so dictation can populate it). */
   prompt: string;
@@ -188,6 +191,7 @@ export function VlmPanel({
   canAsk,
   busy,
   status,
+  searching = false,
   output,
   prompt,
   imageMaxSize,
@@ -324,7 +328,7 @@ export function VlmPanel({
                   <div key={turn.id} className="grid min-w-0 animate-rise grid-cols-[minmax(0,1fr)] gap-2">
                     <Asked turn={turn} />
                     <Answer turn={turn} answer={answer} status={st} streaming={last && busy}
-                      voice={voice} />
+                      searching={last && busy && searching} voice={voice} />
                   </div>
                 );
               })}
@@ -510,8 +514,8 @@ function Asked({ turn }: { turn: Turn }) {
   );
 }
 
-function Answer({ turn, answer, status, streaming, voice }: {
-  turn: Turn; answer: string; status: string; streaming: boolean; voice: VoiceControls;
+function Answer({ turn, answer, status, streaming, searching = false, voice }: {
+  turn: Turn; answer: string; status: string; streaming: boolean; searching?: boolean; voice: VoiceControls;
 }) {
   const t = useT();
   const bad = failed(status) && !answer;
@@ -524,6 +528,10 @@ function Answer({ turn, answer, status, streaming, voice }: {
       <div className={`min-w-0 flex-1 rounded-2xl rounded-tl-md px-3 py-2 text-[13px] ${bad ? "bg-bad-bg text-bad-fg" : "bg-subtle"}`}>
         {bad ? (
           status
+        ) : !answer && searching ? (
+          <span className="flex items-center gap-1.5 py-0.5 text-muted">
+            <IconWorldSearch size={15} className="animate-pulse" />{t("Searching the internet…")}
+          </span>
         ) : !answer ? (
           <span className="flex items-center gap-1 py-1" aria-label={t("Thinking")}>
             {[0, 150, 300].map((d) => (

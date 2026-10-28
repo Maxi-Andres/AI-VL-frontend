@@ -125,10 +125,16 @@ export async function fetchRobotFrame(signal?: AbortSignal): Promise<string | nu
 /** One earlier question and its answer, sent with the next question as context. */
 export interface ChatTurn { question: string; answer: string }
 
+/** iacore's first chunk when the question is searched on the web (search_common.SEARCHING_MARK):
+ * read here, never shown as part of the answer. */
+const SEARCHING_MARK = "\x1esearching\x1e";
+
 export async function askVlmStream(
   req: { image: string; model?: string; prompt: string; robot?: string; history?: ChatTurn[] },
   onDelta: (piece: string) => void,
   signal?: AbortSignal,
+  /** Called once when the server starts searching the web for this question. */
+  onSearching?: () => void,
 ): Promise<string> {
   const r = await backendFetch(`/api/vlm/stream`, {
     method: "POST",
@@ -140,14 +146,30 @@ export async function askVlmStream(
   const reader = r.body.getReader();
   const decoder = new TextDecoder();
   let full = "";
+  // The mark can only be first; hold the start until it is clearly there or clearly not.
+  let head: string | null = "";
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
-    const piece = decoder.decode(value, { stream: true });
+    let piece = decoder.decode(value, { stream: true });
+    if (head !== null) {
+      head += piece;
+      if (head.length < SEARCHING_MARK.length && SEARCHING_MARK.startsWith(head)) continue;
+      if (head.startsWith(SEARCHING_MARK)) {
+        onSearching?.();
+        head = head.slice(SEARCHING_MARK.length);
+      }
+      piece = head;
+      head = null;
+    }
     if (piece) {
       full += piece;
       onDelta(piece);
     }
+  }
+  if (head) {
+    full += head;
+    onDelta(head);
   }
   return full;
 }

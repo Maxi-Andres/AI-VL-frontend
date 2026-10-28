@@ -118,6 +118,8 @@ export function LivePage() {
   // --- VLM request state ---
   const [vlmBusy, setVlmBusy] = useState(false);
   const [vlmStatus, setVlmStatus] = useState("");
+  // The question being answered is searched on the web first (askVlmStream's onSearching).
+  const [vlmSearching, setVlmSearching] = useState(false);
   const [vlmOutput, setVlmOutput] = useState("");
   // Free-prompt text lives here (not in VlmPanel) so dictation can populate it.
   const [prompt, setPrompt] = useState("");
@@ -491,8 +493,10 @@ export function LivePage() {
       setVlmBusy(true);
       setVlmStatus(t("Asking the VLM…"));
       setVlmOutput("");
+      setVlmSearching(false);
       const t0 = performance.now();
       let tFirst: number | null = null;
+      let searched = false;
       try {
         let acc = "";
         const answer = await askVlmStream(
@@ -504,10 +508,16 @@ export function LivePage() {
             onDelta(piece);
           },
           ac.signal,
+          () => {
+            searched = true;
+            setVlmSearching(true);
+            setVlmStatus(t("Searching the internet…"));
+          },
         );
         const total = performance.now() - t0;
         const firstMs = tFirst !== null ? tFirst - t0 : total;
-        setVlmStatus(t("{total} · first reply {first}", { total: fmtMs(total), first: fmtMs(firstMs) }));
+        const timing = t("{total} · first reply {first}", { total: fmtMs(total), first: fmtMs(firstMs) });
+        setVlmStatus(searched ? t("{timing} · searched the internet", { timing }) : timing);
         const text = answer.trim() || t("(no answer)");
         setVlmOutput(text);
         return text;
@@ -517,6 +527,7 @@ export function LivePage() {
         return null;
       } finally {
         setVlmBusy(false);
+        setVlmSearching(false);
       }
     },
     [getCurrentFrame, vlmModel, cmdRobot, t],
@@ -885,6 +896,7 @@ export function LivePage() {
                 canAsk={source === "own" ? active : !!robotFrameUrl}
                 busy={vlmBusy}
                 status={vlmStatus}
+                searching={vlmSearching}
                 output={vlmOutput}
                 prompt={prompt}
                 imageMaxSize={vlmMaxSize}

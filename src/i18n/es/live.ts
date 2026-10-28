@@ -9,6 +9,8 @@ export const LIVE: Record<string, string> = {
   "(invalid JSON)": "(JSON inválido)",
   "Request failed: {error}": "Error en el pedido: {error}",
   "Asking the VLM…": "Preguntando al VLM…",
+  "Searching the internet…": "Buscando en internet…",
+  "{timing} · searched the internet": "{timing} · buscó en internet",
   "{total} · first reply {first}": "{total} · primera respuesta {first}",
   "(no answer)": "(sin respuesta)",
   "Sending to the robot…": "Enviando al robot…",
