@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EAR_OFF, earEvent, earStatus, ROBOTS_WITH_MIC, type EarView } from "./robotEar";
+import { EAR_OFF, earEvent, earStatus, ROBOTS_WITH_MIC, spokenRequest, type EarView } from "./robotEar";
 
 const listening: EarView = { state: "listening", heard: "", error: null };
 
@@ -39,6 +39,20 @@ describe("cutting the robot off", () => {
     const v = earEvent(EAR_OFF, { type: "listening" }).view;
     expect(earEvent(v, { type: "barge", text: "" }).action).toEqual({ kind: "barge", text: "" });
     expect(earEvent(v, { type: "barge", text: "qué hora es" }).action).toEqual({ kind: "barge", text: "qué hora es" });
+  });
+});
+
+describe("spokenRequest", () => {
+  it("drops the names a phrase opens with", () => {
+    expect(spokenRequest("Bender, ¿qué ves?")).toBe("¿qué ves?");
+    expect(spokenRequest("Huesos huesos ¿qué hora es?")).toBe("¿qué hora es?");
+  });
+  it("is empty when only names were said", () => {
+    expect(spokenRequest("Bender Bender Bender")).toBe("");
+    expect(spokenRequest("¡Bénder!")).toBe("");
+  });
+  it("keeps a name inside the question", () => {
+    expect(spokenRequest("¿Quién es Bender?")).toBe("¿Quién es Bender?");
   });
 });
 

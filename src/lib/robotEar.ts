@@ -56,6 +56,18 @@ export function earEvent(view: EarView, raw: unknown): { view: EarView; action: 
   }
 }
 
+// The robots' names, and the device's wake word, at the start of something said to it.
+const NAMES = /^[\s,.;:!¡?¿-]*(b[eé]nd[eé]r|huesos|robot)\b[\s,.;:!?-]*/i;
+
+/** What a phrase spoken on the device's mic asks, without the names it opens with: "Bender,
+ * ¿qué ves?" -> "¿qué ves?"; "" when it was only names ("Bender Bender Bender" was sent as the
+ * question, 2026-10-28) — the same as the robot's ear (iacore ear_common.wake_command). */
+export function spokenRequest(text: string): string {
+  let rest = text.trim();
+  for (let m = NAMES.exec(rest); m && m[0]; m = NAMES.exec(rest)) rest = rest.slice(m[0].length);
+  return rest.trim();
+}
+
 /** One line for the panel. */
 export function earStatus(view: EarView): string {
   switch (view.state) {

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { transcribeAudio } from "../api/backend";
 import { useRobot } from "../components/layout/RobotContext";
 import { robotEarUrl } from "../config";
-import { earStatus, ROBOTS_WITH_MIC } from "../lib/robotEar";
+import { earStatus, ROBOTS_WITH_MIC, spokenRequest } from "../lib/robotEar";
 import type { VoicePhase } from "../types";
 import { useAudioRecorder } from "./useAudioRecorder";
 import { useRobotEar } from "./useRobotEar";
@@ -122,6 +122,9 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
   // as soon as that one ends (it used to be dropped).
   const nextRequest = useRef<string | null>(null);
   const [saysName, setSaysName] = useState(false);
+  // "¿Sí?" (declared further down, next to the robot's ear): a ref, so the device's handlers
+  // above it call the current one.
+  const acknowledgeRef = useRef(() => {});
   const { robot } = useRobot();
   const robotMic = ROBOTS_WITH_MIC.has(robot);
   const [robotEar, setRobotEar] = useState(() => readFlag(LS_ROBOT_EAR));
@@ -235,9 +238,14 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
       setPhase("transcribing");
       setStatus(t("Transcribing…"));
       const res = await transcribeAudio(blob);
-      const text = res.text?.trim();
-      if (res.error || !text || NOT_A_QUESTION.test(text)) {
+      const heard = res.text?.trim();
+      if (res.error || !heard || NOT_A_QUESTION.test(heard)) {
         setStatus(res.error ? t("Error: {error}", { error: res.error }) : t("Nothing recognized"));
+        return;
+      }
+      const text = spokenRequest(heard);
+      if (!text) {
+        if (spokenModeRef.current) acknowledgeRef.current(); // only its name: "¿Sí?", as the robot's ear
         return;
       }
       spoke = await answerText(text);
@@ -302,7 +310,12 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
           continue;
         }
         if (!text || NOT_A_QUESTION.test(text)) continue;
-        spoke = await answerText(text);
+        const request = spokenRequest(text);
+        if (!request) {
+          if (spokenModeRef.current) acknowledgeRef.current(); // only its name: "¿Sí?", as the robot's ear
+          continue;
+        }
+        spoke = await answerText(request);
       } catch (e) {
         setStatus(t("Voice error: {error}", { error: e instanceof Error ? e.message : String(e) }));
       } finally {
@@ -359,6 +372,7 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
     ackTimer.current = setTimeout(() => setAcking(false), 4000);
     speech.speak(WAKE_ACK, undefined, ackDone);
   };
+  acknowledgeRef.current = acknowledge;
 
   const ear = useRobotEar({
     url: robotEarUrl(robot),
