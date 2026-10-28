@@ -22,6 +22,7 @@ import {
   IconVolumeOff,
 } from "@tabler/icons-react";
 import type { ChatMessage, ChatSummary, NewMessage } from "../../api/chats";
+import type { ContextUsage } from "../../api/backend";
 import { DropMenu, useDropdown } from "../ui/DropMenu";
 import { Markdown } from "../ui/Markdown";
 import { Select } from "../ui/Select";
@@ -106,6 +107,8 @@ export interface ChatControls {
   onDelete: (id: string) => void;
   /** Keep a finished exchange (the robot it was about is added by the page). */
   onSave: (msg: Omit<NewMessage, "robot">) => void;
+  /** How full the model's window was on this conversation's last question; null until one. */
+  usage?: ContextUsage | null;
 }
 
 interface Props {
@@ -293,6 +296,7 @@ export function VlmPanel({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <Conversations chat={chat} busy={busy} />
+      {chat.usage && <ContextMeter usage={chat.usage} busy={busy} onNew={() => chat.onOpen(null)} />}
       <div ref={scroller} className="-mx-1 min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-1"
         onScroll={(e) => {
           const el = e.currentTarget;
@@ -695,6 +699,47 @@ function Conversations({ chat, busy }: { chat: ChatControls; busy: boolean }) {
       </button>
       {chat.error && (
         <span role="alert" title={chat.error} className="max-w-[40%] shrink truncate text-[11px] font-semibold text-bad-fg">{chat.error}</span>
+      )}
+    </div>
+  );
+}
+
+const kTokens = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
+
+/** How much of the model's window the last question took, and whether the oldest turns no longer
+ * go with the questions — so the person can choose to start a new conversation. */
+function ContextMeter({ usage, busy, onNew }: { usage: ContextUsage; busy: boolean; onNew: () => void }) {
+  const t = useT();
+  const used = usage.promptTokens + usage.completionTokens;
+  const size = usage.window;
+  const share = size ? Math.min(1, used / size) : null;
+  const forgotten = Math.max(0, usage.turnsTotal - usage.turnsSent);
+  const tone = forgotten || (share ?? 0) >= 0.85 ? "bg-warn-fg" : "bg-accent";
+  return (
+    <div className="mb-2 grid gap-1 px-2"
+      title={t("What the last question took of the model's window: the picture, the earlier questions and answers, any web results and the answer. When the earlier ones no longer fit, the oldest drop off.")}>
+      <div className="flex items-center gap-2 text-[11px] text-dim">
+        {share !== null && (
+          <span className="h-1 w-16 shrink-0 overflow-hidden rounded-full bg-subtle">
+            <span className={`block h-full rounded-full ${tone}`} style={{ width: `${Math.round(share * 100)}%` }} />
+          </span>
+        )}
+        <span className="min-w-0 truncate">
+          {size
+            ? t("Memory: {used} of {window} tokens · {free} free", { used: kTokens(used), window: kTokens(size), free: kTokens(Math.max(0, size - used)) })
+            : t("Memory: {used} tokens", { used: kTokens(used) })}
+        </span>
+      </div>
+      {forgotten > 0 && (
+        <div className="flex items-center gap-2 text-[11px] font-semibold text-warn-fg">
+          <span className="min-w-0 truncate">
+            {forgotten === 1 ? t("It no longer remembers the first question") : t("It no longer remembers the first {n} questions", { n: forgotten })}
+          </span>
+          <button type="button" onClick={onNew} disabled={busy}
+            className="ml-auto shrink-0 cursor-pointer rounded-md px-1.5 py-0.5 text-accent hover:bg-subtle disabled:opacity-40">
+            {t("Start a new one")}
+          </button>
+        </div>
       )}
     </div>
   );

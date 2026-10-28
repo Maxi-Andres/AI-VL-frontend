@@ -125,16 +125,48 @@ export async function fetchRobotFrame(signal?: AbortSignal): Promise<string | nu
 /** One earlier question and its answer, sent with the next question as context. */
 export interface ChatTurn { question: string; answer: string }
 
-/** iacore's first chunk when the question is searched on the web (search_common.SEARCHING_MARK):
- * read here, never shown as part of the answer. */
-const SEARCHING_MARK = "\x1esearching\x1e";
+/** How much of the model's window the last question took (iacore's usage mark). */
+export interface ContextUsage {
+  promptTokens: number;
+  completionTokens: number;
+  /** The server's context window in tokens; null when it does not say (Ollama). */
+  window: number | null;
+  /** Earlier turns that went with the question, of the ones the conversation has. */
+  turnsSent: number;
+  turnsTotal: number;
+}
+
+export interface StreamEvents {
+  /** The server started searching the web for this question. */
+  searching?: () => void;
+  /** The answer ended; how full the window was. */
+  usage?: (u: ContextUsage) => void;
+}
+
+// iacore wraps its notes in record separators (search_common.SEARCHING_MARK,
+// vlm_common.USAGE_MARK): read here, never shown as part of the answer.
+const SEP = "\x1e";
+
+function readMark(body: string, on: StreamEvents) {
+  if (body === "searching") on.searching?.();
+  else if (body.startsWith("usage ")) {
+    try {
+      const u = JSON.parse(body.slice(6)) as Record<string, number | null>;
+      on.usage?.({
+        promptTokens: u.prompt_tokens ?? 0, completionTokens: u.completion_tokens ?? 0,
+        window: u.window ?? null, turnsSent: u.turns_sent ?? 0, turnsTotal: u.turns_total ?? 0,
+      });
+    } catch {
+      /* a mark this page does not know: dropped */
+    }
+  }
+}
 
 export async function askVlmStream(
   req: { image: string; model?: string; prompt: string; robot?: string; history?: ChatTurn[] },
   onDelta: (piece: string) => void,
   signal?: AbortSignal,
-  /** Called once when the server starts searching the web for this question. */
-  onSearching?: () => void,
+  on: StreamEvents = {},
 ): Promise<string> {
   const r = await backendFetch(`/api/vlm/stream`, {
     method: "POST",
@@ -146,31 +178,36 @@ export async function askVlmStream(
   const reader = r.body.getReader();
   const decoder = new TextDecoder();
   let full = "";
-  // The mark can only be first; hold the start until it is clearly there or clearly not.
-  let head: string | null = "";
+  // Text not passed on yet: an unclosed mark, which may be cut across chunks.
+  let pending = "";
+  const emit = (text: string) => {
+    if (text) {
+      full += text;
+      onDelta(text);
+    }
+  };
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
-    let piece = decoder.decode(value, { stream: true });
-    if (head !== null) {
-      head += piece;
-      if (head.length < SEARCHING_MARK.length && SEARCHING_MARK.startsWith(head)) continue;
-      if (head.startsWith(SEARCHING_MARK)) {
-        onSearching?.();
-        head = head.slice(SEARCHING_MARK.length);
+    pending += decoder.decode(value, { stream: true });
+    for (;;) {
+      const open = pending.indexOf(SEP);
+      if (open < 0) {
+        emit(pending);
+        pending = "";
+        break;
       }
-      piece = head;
-      head = null;
-    }
-    if (piece) {
-      full += piece;
-      onDelta(piece);
+      emit(pending.slice(0, open));
+      const close = pending.indexOf(SEP, open + 1);
+      if (close < 0) {
+        pending = pending.slice(open);
+        break;
+      }
+      readMark(pending.slice(open + 1, close), on);
+      pending = pending.slice(close + 1);
     }
   }
-  if (head) {
-    full += head;
-    onDelta(head);
-  }
+  emit(pending.replaceAll(SEP, ""));
   return full;
 }
 

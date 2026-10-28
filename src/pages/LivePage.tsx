@@ -9,7 +9,7 @@ import {
   setRobotCamera,
   transcribeAudio,
 } from "../api/backend";
-import type { ChatTurn } from "../api/backend";
+import type { ChatTurn, ContextUsage } from "../api/backend";
 import { VideoStage } from "../components/live/VideoStage";
 import { RobotCameraStage } from "../components/live/RobotCameraStage";
 import { ClassChips } from "../components/live/ClassChips";
@@ -120,6 +120,9 @@ export function LivePage() {
   const [vlmStatus, setVlmStatus] = useState("");
   // The question being answered is searched on the web first (askVlmStream's onSearching).
   const [vlmSearching, setVlmSearching] = useState(false);
+  // How full the model's window was on the open conversation's last question (iacore's usage
+  // mark): the meter under the conversation, so the person knows when to start a new one.
+  const [contextUsage, setContextUsage] = useState<ContextUsage | null>(null);
   const [vlmOutput, setVlmOutput] = useState("");
   // Free-prompt text lives here (not in VlmPanel) so dictation can populate it.
   const [prompt, setPrompt] = useState("");
@@ -508,10 +511,13 @@ export function LivePage() {
             onDelta(piece);
           },
           ac.signal,
-          () => {
-            searched = true;
-            setVlmSearching(true);
-            setVlmStatus(t("Searching the internet…"));
+          {
+            searching: () => {
+              searched = true;
+              setVlmSearching(true);
+              setVlmStatus(t("Searching the internet…"));
+            },
+            usage: setContextUsage,
           },
         );
         const total = performance.now() - t0;
@@ -541,6 +547,8 @@ export function LivePage() {
   // The assistant's conversations, kept per person on the server: they survive a camera switch,
   // a reload or another computer.
   const chats = useChats(mayAnalyze);
+  // Another conversation, or a new one: the meter starts over (it is known after a question).
+  useEffect(() => setContextUsage(null), [chats.version]);
   historyRef.current = chats.history
     .filter((m) => m.kind === "question" && m.answer.trim())
     .map((m) => ({ question: m.question, answer: m.answer }));
@@ -886,6 +894,7 @@ export function LivePage() {
                   onOpen: (id) => void chats.open(id),
                   onDelete: (id) => void chats.remove(id),
                   onSave: (msg) => chats.save({ ...msg, robot: source === "own" ? "" : cmdRobot }),
+                  usage: contextUsage,
                 }}
                 models={options.vlm_models}
                 scopes={Object.keys(options.scopes)}
