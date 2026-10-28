@@ -173,7 +173,9 @@ export function useWhepStream(url: string, active = true): WhepState {
         });
         if (!res.ok) throw new Error(`WHEP ${res.status}`);
         const loc = res.headers.get("Location");
-        if (loc) resource = new URL(loc, url).toString();
+        // Resolved against the page too: the default endpoint is relative (/api/whep/<robot>),
+        // and new URL(loc, "/api/…") throws — which failed every H.264 attempt (2026-10-28).
+        if (loc) resource = new URL(loc, new URL(url, location.href)).toString();
         const answer = await res.text();
         if (cancelled || !pc) return;
         await pc.setRemoteDescription({ type: "answer", sdp: answer });
