@@ -67,7 +67,7 @@ export const LIVE: Record<string, string> = {
   "Read any text or gauges": "Lee cualquier texto o indicador",
   "Find objects": "Buscar objetos",
   "Scope · prompt variant (change them under the settings)": "Alcance · variante del prompt (cámbialos en la configuración)",
-  "Ask anything about the frame — e.g. Is the reading within normal range?": "Pregunta lo que quieras sobre el cuadro — p. ej. ¿La lectura está en el rango normal?",
+  "Ask about the frame, or say “search…” to look it up on the internet": "Preguntá sobre la imagen, o decí «buscá…» para buscarlo en internet",
   "Question about the frame": "Pregunta sobre el cuadro",
   "Speak a question — it is sent when you stop talking": "Haz una pregunta en voz alta — se envía cuando dejas de hablar",
   "Speak a question": "Hacer una pregunta en voz alta",

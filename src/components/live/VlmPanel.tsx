@@ -23,6 +23,7 @@ import {
 } from "@tabler/icons-react";
 import type { ChatMessage, ChatSummary, NewMessage } from "../../api/chats";
 import { DropMenu, useDropdown } from "../ui/DropMenu";
+import { Markdown } from "../ui/Markdown";
 import { Select } from "../ui/Select";
 import { StatusText } from "../ui/StatusText";
 import { Segmented } from "../ui/Segmented";
@@ -352,7 +353,7 @@ export function VlmPanel({
                 send();
               }
             }}
-            placeholder={t("Ask anything about the frame — e.g. Is the reading within normal range?")}
+            placeholder={t("Ask about the frame, or say “search…” to look it up on the internet")}
             aria-label={t("Question about the frame")}
             className="block max-h-32 min-h-[52px] w-full resize-none bg-transparent px-3 pt-2.5 text-[13px] text-fg outline-none [field-sizing:content] placeholder:text-dim" />
           <div className="flex items-center gap-1 px-2 pb-2">
@@ -546,7 +547,7 @@ function Answer({ turn, answer, status, streaming, searching = false, voice }: {
             <Raw text={answer} />
           </>
         ) : (
-          <p className="m-0 whitespace-pre-wrap">{answer}</p>
+          <Markdown text={answer} />
         )}
         {!streaming && !bad && answer && (
           <div className="mt-1.5 flex items-center gap-2 text-[11px] text-dim">
