@@ -12,7 +12,7 @@ import { useT } from "../../i18n";
  */
 export function VideoTransportSwitch() {
   const t = useT();
-  const { transport, setTransport, available, detail, lastError, whepUrl, mjpegRetired } =
+  const { transport, setTransport, available, detail, lastError, mjpegRetired } =
     useVideoTransport();
   if (!available) return null;
   const options: { id: typeof transport; label: string; title?: string; off?: boolean }[] = [
@@ -39,28 +39,11 @@ export function VideoTransportSwitch() {
         ))}
       </Segmented>
       {lastError && (
-        // The one failure a user can fix themselves, and the only one worth a link.
-        //
-        // The video server answers on its own origin (:8889) with a self-signed certificate,
-        // so a browser that has never been there refuses the request outright — no prompt, no
-        // console entry the operator would look at. Opening the endpoint once and accepting
-        // the warning is the whole fix, and it is per browser, so it comes back on every new
-        // machine. Shown after the fall-back rather than instead of it: the drive view keeps
-        // working on MJPEG while this explains why the other button did nothing.
-        <a
-          href={whepUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="text-xs text-accent2 underline underline-offset-2 hover:opacity-80"
-          title={lastError}
-        >
-          <StatusText
-            status={{
-              tone: "warn",
-              text: t("Open this once and accept the certificate to enable H.264"),
-            }}
-          />
-        </a>
+        // Said, not silent: falling back without a word is how this became "I press H.264
+        // and nothing happens". The reason is in the tooltip.
+        <span title={lastError}>
+          <StatusText status={{ tone: "warn", text: t("H.264 did not connect") }} />
+        </span>
       )}
     </div>
   );

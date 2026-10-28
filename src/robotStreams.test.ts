@@ -13,6 +13,11 @@ describe("whepUrlFor", () => {
   it("leaves an unknown robot on the configured URL", () => {
     expect(whepUrlFor(BASE, "b2")).toBe(BASE);
   });
+  it("names the robot on Pilot's own endpoint", () => {
+    expect(whepUrlFor("/api/whep", "go2")).toBe("/api/whep/go2");
+    expect(whepUrlFor("https://pilot.example/api/whep", "g1")).toBe("https://pilot.example/api/whep/g1");
+    expect(whepUrlFor("/api/whep", "b2")).toBe("/api/whep");
+  });
   it("leaves a URL that is not /<path>/whep untouched", () => {
     expect(whepUrlFor("https://h/custom", "g1")).toBe("https://h/custom");
   });

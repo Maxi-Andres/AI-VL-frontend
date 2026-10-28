@@ -11,13 +11,15 @@
 export const MEDIAMTX_PATH: Record<string, string> = { go2: "robot", g1: "g1" };
 
 /**
- * The WHEP URL for `robot`, built from the configured one by swapping its path segment.
- * `base` is whatever WHEP_URL resolved to (default `…:8889/robot/whep`, or an override).
- * An unknown robot, or a base that does not end in `/<path>/whep`, is returned untouched:
- * a wrong guess here only costs the fall-back to MJPEG, never a broken page.
+ * The WHEP URL for `robot`. `base` is whatever WHEP_URL resolved to: Pilot's `/api/whep`
+ * (the default), which takes the robot's name and knows its path; or an override naming
+ * mediamtx directly (`…:8889/robot/whep`), whose path segment is swapped. An unknown robot,
+ * or a base that is neither, is returned untouched: a wrong guess here only costs the
+ * fall-back, never a broken page.
  */
 export function whepUrlFor(base: string, robot: string): string {
   const path = MEDIAMTX_PATH[robot];
   if (!path) return base;
+  if (base.endsWith("/api/whep")) return `${base}/${robot}`;
   return base.replace(/\/[^/]+\/whep$/, `/${path}/whep`);
 }

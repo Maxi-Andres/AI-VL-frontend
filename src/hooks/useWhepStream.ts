@@ -71,7 +71,7 @@ export function useWhepStream(url: string, active = true): WhepState {
       prev = null;
       if (resource) {
         // Best-effort: the page may be unloading. keepalive lets it leave anyway.
-        fetch(resource, { method: "DELETE", keepalive: true }).catch(() => {});
+        fetch(resource, { method: "DELETE", keepalive: true, credentials: "include" }).catch(() => {});
         resource = null;
       }
       pc?.close();
@@ -167,6 +167,7 @@ export function useWhepStream(url: string, active = true): WhepState {
 
         const res = await fetch(url, {
           method: "POST",
+          credentials: "include",   // Pilot's /api/whep needs the session (the dev server is cross-origin)
           headers: { "Content-Type": "application/sdp" },
           body: pc.localDescription.sdp,
         });

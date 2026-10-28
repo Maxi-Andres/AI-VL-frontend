@@ -165,6 +165,9 @@ export interface Presence {
      * their memory where the driver tells it. [] = none found; null/absent = cannot tell. */
     gpus?: { vendor: string; name: string; used_mb: number | null; total_mb: number | null }[] | null;
   };
+  /** Each robot's camera reaching the video recorder (Frigate), every robot at once — unlike
+   * robot_cam, the one robot the bridge streams. Null/absent: the recorder does not answer. */
+  cameras?: Record<string, boolean> | null;
 }
 
 /** Payload of POST /api/command — the Unitree command interpreter.

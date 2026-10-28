@@ -483,15 +483,24 @@ function RobotCard({ robot, site, presence, net, editable, onEdit }: {
   const can = useCan();
   const navigate = useNavigate();
   const state = presence ? robotState(presence, robot.slot, net) : null;
-  const live = streaming(presence, robot.slot, net);
+  // Its own picture from the recorder, which sees every robot at once; the bridge's frame only
+  // when the recorder cannot tell (it carries just the robot picked last).
+  const recorded = presence?.cameras?.[robot.slot] === true;
+  const live = recorded || (presence?.cameras == null && streaming(presence, robot.slot, net));
+  const frameSrc = presence?.cameras != null
+    ? `${BACKEND_URL}/api/robot-frame?robot=${encodeURIComponent(robot.slot)}` : `${BACKEND_URL}/api/robot-frame?`;
   const battery = net?.[robot.slot]?.relay?.battery;
   const Icon = MODEL_ICON[robot.slot] ?? IconRobot;
-  // The live picture, refreshed while this robot is the one streaming.
+  // The live picture, refreshed while this robot's camera is live.
   const [frame, setFrame] = useState(0);
   const [frameOk, setFrameOk] = useState(true);
   useEffect(() => {
     if (!live) return;
-    const timer = window.setInterval(() => setFrame((n) => n + 1), 2500);
+    // A failed picture is retried on the next tick, not given up on for good.
+    const timer = window.setInterval(() => {
+      setFrame((n) => n + 1);
+      setFrameOk(true);
+    }, 2500);
     return () => window.clearInterval(timer);
   }, [live]);
   const open = (path: string) => {
@@ -516,7 +525,7 @@ function RobotCard({ robot, site, presence, net, editable, onEdit }: {
       <button onClick={() => open("/live")} aria-label={t("Open {name} live", { name: robot.name })}
         className={`relative block h-[120px] w-full cursor-pointer overflow-hidden bg-gradient-to-br from-[#123f3a] via-[#1b2a33] to-[#2a2a14] text-left transition ${offline ? "opacity-80 grayscale" : ""}`}>
         {live && frameOk ? (
-          <img src={`${BACKEND_URL}/api/robot-frame?t=${frame}`} alt={t("{name}, live", { name: robot.name })} onError={() => setFrameOk(false)}
+          <img src={`${frameSrc}&t=${frame}`} alt={t("{name}, live", { name: robot.name })} onError={() => setFrameOk(false)}
             className="absolute inset-0 size-full object-cover" />
         ) : (
           <Icon size={64} stroke={1.2} className="absolute right-4 bottom-2 text-white/15 transition duration-300 group-hover:scale-105" />

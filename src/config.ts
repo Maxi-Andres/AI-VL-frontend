@@ -53,29 +53,23 @@ export function robotEarUrl(robot: string): string {
 export const WS_JOINT_CONTROL_URL = wsUrl("/ws/joint-control?robot=g1");
 
 /**
- * WebRTC (WHEP) endpoint for the robot camera, e.g. "http://192.168.20.99:8889/robot/whep".
+ * WebRTC (WHEP) endpoint for the robot camera: Pilot's own `/api/whep`, which hands the offer
+ * to mediamtx (whepUrlFor adds the robot). An override may still name mediamtx directly,
+ * e.g. "https://192.168.20.99:8889/robot/whep".
  *
- * EMPTY BY DEFAULT ON PURPOSE: the MJPEG path over the backend's view socket stays the
- * drive view until this is set per deployment. Measured 2026-09-11, the reason to set it is
- * bandwidth, not latency — MJPEG costs ~8.9 Mbps PER VIEWER off the robot because the robot
- * serves every viewer a full copy, while the H.264 it already encodes costs 1.4 Mbps ONCE
- * and mediamtx fans it out here. On a LAN, MJPEG is in fact the lower-latency of the two.
- *
- * This URL points at mediamtx DIRECTLY, not at the backend — the only place in the app that
- * does. mediamtx has no STUN/TURN configured, so viewer and server must share the HQ LAN.
+ * Until 2026-10-28 the default pointed at mediamtx DIRECTLY (this host, :8889): its
+ * self-signed certificate was refused until someone opened that address once and accepted
+ * it, per browser, and from the internet the port does not exist. Through the backend the
+ * offer rides Pilot's origin, certificate and sign-in. Only the offer: the video still comes
+ * from mediamtx over ICE, so a viewer outside the office needs mediamtx to announce an
+ * address reachable from there — until then the page falls back on its own.
  */
-const WHEP_DEFAULT_PORT = 8889;
-const WHEP_DEFAULT_PATH = "/robot/whep";
-
 export const WHEP_URL = (
   window.APP_CONFIG?.WHEP_URL ??
   import.meta.env.VITE_WHEP_URL ??
-  // Derived, not hardcoded, and not empty: mediamtx runs beside the backend, so the page's
-  // own host with mediamtx's port is right in every deployment we have. Defaulting to ""
-  // made the transport switch invisible until someone edited a config file, which is the
-  // wrong failure for a control whose entire purpose is being flipped back and forth while
-  // comparing links. A wrong guess is cheap — the switch simply falls back to MJPEG.
-  `${location.protocol}//${location.hostname}:${WHEP_DEFAULT_PORT}${WHEP_DEFAULT_PATH}`
+  // Not empty: an empty one made the transport switch invisible until someone edited a
+  // config file. A wrong one is cheap — the switch simply falls back.
+  `${BACKEND_URL}/api/whep`
 ).replace(/\/$/, "");
 
 /**
