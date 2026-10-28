@@ -17,6 +17,7 @@ import {
 } from "../../api/team";
 import type { Invitation, Member, OneTimeLink, ServerAddress, Team } from "../../api/team";
 import { useMe } from "../../auth/AuthContext";
+import { useCan } from "../../auth/permissions";
 import { ROLES, ROLE_LABEL, ROLE_RANK } from "../../auth/roles";
 import { Avatar } from "../ui/Avatar";
 import { msg, t, useT } from "../../i18n";
@@ -362,9 +363,11 @@ function LinkDialog({ title, to, link, valid, onClose }: {
   title: string; to: string; link: OneTimeLink; valid: string; onClose: () => void;
 }) {
   const t = useT();
+  // The address is the owners' to change: single sign-on is sent there too (team.py).
+  const owner = useCan()("manage_org");
   const [copied, setCopied] = useState(false);
   const [base, setBase] = useState(link.base);
-  const [changing, setChanging] = useState(!link.base && onLocalAddress());
+  const [changing, setChanging] = useState(owner && !link.base && onLocalAddress());
   const url = linkUrl({ ...link, base });
   async function copy() {
     try {
@@ -401,8 +404,8 @@ function LinkDialog({ title, to, link, valid, onClose }: {
         <AddressPicker current={base} onSaved={(u) => { setBase(u); setChanging(false); }} />
       ) : (
         <p className="m-0 text-xs text-dim">
-          {t("Points to {url}", { url: base ?? location.origin })} ·{" "}
-          <button type="button" onClick={() => setChanging(true)} className="cursor-pointer font-bold text-accent hover:underline">{t("Change")}</button>
+          {t("Points to {url}", { url: base ?? location.origin })}
+          {owner && <>{" · "}<button type="button" onClick={() => setChanging(true)} className="cursor-pointer font-bold text-accent hover:underline">{t("Change")}</button></>}
         </p>
       )}
       <div className="mt-5 flex justify-end">
@@ -472,6 +475,7 @@ const ADDRESS_CHANGED = "pilot:linkAddress";
 /** Settings → Team: the address links point to, with a way to change it. */
 function LinkAddress() {
   const t = useT();
+  const owner = useCan()("manage_org");
   const [url, setUrl] = useState<string | null | undefined>(undefined);
   const [changing, setChanging] = useState(false);
   useEffect(() => {
@@ -491,9 +495,11 @@ function LinkAddress() {
         <IconLink size={16} className="text-muted" />
         <b>{t("Invitation links point to")}</b>
         <span className="font-mono text-[12.5px] text-muted">{url ?? t("{origin} (this page — not set)", { origin: location.origin })}</span>
-        <button type="button" onClick={() => setChanging((v) => !v)} className="ml-auto cursor-pointer text-xs font-bold text-accent hover:underline">
-          {changing ? t("Close") : t("Change")}
-        </button>
+        {owner && (
+          <button type="button" onClick={() => setChanging((v) => !v)} className="ml-auto cursor-pointer text-xs font-bold text-accent hover:underline">
+            {changing ? t("Close") : t("Change")}
+          </button>
+        )}
       </div>
       {changing && <div className="mt-3"><AddressPicker current={url} onSaved={(u) => { setUrl(u); setChanging(false); }} /></div>}
     </div>
