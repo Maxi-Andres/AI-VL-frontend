@@ -134,6 +134,8 @@ export interface ContextUsage {
   /** Earlier turns that went with the question, of the ones the conversation has. */
   turnsSent: number;
   turnsTotal: number;
+  /** Tokens the server keeps for the answer: never free for the conversation. */
+  answerRoom: number;
 }
 
 export interface StreamEvents {
@@ -155,6 +157,7 @@ function readMark(body: string, on: StreamEvents) {
       on.usage?.({
         promptTokens: u.prompt_tokens ?? 0, completionTokens: u.completion_tokens ?? 0,
         window: u.window ?? null, turnsSent: u.turns_sent ?? 0, turnsTotal: u.turns_total ?? 0,
+        answerRoom: u.answer_room ?? 0,
       });
     } catch {
       /* a mark this page does not know: dropped */

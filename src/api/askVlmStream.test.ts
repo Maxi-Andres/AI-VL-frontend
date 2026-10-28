@@ -49,9 +49,9 @@ describe("askVlmStream", () => {
     expect(await ask(["Es ", "marrón."])).toEqual({ answer: "Es marrón.", shown: "Es marrón.", searched: 0, usage: undefined });
   });
   it("reads how full the window was from the last mark, even cut in pieces", async () => {
-    const mark = '\x1eusage {"prompt_tokens":1500,"completion_tokens":20,"window":4096,"turns_sent":2,"turns_total":4}\x1e';
+    const mark = '\x1eusage {"prompt_tokens":1500,"completion_tokens":20,"window":4096,"turns_sent":2,"turns_total":4,"answer_room":512}\x1e';
     const r = await ask(["Marrón.", mark.slice(0, 9), mark.slice(9)]);
     expect(r.shown).toBe("Marrón.");
-    expect(r.usage).toEqual({ promptTokens: 1500, completionTokens: 20, window: 4096, turnsSent: 2, turnsTotal: 4 });
+    expect(r.usage).toEqual({ promptTokens: 1500, completionTokens: 20, window: 4096, turnsSent: 2, turnsTotal: 4, answerRoom: 512 });
   });
 });

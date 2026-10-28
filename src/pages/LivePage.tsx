@@ -18,6 +18,7 @@ import { VLM_IMG_DEFAULT, VlmPanel } from "../components/live/VlmPanel";
 import { CommandPanel } from "../components/live/CommandPanel";
 import { useStatus } from "../components/layout/StatusContext";
 import { useRobot } from "../components/layout/RobotContext";
+import { sentAsHistory } from "../lib/chatMemory";
 import { fmtMs } from "../lib/format";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { useCamera } from "../hooks/useCamera";
@@ -550,7 +551,7 @@ export function LivePage() {
   // Another conversation, or a new one: the meter starts over (it is known after a question).
   useEffect(() => setContextUsage(null), [chats.version]);
   historyRef.current = chats.history
-    .filter((m) => m.kind === "question" && m.answer.trim())
+    .filter(sentAsHistory)
     .map((m) => ({ question: m.question, answer: m.answer }));
   // Spoken answers' volume: the robot speaker's when it speaks through the robot, else this
   // device's.

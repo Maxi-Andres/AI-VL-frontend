@@ -23,6 +23,7 @@ import {
 } from "@tabler/icons-react";
 import type { ChatMessage, ChatSummary, NewMessage } from "../../api/chats";
 import type { ContextUsage } from "../../api/backend";
+import { forgottenTurns } from "../../lib/chatMemory";
 import { DropMenu, useDropdown } from "../ui/DropMenu";
 import { Markdown } from "../ui/Markdown";
 import { Select } from "../ui/Select";
@@ -233,6 +234,8 @@ export function VlmPanel({
       const question = kind === "analysis" ? `${scope} · ${variant}` : prompt.trim() || t("(spoken question)");
       setTurns((t) => [...t, { id: nextId.current++, kind, question, answer: "", status: "", done: false }]);
       asked.current = { kind, question };
+      // Any new question shows — also a spoken one, which never went through send().
+      toBottom();
       if (kind === "question") onPromptChange("");
     } else if (!busy && wasBusy.current) {
       setTurns((t) => t.map((x, i) => (i === t.length - 1 ? { ...x, answer: output, status, done: true } : x)));
@@ -259,16 +262,20 @@ export function VlmPanel({
 
   // While a turn is open, its answer is the stream as it arrives.
   const live = busy ? { answer: output, status } : null;
+  // What the last answer no longer received: shown faded, so the person sees what it forgot.
+  const forgotten = forgottenTurns(turns, chat.usage ? Math.max(0, chat.usage.turnsTotal - chat.usage.turnsSent) : 0);
+  const lastForgotten = turns.reduce((at, x, i) => (forgotten.has(x.id) ? i : at), -1);
 
   // Watch the content, not the props: an answer grows token by token, a list of found objects
   // replaces the dots, the settings fold out and shrink the view — each must keep the newest
-  // line in sight.
+  // line in sight. A jump, not a smooth scroll: while one animated, each step it passed through
+  // read as "scrolled up to read" (onScroll), and the view stopped following (2026-10-28).
   useEffect(() => {
     const el = scroller.current;
     const inner = content.current;
     if (!el || !inner) return;
     const follow = () => {
-      if (stick.current) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      if (stick.current) el.scrollTop = el.scrollHeight;
     };
     const ro = new ResizeObserver(follow);
     ro.observe(inner);
@@ -276,10 +283,13 @@ export function VlmPanel({
     return () => ro.disconnect();
   }, []);
 
-  const toBottom = () => {
+  function toBottom() {
     stick.current = true;
-    requestAnimationFrame(() => scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" }));
-  };
+    requestAnimationFrame(() => {
+      const el = scroller.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+  }
   const analyze = () => {
     pending.current = "analysis";
     toBottom();
@@ -329,11 +339,23 @@ export function VlmPanel({
                 const last = i === turns.length - 1;
                 const answer = last && live ? live.answer : turn.answer;
                 const st = last && live ? live.status : turn.status;
+                const gone = forgotten.has(turn.id);
                 return (
-                  <div key={turn.id} className="grid min-w-0 animate-rise grid-cols-[minmax(0,1fr)] gap-2">
-                    <Asked turn={turn} />
-                    <Answer turn={turn} answer={answer} status={st} streaming={last && busy}
-                      searching={last && busy && searching} voice={voice} />
+                  <div key={turn.id} className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
+                    <div title={gone ? t("It no longer remembers this: it does not go with the questions any more") : undefined}
+                      className={`grid min-w-0 animate-rise grid-cols-[minmax(0,1fr)] gap-2 transition-[opacity,filter] duration-500 ${gone ? "opacity-40 grayscale" : ""}`}>
+                      <Asked turn={turn} />
+                      <Answer turn={turn} answer={answer} status={st} streaming={last && busy}
+                        searching={last && busy && searching} voice={voice} />
+                    </div>
+                    {i === lastForgotten && (
+                      <div className="flex items-center gap-2 text-[11px] font-semibold text-dim">
+                        <span className="h-px flex-1 bg-line" />
+                        <IconArrowUp size={12} className="shrink-0" />
+                        {t("It no longer remembers what is above")}
+                        <span className="h-px flex-1 bg-line" />
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -711,13 +733,15 @@ const kTokens = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String
 function ContextMeter({ usage, busy, onNew }: { usage: ContextUsage; busy: boolean; onNew: () => void }) {
   const t = useT();
   const used = usage.promptTokens + usage.completionTokens;
-  const size = usage.window;
+  // What the conversation can use: the window less what the server keeps for the answer, so
+  // "free" reaches 0 when the oldest start to drop.
+  const size = usage.window ? usage.window - usage.answerRoom : null;
   const share = size ? Math.min(1, used / size) : null;
   const forgotten = Math.max(0, usage.turnsTotal - usage.turnsSent);
   const tone = forgotten || (share ?? 0) >= 0.85 ? "bg-warn-fg" : "bg-accent";
   return (
     <div className="mb-2 grid gap-1 px-2"
-      title={t("What the last question took of the model's window: the picture, the earlier questions and answers, any web results and the answer. When the earlier ones no longer fit, the oldest drop off.")}>
+      title={t("What the last question took of the model's window: the picture, the earlier questions and answers, any web results and the answer. Some room is always kept for the next answer. When the earlier ones no longer fit, the oldest drop off and show faded.")}>
       <div className="flex items-center gap-2 text-[11px] text-dim">
         {share !== null && (
           <span className="h-1 w-16 shrink-0 overflow-hidden rounded-full bg-subtle">
