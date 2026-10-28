@@ -20,6 +20,7 @@ import { useMe } from "../../auth/AuthContext";
 import { useCan } from "../../auth/permissions";
 import { ROLES, ROLE_LABEL, ROLE_RANK } from "../../auth/roles";
 import { Avatar } from "../ui/Avatar";
+import { Select } from "../ui/Select";
 import { msg, t, useT } from "../../i18n";
 import { rich } from "../../i18n/rich";
 
@@ -154,22 +155,19 @@ export function TeamSettings() {
                 </td>
                 <td className="px-4 py-3">
                   {editable(m) && m.active ? (
-                    <select
+                    <Select
                       value={m.role}
-                      onChange={(e) => {
-                        const role = e.target.value as Role;
+                      onChange={(v) => {
+                        const role = v as Role;
                         act(
                           t("Make {name} {role}? They will be signed out and sign in again with the new role.",
                             { name: m.name, role: t(ROLE_LABEL[role]) }),
                           () => updateMember(m.id, { role }),
                         );
                       }}
-                      className="cursor-pointer rounded-md border border-line bg-bg px-2 py-1 text-sm text-fg focus:border-accent focus:outline-none"
-                    >
-                      {assignable.map((r) => (
-                        <option key={r.role} value={r.role}>{t(r.label)}</option>
-                      ))}
-                    </select>
+                      className="rounded-md border border-line bg-bg px-2 py-1 text-sm text-fg focus:border-accent focus:outline-none"
+                      options={assignable.map((r) => ({ value: r.role, label: t(r.label) }))}
+                    />
                   ) : (
                     <span className="text-fg">{t(ROLE_LABEL[m.role])}</span>
                   )}

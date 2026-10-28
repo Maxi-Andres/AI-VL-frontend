@@ -5,6 +5,7 @@ import {
   type RobotCameraConfig,
 } from "../../api/backend";
 import { useRobot } from "../layout/RobotContext";
+import { Select } from "../ui/Select";
 import { useT } from "../../i18n";
 
 const FPS = [5, 8, 10, 15, 20, 30];
@@ -70,50 +71,41 @@ export function CameraSettings() {
       </label>
       <label className="block text-[11px] text-muted">
         FPS
-        <select
+        <Select
           className={selCls}
-          value={fps}
-          onChange={(e) => {
-            const v = parseInt(e.target.value, 10);
+          value={String(fps)}
+          onChange={(s) => {
+            const v = parseInt(s, 10);
             setFps(v);
             push({ fps: v });
           }}
-        >
-          {FPS.map((f) => (
-            <option key={f} value={f}>{f}</option>
-          ))}
-        </select>
+          options={FPS.map(String)}
+        />
       </label>
       <label className="block text-[11px] text-muted">
         {t("Resolution")}
-        <select
+        <Select
           className={selCls}
           value={resolution}
-          onChange={(e) => {
-            setResolution(e.target.value);
-            push({ resolution: e.target.value });
+          onChange={(v) => {
+            setResolution(v);
+            push({ resolution: v });
           }}
-        >
-          {RES.map((r) => (
-            <option key={r} value={r}>{r === "native" ? t("native") : r}</option>
-          ))}
-        </select>
+          options={RES.map((r) => ({ value: r, label: r === "native" ? t("native") : r }))}
+        />
       </label>
       <label className="block text-[11px] text-muted">
         {t("Quality")}
-        <select
+        <Select
           className={selCls}
-          value={quality}
-          onChange={(e) => {
-            const v = parseInt(e.target.value, 10);
+          value={String(quality)}
+          onChange={(s) => {
+            const v = parseInt(s, 10);
             setQuality(v);
             push({ quality: v });
           }}
-        >
-          {QUAL.map((q) => (
-            <option key={q} value={q}>{q === 0 ? t("Native") : q}</option>
-          ))}
-        </select>
+          options={QUAL.map((q) => ({ value: String(q), label: q === 0 ? t("Native") : String(q) }))}
+        />
       </label>
       <p className="col-span-3 m-0 text-[11px] leading-tight text-muted">
         {t("Lower = less latency for remote viewers. Anything but Native re-encodes on the bridge. This is the MJPEG view only; H.264 is encoded on the robot.")}

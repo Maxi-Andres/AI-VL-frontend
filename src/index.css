@@ -69,8 +69,12 @@
 @theme {
   --animate-rise: rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   --animate-shake: shake 0.4s ease-in-out;
+  --animate-pop: pop 0.14s ease-out both;
   @keyframes rise {
     from { opacity: 0; transform: translateY(10px); }
+  }
+  @keyframes pop {
+    from { opacity: 0; transform: scale(0.98); }
   }
   @keyframes shake {
     20%, 60% { transform: translateX(-5px); }
@@ -78,7 +82,7 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .animate-rise, .animate-shake { animation: none; }
+  .animate-rise, .animate-shake, .animate-pop { animation: none; }
 }
 
 /* Screens that are always light, whatever the theme: sign-in, setup, invitations. */
@@ -110,6 +114,47 @@ body {
   font: 14px/1.45 var(--font-sans);
   -webkit-font-smoothing: antialiased;
   transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* Scrollbars in the app's look, not the OS's: thin, a rounded thumb on a clear track, no arrow
+   buttons; the thumb firms up under the pointer. Both themes, through the tokens.
+   - Firefox reads only the standard scrollbar-width / scrollbar-color (no hover, so its thumb
+     is the firmer `dim`). They are fenced off from Chrome and Edge, which since 121 also read
+     them — and then ignore every ::-webkit-scrollbar rule, hover and width included.
+   - Chrome and Edge read the ::-webkit-scrollbar rules.
+   In @layer base on purpose: unlayered CSS would beat every Tailwind utility, and the strips
+   that hide their bar ([scrollbar-width:none] in Header and ClassChips) must keep winning. */
+@layer base {
+  :root {
+    --scrollbar-thumb: color-mix(in srgb, var(--color-dim) 60%, transparent);
+    --scrollbar-thumb-hover: var(--color-muted);
+  }
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--color-dim) transparent;
+    }
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+    background: transparent;
+  }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 8px;
+    background: var(--scrollbar-thumb) padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover) padding-box;
+  }
+  ::-webkit-scrollbar-button {
+    display: none;
+  }
 }
 
 /* Map tile credit (SiteMap): a licence term, so never removed — kept small and quiet, then

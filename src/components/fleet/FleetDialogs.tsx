@@ -5,6 +5,7 @@ import { searchAddress, type Place } from "../../lib/geocode";
 import { deletePlan, deleteRobot, deleteSite, saveRobot, saveSite, uploadPlan } from "../../api/fleet";
 import type { Fleet, FleetRobot, Site } from "../../api/fleet";
 import { ColorPicker } from "../ui/ColorPicker";
+import { Select } from "../ui/Select";
 import { RobotIcon } from "./RobotIcon";
 import { colorOf, randomColor, type ColorName } from "../../lib/colors";
 import { SiteMap } from "./SiteMap";
@@ -178,13 +179,10 @@ export function SiteDialog({ site, robotsHere, satellite, onClose }: {
           </div>
           <div>
             <Label htmlFor="site-tz">{t("Time zone")}</Label>
-            <select id="site-tz" value={timezone} onChange={(e) => setTimezone(e.target.value)} className={inputCls}>
-              {/* The saved zone may be spelled differently from the browser's list
-                  ("America/Argentina/Buenos_Aires" vs "America/Buenos_Aires"): keep it shown. */}
-              {(ZONES.includes(timezone) ? ZONES : [timezone, ...ZONES]).map((z) => (
-                <option key={z} value={z}>{z.replaceAll("_", " ")}</option>
-              ))}
-            </select>
+            {/* The saved zone may be spelled differently from the browser's list
+                ("America/Argentina/Buenos_Aires" vs "America/Buenos_Aires"): keep it shown. */}
+            <Select id="site-tz" value={timezone} onChange={setTimezone} className={inputCls}
+              options={(ZONES.includes(timezone) ? ZONES : [timezone, ...ZONES]).map((z) => ({ value: z, label: z.replaceAll("_", " ") }))} />
           </div>
           <div>
             <Label>{t("Floor plan")}</Label>
@@ -335,10 +333,8 @@ export function RobotDialog({ robot, siteId, fleet, onClose }: {
           </div>
           <div>
             <Label htmlFor="robot-site">{t("Site")}</Label>
-            <select id="robot-site" value={site} onChange={(e) => setSite(e.target.value)} className={inputCls}>
-              <option value="">{t("Not assigned")}</option>
-              {fleet.sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
+            <Select id="robot-site" value={site} onChange={setSite} className={inputCls}
+              options={[{ value: "", label: t("Not assigned") }, ...fleet.sites.map((s) => ({ value: s.id, label: s.name }))]} />
           </div>
           {error && <p role="alert" className="m-0 text-sm text-danger">{error}</p>}
           <div className="flex items-center gap-2">

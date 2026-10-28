@@ -36,6 +36,9 @@ import { msg, useT, type Vars } from "../../i18n";
 export const VLM_IMG_SIZES = ["1152", "1600", msg("Full")];
 export const VLM_IMG_DEFAULT = 1152;
 
+/** The settings drawer's dropdowns: small, full width of their w-40 slot. */
+const SELECT_CLS = "w-full rounded-md border border-line bg-bg p-1.5 text-xs text-fg focus:border-accent focus:outline-none";
+
 /** Hands-free voice controls, produced by useVoiceAssistant. */
 export interface VoiceControls {
   /** The mic can record here (the hands-free "just speak" mode and the mic button need no more). */
@@ -453,29 +456,28 @@ export function VlmPanel({
                 )}
                 {voice.speechSupported && voice.voices.length > 0 && (
                   <Row label={t("Voice")} hint={t("Made on the server; Drive uses it too")}>
-                    <select value={voice.voiceURI ?? ""} onChange={(e) => voice.onVoiceChange(e.target.value)}
-                      className="w-40 rounded-md border border-line bg-bg p-1.5 text-xs text-fg focus:border-accent focus:outline-none">
-                      <option value="">{t("Default")}</option>
-                      {voice.voices.map((v) => <option key={v.uri} value={v.uri}>{v.label}</option>)}
-                    </select>
+                    <div className="w-40">
+                      <Select value={voice.voiceURI ?? ""} onChange={voice.onVoiceChange} className={SELECT_CLS}
+                        options={[{ value: "", label: t("Default") }, ...voice.voices.map((v) => ({ value: v.uri, label: v.label }))]} />
+                    </div>
                   </Row>
                 )}
               </SettingsGroup>
               <SettingsGroup title={t("Model")}>
                 <Row label={t("Model")}>
-                  <div className="w-40"><Select options={models} value={model} onChange={(e) => onModelChange(e.target.value)} className="text-xs" /></div>
+                  <div className="w-40"><Select options={models} value={model} onChange={onModelChange} className={SELECT_CLS} /></div>
                 </Row>
                 <Row label={t("Find objects in")} hint={t("What “Find objects” looks for")}>
-                  <div className="w-40"><Select options={scopes} value={scope} onChange={(e) => onScopeChange(e.target.value)} className="text-xs" /></div>
+                  <div className="w-40"><Select options={scopes} value={scope} onChange={onScopeChange} className={SELECT_CLS} /></div>
                 </Row>
                 <Row label={t("Prompt variant")}>
-                  <div className="w-40"><Select options={variants} value={variant} onChange={(e) => onVariantChange(e.target.value)} className="text-xs" /></div>
+                  <div className="w-40"><Select options={variants} value={variant} onChange={onVariantChange} className={SELECT_CLS} /></div>
                 </Row>
                 {imageMaxSize !== undefined && onImageMaxSizeChange && (
                   <Row label={t("Image quality")} hint={t("1152 costs nothing extra; bigger reads small print, slower")}>
                     <div className="w-40">
-                      <Select options={VLM_IMG_SIZES.map((s) => t(s))} value={imageMaxSize > 0 ? String(imageMaxSize) : t("Full")} className="text-xs"
-                        onChange={(e) => onImageMaxSizeChange(e.target.value === t("Full") ? 0 : parseInt(e.target.value, 10))} />
+                      <Select options={VLM_IMG_SIZES.map((s) => t(s))} value={imageMaxSize > 0 ? String(imageMaxSize) : t("Full")} className={SELECT_CLS}
+                        onChange={(v) => onImageMaxSizeChange(v === t("Full") ? 0 : parseInt(v, 10))} />
                     </div>
                   </Row>
                 )}

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { IconCheck, IconScan, IconSearch, IconX } from "@tabler/icons-react";
 import { ClassChips } from "./ClassChips";
+import { Select } from "../ui/Select";
 import { Switch } from "../ui/Switch";
 import { Segmented } from "../ui/Segmented";
 import { msg, useT } from "../../i18n";
@@ -122,10 +123,8 @@ export function YoloPanel({
 
       <div className={`transition-opacity ${enabled ? "" : "opacity-70"}`}>
         <Row label={t("Model")} hint={t("Bigger models see more, and cost more GPU")}>
-          <select value={model} onChange={(e) => onModelChange(e.target.value)} aria-label={t("Model")}
-            className="w-40 rounded-lg border border-line bg-bg px-2 py-1.5 text-xs font-semibold text-fg focus:border-accent focus:outline-none">
-            {models.map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>
+          <Select value={model} onChange={onModelChange} aria-label={t("Model")} options={models}
+            className="w-40 rounded-lg border border-line bg-bg px-2 py-1.5 text-xs font-semibold text-fg focus:border-accent focus:outline-none" />
         </Row>
 
         <div className="border-b border-line py-3">

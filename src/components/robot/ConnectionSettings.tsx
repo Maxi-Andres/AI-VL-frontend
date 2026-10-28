@@ -7,6 +7,7 @@ import {
   type RobotNet,
 } from "../../api/backend";
 import { useRobot } from "../layout/RobotContext";
+import { Select } from "../ui/Select";
 import { useT } from "../../i18n";
 
 /**
@@ -203,15 +204,16 @@ export function ConnectionSettings() {
 
       <label className="block text-[11px] text-muted">
         {t("Command transport")}
-        <select
+        <Select
           value={mode}
           disabled={busy || !ready}
-          onChange={(e) => applyTransport(e.target.value, relayUrl)}
+          onChange={(v) => applyTransport(v, relayUrl)}
           className={field}
-        >
-          <option value="relay">{t("Relay on the robot — any network")}</option>
-          <option value="dds">{t("DDS from this machine — same subnet only")}</option>
-        </select>
+          options={[
+            { value: "relay", label: t("Relay on the robot — any network") },
+            { value: "dds", label: t("DDS from this machine — same subnet only") },
+          ]}
+        />
         <span className="mt-0.5 block text-[10px] leading-tight text-muted/70">
           {mode === "relay"
             ? t("Commands go over HTTP to the relay on the robot, which publishes DDS there.")

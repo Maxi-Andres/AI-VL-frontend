@@ -10,6 +10,7 @@ import {
   IconQuestionMark,
 } from "@tabler/icons-react";
 import { StatusText, type Status } from "../ui/StatusText";
+import { Select } from "../ui/Select";
 import { Switch } from "../ui/Switch";
 import type { CommandResponse } from "../../types";
 import { fmtMs } from "../../lib/format";
@@ -104,10 +105,8 @@ export function CommandPanel({
           <b className="block text-[13px]">{t("Model")}</b>
           <small className="block text-[11.5px] text-dim">{t("An *-instruct model answers fastest")}</small>
         </div>
-        <select value={model} onChange={(e) => onModelChange(e.target.value)} aria-label={t("Model")}
-          className="w-40 shrink-0 rounded-lg border border-line bg-bg px-2 py-1.5 text-xs font-semibold text-fg focus:border-accent focus:outline-none">
-          {models.map((m) => <option key={m} value={m}>{m}</option>)}
-        </select>
+        <Select value={model} onChange={onModelChange} aria-label={t("Model")} options={models}
+          className="w-40 shrink-0 rounded-lg border border-line bg-bg px-2 py-1.5 text-xs font-semibold text-fg focus:border-accent focus:outline-none" />
       </div>
 
       {/* The phrase */}
