@@ -195,7 +195,7 @@ export const LIVE: Record<string, string> = {
   "WebRTC from the video server: holds up on a lossy link": "WebRTC desde el servidor de video: aguanta en un enlace con pérdidas",
   "All-intra H.264 from the robot, decoded here. Half the bytes of MJPEG, no jitter buffer.": "H.264 todo intra desde el robot, decodificado aquí. La mitad de bytes que MJPEG, sin búfer de jitter.",
   "Video transport": "Transporte de video",
-  "H.264 did not connect": "H.264 no conectó",
+  "H.264 did not connect · showing {path}": "H.264 no conectó · mostrando {path}",
   // Video transport caption and voice badge
   "H.264 all-intra · {error}": "H.264 todo intra · {error}",
   "H.264 all-intra {fps} fps · {kbps} kbps · {errors} errors": "H.264 todo intra {fps} fps · {kbps} kbps · {errors} errores",

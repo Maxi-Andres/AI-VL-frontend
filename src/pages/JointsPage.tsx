@@ -124,7 +124,7 @@ export function JointsPage() {
   ] as const;
 
   return (
-    <main className="grid gap-4 p-4 lg:h-[calc(100dvh-65px)] lg:grid-cols-[minmax(0,1fr)_400px] lg:overflow-hidden">
+    <main className="grid gap-4 p-4 lg:h-full lg:grid-cols-[minmax(0,1fr)_400px] lg:overflow-hidden">
       <div className="flex min-h-0 min-w-0 flex-col gap-3">
         <SourceBar kind={kind} onKind={setKind} state={source} locked={control.phase !== "off"} />
         <div className="h-[60vh] min-h-0 lg:h-auto lg:flex-1">

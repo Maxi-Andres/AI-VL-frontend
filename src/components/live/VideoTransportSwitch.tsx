@@ -42,7 +42,8 @@ export function VideoTransportSwitch() {
         // Said, not silent: falling back without a word is how this became "I press H.264
         // and nothing happens". The reason is in the tooltip.
         <span title={lastError}>
-          <StatusText status={{ tone: "warn", text: t("H.264 did not connect") }} />
+          <StatusText status={{ tone: "warn", text: t("H.264 did not connect · showing {path}", {
+            path: transport === "intra" ? "H.264 intra" : "MJPEG" }) }} />
         </span>
       )}
     </div>

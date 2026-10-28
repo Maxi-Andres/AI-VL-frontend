@@ -779,7 +779,7 @@ export function LivePage() {
   const mayMirror = !mayOperate || source === "view" || othersStreaming || (!!cam?.live && source !== "robot");
 
   return (
-    <main className={`grid gap-4 p-4 lg:h-[calc(100dvh-65px)] lg:overflow-hidden ${mayAnalyze ? "lg:grid-cols-[minmax(0,1fr)_420px]" : ""}`}>
+    <main className={`grid gap-4 p-4 lg:h-full lg:overflow-hidden ${mayAnalyze ? "lg:grid-cols-[minmax(0,1fr)_420px]" : ""}`}>
       <div className="flex min-h-0 min-w-0 flex-col gap-3">
         {/* Source, and for the robot camera its picture settings */}
         <div className="flex flex-wrap items-center gap-2.5">

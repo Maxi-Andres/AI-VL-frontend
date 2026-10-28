@@ -1,4 +1,5 @@
-import { Outlet } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { Outlet, useLocation } from "react-router-dom";
 import { Header } from "./Header";
 import { StatusProvider, useStatus } from "./StatusContext";
 import { RobotProvider } from "./RobotContext";
@@ -35,13 +36,25 @@ function HeaderWithStatus() {
  * you look at while driving, and the camera/network popovers that used to sit here wrote the
  * same values as the robot selector under other names. */
 export function Layout() {
+  // The page scrolls in its own box under the header, not the document: a document scrollbar
+  // ran the full height of the window and cut the header's right edge (Fleet, 2026-10-28).
+  // A new page starts at its top, as the document scroll did.
+  const page = useRef<HTMLDivElement>(null);
+  const { pathname } = useLocation();
+  useEffect(() => {
+    page.current?.scrollTo(0, 0);
+  }, [pathname]);
   return (
     <StatusProvider>
       <RobotProvider>
         <VideoTransportProvider>
           <VoiceAssistantProvider>
-            <HeaderWithStatus />
-            <Outlet />
+            <div className="flex h-dvh flex-col">
+              <HeaderWithStatus />
+              <div ref={page} className="min-h-0 flex-1 overflow-y-auto">
+                <Outlet />
+              </div>
+            </div>
           </VoiceAssistantProvider>
         </VideoTransportProvider>
       </RobotProvider>

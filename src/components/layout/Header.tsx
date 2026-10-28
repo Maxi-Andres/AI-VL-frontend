@@ -68,7 +68,7 @@ export function Header({ children }: Props) {
     if (bar && !ready) requestAnimationFrame(() => setReady(true));
   }, [bar, ready]);
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-panel/85 backdrop-blur-md backdrop-saturate-150">
+    <header className="relative z-40 shrink-0 border-b border-line bg-panel/85 backdrop-blur-md backdrop-saturate-150">
       <div className="flex h-16 items-center gap-4 px-4 lg:gap-6 lg:px-6">
         <div className="flex shrink-0 items-center gap-2.5">
           <img src={silkLogoOnLight} alt="Silk Technologies" className="h-7 w-auto dark:hidden" />

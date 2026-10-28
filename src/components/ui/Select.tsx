@@ -42,11 +42,14 @@ interface Props {
   "aria-label"?: string;
   /** Shown when `value` matches no option. */
   placeholder?: string;
+  /** What the list lines up under: the button, or its parent when the parent is what looks
+   * like the control (a bordered box holding an icon and this button). */
+  anchor?: "self" | "parent";
 }
 
 const LOOK = "w-full rounded-md border border-line bg-bg p-1.5 text-fg focus:border-accent focus:outline-none";
 const MAX_HEIGHT = 288;
-const GAP = 4;
+const GAP = 6;
 const EDGE = 8;
 const TYPEAHEAD_MS = 600;
 
@@ -63,7 +66,7 @@ const norm = (o: SelectOption | string): SelectOption => (typeof o === "string" 
 
 export function Select({
   value, options, onChange, disabled = false, id, className = LOOK, title, placeholder,
-  "aria-label": ariaLabel,
+  "aria-label": ariaLabel, anchor = "self",
 }: Props) {
   const opts = options.map(norm);
   const autoId = useId();
@@ -174,7 +177,7 @@ export function Select({
 
   // Where the list goes: measured from the button, below it unless it fits better above.
   const measure = useCallback(() => {
-    const btn = trigger.current;
+    const btn = anchor === "parent" ? trigger.current?.parentElement : trigger.current;
     const el = list.current;
     if (!btn || !el) return;
     const r = btn.getBoundingClientRect();
@@ -194,7 +197,7 @@ export function Select({
       maxHeight: Math.max(80, Math.min(MAX_HEIGHT, up ? above : below)),
       up,
     });
-  }, []);
+  }, [anchor]);
 
   useLayoutEffect(() => {
     if (shown) measure();
@@ -212,7 +215,8 @@ export function Select({
     };
     const outside = (e: PointerEvent) => {
       const n = e.target as Node;
-      if (!trigger.current?.contains(n) && !list.current?.contains(n)) close();
+      const box = anchor === "parent" ? trigger.current?.parentElement : trigger.current;
+      if (!box?.contains(n) && !list.current?.contains(n)) close();
     };
     window.addEventListener("resize", follow);
     document.addEventListener("scroll", follow, true);
@@ -225,7 +229,7 @@ export function Select({
       document.removeEventListener("pointerdown", outside, true);
       document.removeEventListener("fullscreenchange", close);
     };
-  }, [shown, measure, close]);
+  }, [shown, measure, close, anchor]);
 
   // Keep the active option in view inside the list (never scrolls the page).
   useEffect(() => {

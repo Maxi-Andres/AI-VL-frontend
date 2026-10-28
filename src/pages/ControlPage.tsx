@@ -611,7 +611,7 @@ export function ControlPage() {
   );
 
   return (
-    <main className="grid gap-4 p-4 lg:h-[calc(100dvh-65px)] lg:grid-cols-[minmax(0,1fr)_380px] lg:overflow-hidden">
+    <main className="grid gap-4 p-4 lg:h-full lg:grid-cols-[minmax(0,1fr)_380px] lg:overflow-hidden">
       <div className="flex min-h-0 min-w-0 flex-col gap-3">
         {/* Arm, safety, speed */}
         <div className="flex flex-wrap items-center gap-2.5">

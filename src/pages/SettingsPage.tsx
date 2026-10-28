@@ -148,7 +148,7 @@ export function SettingsPage() {
   );
 
   return (
-    <main className="grid lg:h-[calc(100dvh-65px)] lg:grid-cols-[270px_minmax(0,1fr)] lg:overflow-hidden">
+    <main className="grid lg:h-full lg:grid-cols-[270px_minmax(0,1fr)] lg:overflow-hidden">
       <nav className="min-w-0 border-b border-line bg-panel px-3.5 py-5 lg:overflow-x-hidden lg:overflow-y-auto lg:border-r lg:border-b-0">
         {heading(t("Account"))}
         {nav.filter((n) => n.group === "account").map(navLink)}

@@ -95,7 +95,10 @@ export function VideoTransportProvider({ children }: { children: ReactNode }) {
   const mjpegRetired = MJPEG_RETIRED_FOR.has(robot);
   // Where a dead path falls back to, and what the robot starts on.
   const fallback: VideoTransport = mjpegRetired ? "intra" : "mjpeg";
-  const setTransport = (next: VideoTransport) => setTransportState(next === "mjpeg" ? fallback : next);
+  const setTransport = (next: VideoTransport) => {
+    setLastError(null);
+    setTransportState(next === "mjpeg" ? fallback : next);
+  };
   // Picking a robot that retired MJPEG while on it moves the view to the all-intra branch.
   useEffect(() => {
     if (mjpegRetired) setTransportState((cur) => (cur === "mjpeg" ? "intra" : cur));
@@ -121,14 +124,20 @@ export function VideoTransportProvider({ children }: { children: ReactNode }) {
       setTransportState(fallback);
     }
   }, [transport, error, fallback]);
-  useEffect(() => {
-    if (connected) setLastError(null);
-  }, [connected]);
 
   // One canvas for the whole app, like the one WebRTC connection above: Drive and Live show
   // the same camera, and two decoders would be two copies of the same work.
   const intraCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const intra = useH264FrameStream(WS_VIEW_H264_URL, transport === "intra", intraCanvasRef);
+
+  // The notice is about the attempt that failed: it goes when H.264 connects or when the
+  // person picks a path again (setTransport). It says where the picture went, because under
+  // a working fallback picture a bare "did not connect" read as wrong (2026-10-28).
+  useEffect(() => {
+    if (connected) setLastError(null);
+  }, [connected]);
+  const receiving = transport === "intra" ? (intra.stats?.fps ?? 0) > 0
+    : transport === "h264" ? connected && (stats?.fps ?? 0) > 0 : false;
 
   // The bridge retargets the drive branch to the newly picked robot, but the canvas still
   // holds the last frame of the old one until a new frame paints over it — which never
@@ -164,8 +173,7 @@ export function VideoTransportProvider({ children }: { children: ReactNode }) {
         connected: transport === "intra" ? intra.connected : connected,
         intraCanvasRef: transport === "intra" ? intraCanvasRef : null,
         mjpegRetired,
-        receiving: transport === "intra" ? (intra.stats?.fps ?? 0) > 0
-          : transport === "h264" ? connected && (stats?.fps ?? 0) > 0 : false,
+        receiving,
       }}
     >
       {children}

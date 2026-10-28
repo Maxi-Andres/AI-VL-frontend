@@ -93,7 +93,7 @@ export function RobotCameraSwitch() {
       <label className={`flex h-[34px] items-center gap-1.5 rounded-[10px] border border-line bg-panel pr-1 pl-2.5 transition focus-within:border-accent ${busy ? "opacity-60" : ""}`}
         title={current && HINTS[current] ? t(HINTS[current]) : undefined}>
         {busy ? <IconLoader2 size={15} className="shrink-0 animate-spin text-muted" /> : <IconCamera size={15} className="shrink-0 text-muted" />}
-        <Select value={current ?? ""} disabled={busy} onChange={(c) => void pick(c)} aria-label={t("Robot camera")}
+        <Select value={current ?? ""} disabled={busy} onChange={(c) => void pick(c)} aria-label={t("Robot camera")} anchor="parent"
           options={[
             ...(current === null ? [{ value: "", label: t("Camera…"), disabled: true }] : []),
             ...cameras.map((c) => ({ value: c, label: LABELS[c] ? t(LABELS[c]) : c, title: HINTS[c] ? t(HINTS[c]) : undefined })),
