@@ -122,8 +122,11 @@ export async function fetchRobotFrame(signal?: AbortSignal): Promise<string | nu
   }
 }
 
+/** One earlier question and its answer, sent with the next question as context. */
+export interface ChatTurn { question: string; answer: string }
+
 export async function askVlmStream(
-  req: { image: string; model?: string; prompt: string; robot?: string },
+  req: { image: string; model?: string; prompt: string; robot?: string; history?: ChatTurn[] },
   onDelta: (piece: string) => void,
   signal?: AbortSignal,
 ): Promise<string> {

@@ -9,6 +9,7 @@ import {
   setRobotCamera,
   transcribeAudio,
 } from "../api/backend";
+import type { ChatTurn } from "../api/backend";
 import { VideoStage } from "../components/live/VideoStage";
 import { RobotCameraStage } from "../components/live/RobotCameraStage";
 import { ClassChips } from "../components/live/ClassChips";
@@ -470,6 +471,10 @@ export function LivePage() {
   // Free-form question about the current frame, STREAMED. `onDelta` receives each
   // text chunk as the model generates it (shown live + spoken sentence by
   // sentence). Resolves with the full answer, or null on failure.
+  // The open conversation's earlier questions and answers, sent with each new question so it
+  // follows on ("¿y la de la izquierda?"). A ref: the conversation is loaded further down
+  // (useChats), and a new turn must not rebuild this callback. iacore keeps the newest that fit.
+  const historyRef = useRef<ChatTurn[]>([]);
   const askPromptStream = useCallback(
     async (
       prompt: string,
@@ -491,7 +496,7 @@ export function LivePage() {
       try {
         let acc = "";
         const answer = await askVlmStream(
-          { image, model: vlmModel, prompt, robot: cmdRobot },
+          { image, model: vlmModel, prompt, robot: cmdRobot, history: historyRef.current },
           (piece) => {
             if (tFirst === null) tFirst = performance.now();
             acc += piece;
@@ -525,6 +530,9 @@ export function LivePage() {
   // The assistant's conversations, kept per person on the server: they survive a camera switch,
   // a reload or another computer.
   const chats = useChats(mayAnalyze);
+  historyRef.current = chats.history
+    .filter((m) => m.kind === "question" && m.answer.trim())
+    .map((m) => ({ question: m.question, answer: m.answer }));
   // Spoken answers' volume: the robot speaker's when it speaks through the robot, else this
   // device's.
   const toRobotSpeaker = va.speechOutput === "robot" && va.robotSpeaker;
