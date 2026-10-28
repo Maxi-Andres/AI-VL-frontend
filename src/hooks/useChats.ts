@@ -10,7 +10,9 @@ const LAST = "pilot.chat"; // the conversation this browser had open last
  * The person's conversations with the vision assistant, kept on the server: the list, the one
  * open, and what it said. A new chat exists only once its first message is saved. `version`
  * changes when another conversation is opened (or a new one started) — not when a message is
- * saved — so the chat view reloads its history exactly then.
+ * saved — so the chat view reloads its history exactly then. `history` follows the saves too:
+ * it is what the next question sends as context, and before 2026-10-28 it held only what was
+ * loaded on opening, so the second question of a new chat went without the first.
  *
  * Saves run one after another: a second answer that lands while the first message is still
  * making the chat goes into that same chat, not into a new one.
@@ -77,7 +79,13 @@ export function useChats(enabled: boolean) {
   const save = useCallback((msg: NewMessage) => {
     queue.current = queue.current.then(async () => {
       try {
-        const chat = await addMessage(currentRef.current, msg);
+        const before = currentRef.current;
+        const chat = await addMessage(before, msg);
+        // The conversation the question belongs to: kept for the next question's context
+        // (a conversation opened meanwhile has loaded its own).
+        if (currentRef.current === before) {
+          setHistory((h) => [...h, { id: -Date.now(), at: new Date().toISOString(), ...msg }]);
+        }
         if (currentRef.current !== chat.id) {
           currentRef.current = chat.id; // the chat this first message made; no reload
           setCurrent(chat.id);
