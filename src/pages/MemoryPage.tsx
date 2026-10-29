@@ -11,7 +11,8 @@ import { useLanguage, useT } from "../i18n";
 type Show = "all" | "image" | "note";
 
 /** What the selected robot was asked to keep: pictures ("guardá esta imagen") and notes
- * ("acordate que…"), newest first. The whole team sees them; operators add notes and delete.
+ * ("acordate que…"), newest first. A picture kept for what it shows ("acordate de la medida")
+ * carries the fact read off it as its caption. The whole team sees them; operators add notes and delete.
  * The robot in the header decides whose memory this is. */
 export function MemoryPage() {
   const t = useT();
@@ -98,6 +99,7 @@ export function MemoryPage() {
                     className="group cursor-pointer overflow-hidden rounded-2xl border border-line bg-panel text-left shadow-card transition hover:border-accent">
                     <img src={memoryImageUrl(m.id)} alt={t("Picture saved on {date}", { date: when(m.created_at) })}
                       loading="lazy" className="aspect-video w-full bg-subtle object-cover" />
+                    {m.text && <span className="line-clamp-2 block px-3 pt-2 text-[13px] text-fg">{m.text}</span>}
                     <span className="block px-3 py-2 text-[12px] text-muted">
                       {when(m.created_at)}{m.created_by && ` · ${m.created_by}`}
                     </span>
@@ -139,7 +141,10 @@ export function MemoryPage() {
             className="m-0 grid max-h-full w-full max-w-5xl animate-rise gap-3 rounded-2xl border border-line bg-panel p-3 shadow-2xl">
             <img src={memoryImageUrl(open.id)} alt="" className="max-h-[75vh] w-full rounded-xl object-contain" />
             <figcaption className="flex items-center gap-3 px-1 text-[13px] text-muted">
-              <span>{when(open.created_at)}{open.created_by && ` · ${open.created_by}`}</span>
+              <span className="min-w-0">
+                {open.text && <span className="block text-[14px] text-fg [overflow-wrap:anywhere]">{open.text}</span>}
+                {when(open.created_at)}{open.created_by && ` · ${open.created_by}`}
+              </span>
               {editable && <DeleteButton onDelete={() => remove(open.id)} />}
               <button type="button" onClick={() => setOpen(null)} aria-label={t("Close")} autoFocus
                 className="ml-auto grid size-8 cursor-pointer place-items-center rounded-lg text-muted hover:bg-subtle hover:text-fg">
