@@ -32,8 +32,10 @@ const TABS: { to: string; label: string; icon: typeof IconBroadcast; perm?: Perm
   { to: "/settings", label: msg("Settings"), icon: IconSettings },
 ];
 
+// On a phone the six tabs share the row, icon over word, as a phone app's tab bar: side by side
+// they needed 550 px, and Settings sat off the screen where nobody would look for it.
 const tabClass = ({ isActive }: { isActive: boolean }) =>
-  `flex h-full items-center gap-[7px] px-3 text-[13.5px] font-bold whitespace-nowrap transition-colors ${
+  `flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-bold whitespace-nowrap transition-colors sm:flex-none sm:flex-row sm:gap-[7px] sm:px-3 sm:text-[13.5px] ${
     isActive ? "text-fg" : "text-muted hover:text-fg"
   }`;
 
@@ -71,18 +73,22 @@ export function Header({ children }: Props) {
   }, [bar, ready]);
   return (
     <header className="relative z-40 shrink-0 border-b border-line bg-panel/85 backdrop-blur-md backdrop-saturate-150">
-      <div className="flex h-16 items-center gap-4 px-4 lg:gap-6 lg:px-6">
-        <div className="flex shrink-0 items-center gap-2.5">
+      {/* Below xl the tabs take a row of their own under the brand: squeezed beside it they
+          shrank to nothing on a phone (and the right-hand slot pushed the page 90 px wider than
+          the screen), and on a tablet or a 1024-1280 px laptop some hid off the edge with
+          nothing to say so (measured 2026-10-29: all six fit in one row from 1280 px). */}
+      <div className="flex flex-wrap items-center gap-x-4 px-4 lg:gap-x-6 lg:px-6 xl:h-16 xl:flex-nowrap">
+        <div className="flex h-16 shrink-0 items-center gap-2.5 xl:h-auto">
           <img src={silkLogoOnLight} alt="Silk Technologies" className="h-7 w-auto dark:hidden" />
           <img src={silkLogoOnDark} alt="Silk Technologies" className="hidden h-7 w-auto dark:block" />
           {/* The product is "Silk Pilot": the Silk logo beside it supplies the first word. */}
-          <span className="border-l border-line pl-2.5 text-[17px] font-bold tracking-tight">Pilot</span>
+          <span className="hidden border-l border-line pl-2.5 text-[17px] font-bold tracking-tight sm:inline">Pilot</span>
         </div>
-        <span className="hidden shrink-0 items-center gap-2 rounded-[10px] border border-line bg-panel px-2.5 py-1.5 text-[13px] font-bold xl:flex" title={t("Your company")}>
+        <span className="hidden shrink-0 items-center gap-2 rounded-[10px] border border-line bg-panel px-2.5 py-1.5 text-[13px] font-bold 2xl:flex" title={t("Your company")}>
           <span className="size-5 rounded-md bg-gradient-to-br from-[#2fc1b1] to-[#d8cf3c]" />
           {me.org.name}
         </span>
-        <nav ref={nav} className="relative -mb-px flex h-full min-w-0 overflow-x-auto [scrollbar-width:none]">
+        <nav ref={nav} className="relative order-last -mx-4 -mb-px flex h-13 w-[calc(100%+2rem)] min-w-0 overflow-x-auto px-1 [scrollbar-width:none] sm:h-11 sm:px-2 xl:order-none xl:mx-0 xl:h-full xl:w-auto xl:px-0">
           {TABS.filter((t) => !t.perm || can(t.perm)).map(({ to, label, icon: Icon, end }) => (
             <NavLink key={to} to={to} end={end} className={tabClass}>
               <Icon size={18} stroke={1.8} />
@@ -95,7 +101,7 @@ export function Header({ children }: Props) {
                 ready ? "transition-[left,width] duration-300 ease-[cubic-bezier(.2,.8,.2,1)]" : ""}`} />
           )}
         </nav>
-        <div className="ml-auto flex shrink-0 items-center gap-2.5">{children}</div>
+        <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-2.5">{children}</div>
       </div>
     </header>
   );

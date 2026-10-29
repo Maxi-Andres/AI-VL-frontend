@@ -79,11 +79,12 @@ export function UserMenu() {
       <button onClick={() => setOpen((v) => !v)} aria-expanded={open}
         className="flex cursor-pointer items-center gap-2.5 rounded-xl py-1 pr-2 pl-1 transition hover:bg-subtle">
         <Avatar id={me.user.id} name={me.user.name || me.user.email} color={me.user.color} size={34} />
-        <span className="hidden text-left md:block">
+        {/* Not where the tabs share the header's one row (xl to 2xl): there it is in the menu. */}
+        <span className="hidden text-left md:block xl:hidden 2xl:block">
           <b className="block text-[13px] leading-tight">{me.user.name}</b>
           <small className="block text-[11.5px] leading-tight text-dim">{t(ROLE_LABEL[me.role])}</small>
         </span>
-        <IconChevronDown size={15} className="text-dim" />
+        <IconChevronDown size={15} className="hidden text-dim sm:block" />
       </button>
       <DropMenu open={open} className="top-[52px] w-[270px]">
         <div className="mb-1 flex items-center gap-2.5 border-b border-line p-2.5">

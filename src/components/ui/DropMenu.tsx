@@ -27,7 +27,9 @@ export function useDropdown(): { open: boolean; setOpen: (v: boolean | ((o: bool
 export function DropMenu({ open, className = "", children }: { open: boolean; className?: string; children: ReactNode }) {
   return (
     <div inert={!open}
-      className={`absolute right-0 z-50 origin-top-right rounded-[14px] border border-line bg-panel p-1.5 text-left shadow-lift transition duration-200 ease-out ${
+      // On a phone it spans the screen under the header's first row: hung off its button, the
+      // robot menu (330 px) started 17 px left of the screen.
+      className={`absolute right-0 z-50 origin-top-right rounded-[14px] border border-line bg-panel p-1.5 text-left shadow-lift transition duration-200 ease-out max-sm:fixed max-sm:inset-x-3 max-sm:top-[60px] max-sm:w-auto ${
         open ? "translate-y-0 scale-100 opacity-100" : "pointer-events-none -translate-y-1.5 scale-[.98] opacity-0"} ${className}`}>
       {children}
     </div>

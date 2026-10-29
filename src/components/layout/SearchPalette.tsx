@@ -142,7 +142,8 @@ export function SearchPalette() {
   return (
     <>
       <button onClick={() => setOpen(true)} aria-label={t("Search (Ctrl+K)")} title={t("Search  ·  Ctrl+K")}
-        className="grid size-9 cursor-pointer place-items-center rounded-[10px] border border-line bg-panel text-muted transition hover:text-fg hover:shadow-card">
+        className="hidden size-9 cursor-pointer place-items-center rounded-[10px] border border-line bg-panel text-muted transition hover:text-fg hover:shadow-card sm:grid">
+        {/* Not on a phone: the tabs have their own row there, and the header has no room. */}
         <IconSearch size={18} />
       </button>
       {/* Rendered on <body>: the header's backdrop blur makes it the containing block of

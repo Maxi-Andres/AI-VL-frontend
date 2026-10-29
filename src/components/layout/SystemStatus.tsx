@@ -85,7 +85,8 @@ export function SystemStatus({ connected }: { connected: boolean }) {
           <span className="flex items-center gap-1.5 border-r border-line pr-2" title={t("Working with {name}", { name: active.name })}>
             <RobotIcon slot={active.id} color={active.color} size={22} />
             <span className="max-w-[120px] truncate">{active.name}</span>
-            <BatteryPill net={net} robotId={active.id} />
+            {/* On a phone the battery is in this menu and on Fleet: the header has no room. */}
+            <span className="hidden sm:contents"><BatteryPill net={net} robotId={active.id} /></span>
           </span>
         )}
         <span className={`size-2 rounded-full ${DOT[tone]} ${RING[tone]}`} />
@@ -93,7 +94,7 @@ export function SystemStatus({ connected }: { connected: boolean }) {
         <span className="hidden lg:inline">
           {!reachable ? t("Server offline") : presence ? t("{up} of {total} up", { up, total: counted.length }) : t("Checking…")}
         </span>
-        <IconChevronDown size={14} className="text-dim" />
+        <IconChevronDown size={14} className="hidden text-dim sm:block" />
       </button>
       <DropMenu open={open} className="top-[46px] w-[330px]">
         <div className="px-2.5 pt-2 pb-1 text-[11px] font-extrabold tracking-[.1em] text-dim uppercase">{t("Robots")}</div>
