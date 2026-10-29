@@ -83,7 +83,7 @@ export function BackupSettings() {
             <div className="min-w-0 flex-1 text-[13px]">
               <b className="block">{last ? t("Last backup {when}", { when: ago(last.at) }) : t("No backup yet")}</b>
               <span className="flex items-center gap-1 truncate text-xs text-muted" title={data.dir}>
-                <IconFolder size={13} className="shrink-0" /><span className="truncate font-mono">{data.dir}</span>
+                <IconFolder size={13} className="shrink-0" /><span className="min-w-0 truncate font-mono">{data.dir}</span>
               </span>
             </div>
           </div>

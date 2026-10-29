@@ -79,6 +79,7 @@ export function SettingsPage() {
   const can = useCan();
   const location = useLocation();
   const pane = useRef<HTMLDivElement>(null);
+  const menu = useRef<HTMLElement>(null);
   const [nav, setNav] = useState<NavItem[]>([]);
   const [active, setActive] = useState<string | null>(null);
   const [names, setNames] = useState<Record<string, string>>({});
@@ -110,18 +111,34 @@ export function SettingsPage() {
     return () => mo.disconnect();
   }, []);
 
-  // Which block is on screen: the last one whose top has passed the top of the pane.
+  // Which block is on screen: the last one whose top has passed the top of what scrolls — the
+  // pane on a wide screen; below lg the whole page, under the sticky row of sections.
   const onScroll = useCallback(() => {
     const el = pane.current;
     if (!el) return;
+    const wide = window.matchMedia("(min-width: 1024px)").matches;
+    const top = wide ? el.getBoundingClientRect().top : (menu.current?.getBoundingClientRect().bottom ?? 0);
     let cur: string | null = null;
     for (const item of nav) {
       const s = document.getElementById(item.id);
-      if (s && s.offsetTop - el.scrollTop < 140) cur = item.id;
+      if (s && s.getBoundingClientRect().top - top < 140) cur = item.id;
     }
     setActive(cur ?? nav[0]?.id ?? null);
   }, [nav]);
-  useEffect(onScroll, [onScroll]);
+  useEffect(() => {
+    onScroll();
+    // Below lg the page scrolls, not the pane: any scroll on the page reaches here.
+    document.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    return () => document.removeEventListener("scroll", onScroll, { capture: true });
+  }, [onScroll]);
+  // The row of sections follows: the current one slides to its middle. The row only —
+  // scrollIntoView also moved the page, which cut a jump to a section short halfway there.
+  useEffect(() => {
+    const row = menu.current;
+    if (!active || !row || window.matchMedia("(min-width: 1024px)").matches) return;
+    const chip = row.querySelector<HTMLElement>(`[data-section="${active}"]`);
+    if (chip) row.scrollTo({ left: chip.offsetLeft - (row.clientWidth - chip.offsetWidth) / 2, behavior: "smooth" });
+  }, [active]);
 
   // /settings#video (where the old /video link lands) opens on that group.
   useEffect(() => {
@@ -129,14 +146,21 @@ export function SettingsPage() {
     if (id && nav.length) document.getElementById(id)?.scrollIntoView();
   }, [location.hash, nav.length]);
 
-  const go = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+  // Under the sticky row of sections (a phone or a tablet), not behind it.
+  const go = (id: string) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const wide = window.matchMedia("(min-width: 1024px)").matches;
+    el.style.scrollMarginTop = wide ? "" : `${(menu.current?.offsetHeight ?? 0) + 12}px`;
+    el.scrollIntoView({ behavior: "smooth" });
+  };
   const robotName = names[robot] ?? robots.find((r) => r.id === robot)?.label ?? robot;
   const mayConfigure = can("configure");
   const navLink = (n: NavItem) => {
     const Icon = NAV_ICON[n.title] ?? IconPoint;
     return (
-      <button key={n.id} type="button" onClick={() => go(n.id)}
-        className={`flex w-full cursor-pointer items-center gap-2.5 rounded-[9px] px-2.5 py-2 text-left text-[13px] font-bold transition ${
+      <button key={n.id} type="button" onClick={() => go(n.id)} data-section={n.id}
+        className={`flex shrink-0 cursor-pointer items-center gap-2.5 rounded-[9px] px-2.5 py-2 text-left text-[13px] font-bold whitespace-nowrap transition lg:w-full ${
           active === n.id ? "bg-good-bg text-good-fg" : "text-muted hover:bg-subtle hover:text-fg"}`}>
         <Icon size={17} className="shrink-0" />
         <span className="truncate">{t(n.title)}</span>
@@ -144,31 +168,33 @@ export function SettingsPage() {
     );
   };
   const heading = (text: string) => (
-    <h4 className="m-0 mt-4 mb-1.5 px-2.5 text-[11px] font-extrabold tracking-[.1em] text-dim uppercase first:mt-0">{text}</h4>
+    <h4 className="m-0 mt-4 mb-1.5 hidden px-2.5 text-[11px] font-extrabold tracking-[.1em] text-dim uppercase first:mt-0 lg:block">{text}</h4>
   );
 
   return (
-    <main className="grid lg:h-full lg:grid-cols-[270px_minmax(0,1fr)] lg:overflow-hidden">
-      <nav className="min-w-0 border-b border-line bg-panel px-3.5 py-5 lg:overflow-x-hidden lg:overflow-y-auto lg:border-r lg:border-b-0">
+    <main className="grid grid-cols-[minmax(0,1fr)] lg:h-full lg:grid-cols-[270px_minmax(0,1fr)] lg:overflow-hidden">
+      {/* Below lg one row that scrolls sideways and stays on top: as a list, the eighteen
+          sections pushed the settings a whole phone screen down. */}
+      <nav ref={menu} className="sticky top-0 z-10 flex min-w-0 items-center gap-1 overflow-x-auto border-b border-line bg-panel px-3 py-2 [scrollbar-width:none] lg:static lg:block lg:overflow-x-hidden lg:overflow-y-auto lg:border-r lg:border-b-0 lg:px-3.5 lg:py-5">
         {heading(t("Account"))}
         {nav.filter((n) => n.group === "account").map(navLink)}
         {mayConfigure && (
           <>
             {heading(t("Robot"))}
-            <div className="mb-1.5 grid min-w-0 gap-1">
+            <div className="flex shrink-0 gap-1 lg:mb-1.5 lg:grid lg:min-w-0">
               {robots.map((r) => {
                 const Icon = ICON[r.id] ?? IconRobot;
                 return (
                   <button key={r.id} type="button" onClick={() => setRobot(r.id)} aria-pressed={r.id === robot}
-                    className={`flex w-full min-w-0 cursor-pointer items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left transition ${
+                    className={`flex shrink-0 cursor-pointer items-center gap-2.5 rounded-xl border px-2.5 py-1.5 text-left transition lg:w-full lg:min-w-0 lg:shrink lg:py-2 ${
                       r.id === robot ? "border-line bg-panel shadow-card" : "border-transparent hover:bg-subtle"}`}>
-                    <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${r.id === robot ? "bg-good-bg text-good-fg" : "bg-subtle text-muted"}`}>
+                    <span className={`grid size-7 shrink-0 place-items-center rounded-lg lg:size-8 ${r.id === robot ? "bg-good-bg text-good-fg" : "bg-subtle text-muted"}`}>
                       <Icon size={17} />
                     </span>
                     <span className="min-w-0 flex-1">
                       {/* Two lines, not an ellipsis: "Unitree Go2 (quadruped robot dog)" must read whole. */}
-                      <span className="line-clamp-2 text-[13px] leading-snug font-bold">{names[r.id] ?? r.label}</span>
-                      <span className="line-clamp-2 text-[11.5px] leading-snug text-dim">
+                      <span className="text-[13px] leading-snug font-bold whitespace-nowrap lg:line-clamp-2 lg:whitespace-normal">{names[r.id] ?? r.label}</span>
+                      <span className="hidden text-[11.5px] leading-snug text-dim lg:line-clamp-2">
                         {r.id === robot ? t("Configuring this robot") : names[r.id] ? r.label : t("Switch to this robot")}
                       </span>
                     </span>
@@ -183,9 +209,11 @@ export function SettingsPage() {
         )}
       </nav>
 
-      <div ref={pane} onScroll={onScroll} className="relative min-w-0 lg:overflow-y-auto">
-        <div className="mx-auto grid max-w-4xl gap-8 px-4 py-7 lg:px-8">
-          <div data-group="account" className="grid gap-8">
+      <div ref={pane} className="relative min-w-0 lg:overflow-y-auto">
+        {/* minmax(0,1fr): an implicit grid column grows to its widest content — a long backup
+            path made the whole page 865 px wide on a phone. */}
+        <div className="mx-auto grid max-w-4xl grid-cols-[minmax(0,1fr)] gap-8 px-4 py-7 lg:px-8">
+          <div data-group="account" className="grid grid-cols-[minmax(0,1fr)] gap-8">
             <ProfileSettings />
             {can("manage_users") && <TeamSettings />}
             {mayConfigure && <ActivitySettings />}

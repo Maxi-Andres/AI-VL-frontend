@@ -105,7 +105,7 @@ export function RobotSettings() {
   const deploy = deployFor(robot);
 
   return (
-    <div className="grid gap-4 leading-relaxed">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-4 leading-relaxed">
       <section data-nav={msg("About these values")} className="scroll-mt-4 rounded-2xl border border-line bg-panel p-5 shadow-card">
       <h3 className="m-0 mb-2 text-[15px] font-extrabold text-fg">{t("About these values")}</h3>
       <p className="m-0 text-sm text-muted">

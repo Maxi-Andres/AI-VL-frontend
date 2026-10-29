@@ -120,7 +120,8 @@ export function TeamSettings() {
         </div>
       )}
 
-      <section className="overflow-hidden rounded-2xl border border-line bg-panel shadow-card">
+      {/* Scrolls sideways on a phone: hidden, the last columns were cut off. */}
+      <section className="overflow-x-auto rounded-2xl border border-line bg-panel shadow-card">
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-line text-left text-[11px] tracking-wider text-muted uppercase">
