@@ -100,6 +100,20 @@ describe("parseStreamMessage", () => {
     expect(f.right).toBeNull();
   });
 
+  it("reads each fingertip's touch, a void finger as null, and no touch as null", () => {
+    const hand = { age_ms: 3, pos: [399, 400, 50, 50, 49, 50], speed: [0, 0, 0, 0, 0, 0],
+                   current: [0, 0, 0, 0, 0, 0], state: [0, 0, 0, 0, 0, 0], errors: 0 };
+    const f = frameOf(line({ left: { ...hand, touch: [3.65, null, 0, 0.4, 5.72] } }));
+    expect(f.left?.touch).toEqual([3.65, null, 0, 0.4, 5.72]);
+    const thumbRotation = JOINTS.find((j) => j.source === "left" && j.urdf.includes("thumb_metacarpal"));
+    const index = JOINTS.find((j) => j.source === "left" && j.urdf.includes("index_proximal"));
+    expect(readJoint(f, thumbRotation!)?.finger?.touch).toBe(3.65);
+    expect(readJoint(f, index!)?.finger?.touch).toBeNull();
+    expect(frameOf(line()).left?.touch).toBeNull();
+    expect(frameOf(line({ left: { ...hand, touch: [1, 2] } })).left?.touch).toBeNull();
+    expect(readJoint(frameOf(line()), index!)?.finger?.touch).toBeUndefined();
+  });
+
   it("reads the line the bridge prints before the robot has said anything", () => {
     const f = frameOf('{"t":1791900000.1,"age_ms":-1,"left":null,"right":null}');
     expect(f.ageMs).toBe(-1);

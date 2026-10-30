@@ -8,6 +8,7 @@ import {
   LegCheckPanel,
   SourceBar,
   TiltPanel,
+  TouchPanel,
 } from "../components/joints/JointPanels";
 import { RobotViewer, type JointLimits } from "../components/joints/RobotViewer";
 import { useJointControl } from "../hooks/useJointControl";
@@ -171,9 +172,11 @@ export function JointsPage() {
               onBackToStart={onBackToStart}
             />
           )}
+          {tab === "control" && <TouchPanel frame={source.frame} />}
           {tab === "joint" && <JointInspector urdf={hovered ?? selected} frame={source.frame} limits={limits} />}
           {tab === "health" && (
             <>
+              <TouchPanel frame={source.frame} />
               <TiltPanel frame={source.frame} showTilt={showTilt} onShowTilt={setShowTilt} />
               <LegCheckPanel frame={source.frame} />
             </>

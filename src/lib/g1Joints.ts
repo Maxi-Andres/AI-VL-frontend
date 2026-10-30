@@ -141,7 +141,20 @@ export interface HandFrame {
   state: number[];
   /** Failed reads since the last good one. */
   errors: number;
+  /** Fingertip normal force in newtons, thumb .. pinky (TOUCH_FINGERS: five tips for the six
+   * motors). A null finger is a void reading (one of its status bits 0-2 set); a null array is a
+   * hand that sends no touch at all. */
+  touch: (number | null)[] | null;
 }
+
+/** The five fingertips of a Revo 2 Touch, in the order the hand reports them. */
+export const TOUCH_FINGERS = [msg("thumb"), msg("index"), msg("middle"), msg("ring"), msg("pinky")] as const;
+/** Which fingertip each of HAND_JOINTS' six motors ends in: both thumb motors share one tip. */
+export const TOUCH_OF_MOTOR = [0, 0, 1, 2, 3, 4] as const;
+/** The panel's full bar: a firm grip on a plastic bottle read 3-7 N on 2026-10-22. */
+export const TOUCH_FULL_N = 10;
+/** At or over this, the panel shows the fingertip as touching something. */
+export const TOUCH_CONTACT_N = 0.5;
 
 /** Shown with t(). */
 export const FINGER_STATE = [msg("idle"), msg("moving"), msg("stalled"), msg("turbo")] as const;
@@ -182,7 +195,14 @@ function parseHand(v: unknown): HandFrame | null {
     current: isNumArray(h.current, n) ? h.current : new Array(n).fill(0),
     state: isNumArray(h.state, n) ? h.state : new Array(n).fill(0),
     errors: typeof h.errors === "number" ? h.errors : 0,
+    touch: parseTouch(h.touch),
   };
+}
+
+function parseTouch(v: unknown): (number | null)[] | null {
+  if (!Array.isArray(v) || v.length !== TOUCH_FINGERS.length) return null;
+  if (!v.every((x) => x === null || (typeof x === "number" && isFinite(x)))) return null;
+  return v as (number | null)[];
 }
 
 /** One message off /ws/joints. Anything malformed is null: a bad line is dropped, never
@@ -221,8 +241,9 @@ export interface JointReading {
   q: number;
   tau: number | null;
   temp: number | null;
-  /** Hands only: the finger as the hand reports it. */
-  finger?: { pos: number; current: number; state: number };
+  /** Hands only: the finger as the hand reports it. `touch` is its fingertip's force (N), null
+   * for a void reading, undefined for a hand without touch. */
+  finger?: { pos: number; current: number; state: number; touch?: number | null };
 }
 
 /** One joint's reading out of a frame, or null when that part of the robot is not reporting. */
@@ -242,7 +263,12 @@ export function readJoint(frame: JointFrame | null, j: JointRef): JointReading |
     q: hand.q[j.index],
     tau: null,
     temp: null,
-    finger: { pos: hand.pos[j.index], current: hand.current[j.index], state: hand.state[j.index] },
+    finger: {
+      pos: hand.pos[j.index],
+      current: hand.current[j.index],
+      state: hand.state[j.index],
+      touch: hand.touch ? hand.touch[TOUCH_OF_MOTOR[j.index]] : undefined,
+    },
   };
 }
 

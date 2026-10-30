@@ -8,6 +8,9 @@ import {
   JOINT_BY_URDF,
   LEG_DIFF_WARN_DEG,
   LOCKED_JOINTS,
+  TOUCH_CONTACT_N,
+  TOUCH_FINGERS,
+  TOUCH_FULL_N,
   deg,
   legPairs,
   readJoint,
@@ -188,6 +191,14 @@ export function JointInspector({ urdf, frame, limits }: {
           <dd className={`m-0 text-right ${r.finger.state === 2 ? "font-semibold text-warn-fg" : ""}`}>
             {FINGER_STATE[r.finger.state] !== undefined ? t(FINGER_STATE[r.finger.state]) : r.finger.state}
           </dd>
+          {r.finger.touch !== undefined && (
+            <>
+              <dt className="text-muted">{t("Fingertip force")}</dt>
+              <dd className="m-0 text-right font-mono tabular-nums">
+                {r.finger.touch === null ? t("no reading") : `${r.finger.touch.toFixed(2)} N`}
+              </dd>
+            </>
+          )}
         </dl>
       ) : (
         <>
@@ -211,6 +222,56 @@ export function JointInspector({ urdf, frame, limits }: {
 // ------------------------------------------------------------------------------------------
 // Tilt and legs: the two readings behind the "leans back" diagnosis
 // ------------------------------------------------------------------------------------------
+
+/** Both hands' fingertips at a glance (Revo 2 Touch): what a grasp is confirmed by. */
+export function TouchPanel({ frame }: { frame: JointFrame | null }) {
+  const t = useT();
+  const hands = [
+    { side: "left" as const, label: t("Left hand"), hand: frame?.left ?? null },
+    { side: "right" as const, label: t("Right hand"), hand: frame?.right ?? null },
+  ];
+  return (
+    <Section title={t("Fingertip touch")} aside={<span className="text-xs text-muted">{t("newtons")}</span>}>
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-2">
+        {hands.map(({ side, label, hand }) => (
+          <div key={side} className="min-w-0">
+            <p className="m-0 mb-1 text-xs font-semibold">{label}</p>
+            {!hand ? (
+              <p className="m-0 text-xs text-muted">{t("Not answering.")}</p>
+            ) : !hand.touch ? (
+              <p className="m-0 text-xs text-muted">{t("This hand sends no touch readings.")}</p>
+            ) : (
+              <ul className="m-0 grid list-none gap-1 p-0">
+                {TOUCH_FINGERS.map((name, i) => {
+                  const n = hand.touch?.[i] ?? null;
+                  const pct = n === null ? 0 : Math.min(100, (n / TOUCH_FULL_N) * 100);
+                  const contact = n !== null && n >= TOUCH_CONTACT_N;
+                  return (
+                    <li key={name} className="grid grid-cols-[4.5rem_minmax(0,1fr)_3.5rem] items-center gap-2 text-xs">
+                      <span className="text-muted">{t(name)}</span>
+                      <span className="relative h-2 overflow-hidden rounded-full bg-subtle">
+                        <span
+                          className={`absolute inset-y-0 left-0 rounded-full ${contact ? "bg-good-fg" : "bg-line"}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </span>
+                      <span className={`text-right font-mono tabular-nums ${contact ? "font-semibold" : "text-muted"}`}>
+                        {n === null ? "—" : n.toFixed(2)}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        ))}
+      </div>
+      <p className="m-0 mt-2 text-xs text-muted">
+        {t("Normal force on each fingertip. — is a reading the hand marked void; it clears by itself when the finger is touched.")}
+      </p>
+    </Section>
+  );
+}
 
 export function TiltPanel({ frame, showTilt, onShowTilt }: {
   frame: JointFrame | null;

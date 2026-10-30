@@ -123,4 +123,12 @@ export const JOINTS: Record<string, string> = {
   "idle": "inactivo",
   "stalled": "trabado",
   "turbo": "turbo",
+  "Fingertip force": "Fuerza en la yema",
+  "no reading": "sin lectura",
+  "Fingertip touch": "Tacto de los dedos",
+  "newtons": "newtons",
+  "Not answering.": "No responde.",
+  "This hand sends no touch readings.": "Esta mano no manda lecturas de tacto.",
+  "Normal force on each fingertip. — is a reading the hand marked void; it clears by itself when the finger is touched.": "Fuerza normal en cada yema. — es una lectura que la mano marcó como inválida; se limpia sola al tocar el dedo.",
+  "thumb": "pulgar",
 };
