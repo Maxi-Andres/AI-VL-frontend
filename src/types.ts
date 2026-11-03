@@ -220,3 +220,31 @@ export interface VlmResponse {
   /** Raw text answer — present (and what to show) for free-form prompts. */
   content?: string;
 }
+
+/** What a tool reports when it ends (iacore src/agent_common.py): `ok` always, the rest per
+ * tool — `state`/`held`/`last` from pick, `answer` from look, `error` when it failed. */
+export interface AgentToolResult {
+  ok: boolean;
+  state?: string;
+  held?: boolean;
+  answer?: string;
+  error?: string;
+  last?: string;
+  [key: string]: unknown;
+}
+
+/** One event of POST /api/agent's stream, in the order the run produces them. */
+export type AgentEvent =
+  | { type: "heard"; text: string }
+  | { type: "understood"; text: string }
+  | { type: "plan"; steps: string[] }
+  | { type: "thought"; text: string }
+  /** A tool starts. */
+  | { type: "tool"; tool: string; args: Record<string, unknown> }
+  /** A step inside the running tool, every few seconds while the robot moves. */
+  | { type: "tool_event"; tool: string; step: string; detail: string }
+  | { type: "tool_result"; tool: string; result: AgentToolResult }
+  /** Also how "the robot is busy with another instruction" arrives (then the stream ends). */
+  | { type: "error"; text: string }
+  /** The final words. */
+  | { type: "reply"; text: string };

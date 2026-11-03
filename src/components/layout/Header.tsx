@@ -6,6 +6,7 @@ import {
   IconBroadcast,
   IconLayoutGrid,
   IconMan,
+  IconMessageChatbot,
   IconSettings,
   IconSteeringWheel,
 } from "@tabler/icons-react";
@@ -26,13 +27,15 @@ const TABS: { to: string; label: string; icon: typeof IconBroadcast; perm?: Perm
   { to: "/", label: msg("Fleet"), icon: IconLayoutGrid, end: true },
   { to: "/live", label: msg("Live"), icon: IconBroadcast },
   { to: "/drive", label: msg("Drive"), icon: IconSteeringWheel, perm: "operate" },
+  // Carries out an instruction with the robot's tools: it moves the arm, so "operate" like Drive.
+  { to: "/agent", label: msg("Agent"), icon: IconMessageChatbot, perm: "operate" },
   { to: "/joints", label: msg("Joints"), icon: IconMan },
   { to: "/memory", label: msg("Memory"), icon: IconBrain },
   // Everyone has Settings: Profile is there. The team and the robot sections show by role.
   { to: "/settings", label: msg("Settings"), icon: IconSettings },
 ];
 
-// On a phone the six tabs share the row, icon over word, as a phone app's tab bar: side by side
+// On a phone the seven tabs share the row, icon over word, as a phone app's tab bar: side by side
 // they needed 550 px, and Settings sat off the screen where nobody would look for it.
 const tabClass = ({ isActive }: { isActive: boolean }) =>
   `flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-bold whitespace-nowrap transition-colors sm:flex-none sm:flex-row sm:gap-[7px] sm:px-3 sm:text-[13.5px] ${
@@ -76,7 +79,8 @@ export function Header({ children }: Props) {
       {/* Below xl the tabs take a row of their own under the brand: squeezed beside it they
           shrank to nothing on a phone (and the right-hand slot pushed the page 90 px wider than
           the screen), and on a tablet or a 1024-1280 px laptop some hid off the edge with
-          nothing to say so (measured 2026-10-29: all six fit in one row from 1280 px). */}
+          nothing to say so (measured 2026-10-29: all six fit in one row from 1280 px; Agent made
+          them seven on 2026-11-03, not re-measured). */}
       <div className="flex flex-wrap items-center gap-x-4 px-4 lg:gap-x-6 lg:px-6 xl:h-16 xl:flex-nowrap">
         <div className="flex h-16 shrink-0 items-center gap-2.5 xl:h-auto">
           <img src={silkLogoOnLight} alt="Silk Technologies" className="h-7 w-auto dark:hidden" />

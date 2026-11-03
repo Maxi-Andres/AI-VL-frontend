@@ -1,6 +1,7 @@
 // Spanish, assembled from one dictionary per area of the app. Keys are the English texts,
 // exactly as written in `t("…")` / `msg("…")`; values keep the same {placeholders}.
 // A key belongs in ONE file: shared words live in common.ts and every area may use them.
+import { AGENT } from "./agent";
 import { AUTH } from "./auth";
 import { COMMON } from "./common";
 import { DRIVE } from "./drive";
@@ -18,6 +19,7 @@ export const ES: Record<string, string> = {
   ...FLEET,
   ...LIVE,
   ...DRIVE,
+  ...AGENT,
   ...JOINTS,
   ...MEMORY,
   ...SETTINGS,

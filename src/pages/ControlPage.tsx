@@ -20,7 +20,6 @@ import {
   IconMaximize,
   IconMinimize,
   IconPlayerPlayFilled,
-  IconPlayerStopFilled,
   IconSearch,
   IconShieldCheck,
   IconShieldOff,
@@ -31,7 +30,8 @@ import { ControlsHelp, type PadAction } from "../components/control/ControlsHelp
 import { RobotSpeaker } from "../components/control/RobotSpeaker";
 import { choiceSendable, unsendableSkills } from "../components/control/unsendableSkills";
 import { useRobotTransports } from "../hooks/useRobotTransports";
-import { CameraCanvas } from "../components/live/CameraCanvas";
+import { RobotPicture } from "../components/live/RobotPicture";
+import { StopButton } from "../components/ui/StopButton";
 import { useRobot } from "../components/layout/RobotContext";
 import { Segmented } from "../components/ui/Segmented";
 import { msg, useT } from "../i18n";
@@ -171,16 +171,7 @@ export function ControlPage() {
     true, false, undefined, robot);
   // The view socket stays connected on either transport: it still carries the shared config
   // and the detection boxes. Only the PICTURE moves.
-  const { transport, stream: h264Stream, intraCanvasRef, receiving } = useVideoTransport();
-  const videoRef = useRef<HTMLVideoElement>(null);
-  useEffect(() => {
-    const el = videoRef.current;
-    if (!el || !h264Stream) return;
-    el.srcObject = h264Stream;              // srcObject cannot be set from JSX
-    return () => {
-      el.srcObject = null;
-    };
-  }, [h264Stream]);
+  const { transport, receiving } = useVideoTransport();
   useEffect(() => {
     setRobotCamera("start").catch(() => {});
     return () => {
@@ -555,13 +546,7 @@ export function ControlPage() {
     </Segmented>
   );
 
-  const stopButton = (big: boolean) => (
-    <button type="button" onClick={estop} title={t("Emergency stop (Back on a gamepad)")}
-      className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-[#e5484e] to-[#c42f35] font-extrabold tracking-[0.06em] text-white transition active:scale-[0.97] ${
-        big ? "px-5 py-2.5 text-sm" : "px-4 py-2 text-[13px]"}`}>
-      <IconPlayerStopFilled size={16} />{t("STOP")}
-    </button>
-  );
+  const stopButton = <StopButton onClick={estop} title={t("Emergency stop (Back on a gamepad)")} />;
 
   // Search and fold-all over the actions: the side panel's and the cockpit drawer's.
   const actionTools = (glass: boolean) => (
@@ -644,18 +629,7 @@ export function ControlPage() {
         {/* The stage: the robot's camera, and in fullscreen the whole cockpit. */}
         <div ref={stageRef}
           className={`relative min-h-[280px] flex-1 overflow-hidden bg-black ${cockpit ? "stage-expanded" : "rounded-2xl shadow-lift"}`}>
-          {transport === "intra" && intraCanvasRef ? (
-            // The all-intra branch paints itself; this component only places the canvas.
-            <canvas ref={intraCanvasRef} className="absolute inset-0 h-full w-full object-contain" />
-          ) : transport === "h264" && h264Stream ? (
-            <video ref={videoRef} autoPlay muted playsInline className="absolute inset-0 h-full w-full object-contain" />
-          ) : frameUrl ? (
-            <CameraCanvas frameUrl={frameUrl} getBlob={getLastFrameBlob} className="absolute inset-0 h-full w-full object-contain" />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center text-sm text-white/60">
-              {connected ? t("Waiting for the robot camera…") : t("Connecting…")}
-            </div>
-          )}
+          <RobotPicture frameUrl={frameUrl} getBlob={getLastFrameBlob} connected={connected} />
           {!cockpit && <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/35 via-transparent to-black/45" />}
 
           {/* Top: state chips, video settings, fullscreen */}
@@ -738,7 +712,7 @@ export function ControlPage() {
                 <Reading label={t("Max speed")} value={`${vmax.vx.toFixed(1)}`} unit="m/s" />
                 {pct !== null && <Reading label={t("Battery")} value={`${pct}`} unit="%" />}
                 {speedSeg}
-                {stopButton(true)}
+                {stopButton}
               </div>
               {/* As tall as its content, up to the bottom of the screen: with every group folded it
                   shrinks to the list instead of a mostly empty glass column. */}
@@ -760,7 +734,7 @@ export function ControlPage() {
           <Reading label={t("Battery")} value={pct === null ? "—" : `${pct}`} unit={pct === null ? undefined : "%"} />
           <Reading label="Gamepad" value={pad ? t("Connected") : t("None")} />
           <span className="flex-1" />
-          {stopButton(true)}
+          {stopButton}
         </div>
       </div>
 
