@@ -8,6 +8,7 @@ import {
 import { runAgent, stopAgent } from "../api/agent";
 import { setRobotCamera, transcribeAudio } from "../api/backend";
 import { AgentTrace } from "../components/agent/AgentTrace";
+import { robotState } from "../components/layout/PresencePills";
 import { useRobot } from "../components/layout/RobotContext";
 import { useVideoTransport } from "../components/layout/VideoTransportContext";
 import { useVoiceAssistantContext } from "../components/layout/VoiceAssistantContext";
@@ -17,7 +18,9 @@ import { VideoTransportSwitch } from "../components/live/VideoTransportSwitch";
 import { StatusText, type Status } from "../components/ui/StatusText";
 import { StopButton } from "../components/ui/StopButton";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
+import { usePresence } from "../hooks/usePresence";
 import { useRobotCameraView } from "../hooks/useRobotCameraView";
+import { useRobotTransports } from "../hooks/useRobotTransports";
 import { agentChat } from "../lib/agentTrace";
 import { msg, useT } from "../i18n";
 
@@ -47,6 +50,19 @@ export function AgentPage() {
   const { frameUrl, connected, getLastFrameBlob } = useRobotCameraView(true, false, undefined, robot);
   const { transport, receiving } = useVideoTransport();
   const live = transport === "mjpeg" ? !!frameUrl : receiving;
+  // The label next to the robot's name answers "is the ROBOT there", from the backend's ping
+  // (the header pill's signal). `connected` is only this page's socket to the backend: it read
+  // "Connected" over a black picture with the G1 switched off (2026-11-04).
+  const { presence } = usePresence();
+  const net = useRobotTransports();
+  const reach = presence ? robotState(presence, robot, net) : null;
+  const label = !connected
+    ? { tone: "idle", text: t("Connecting…"), title: undefined }
+    : reach?.tone === "good"
+      ? { tone: "good", text: t("Robot online"), title: reach.title }
+      : reach?.tone === "bad"
+        ? { tone: "bad", text: t("Robot offline"), title: reach.title }
+        : { tone: "idle", text: t("Robot state unknown"), title: reach?.title };
   useEffect(() => {
     setRobotCamera("start").catch(() => {});
     return () => {
@@ -189,9 +205,10 @@ export function AgentPage() {
             <span className="text-dim">·</span>
             {robotName}
           </h1>
-          <span className={`flex items-center gap-2 text-[12.5px] font-semibold ${connected ? "text-good-fg" : "text-muted"}`}>
-            <span className={`size-2 shrink-0 rounded-full ${connected ? "bg-good-fg shadow-[0_0_0_4px_var(--color-good-bg)]" : "bg-dim"}`} />
-            {connected ? t("Connected") : t("Connecting…")}
+          <span title={label.title}
+            className={`flex items-center gap-2 text-[12.5px] font-semibold ${label.tone === "good" ? "text-good-fg" : label.tone === "bad" ? "text-bad-fg" : "text-muted"}`}>
+            <span className={`size-2 shrink-0 rounded-full ${label.tone === "good" ? "bg-good-fg shadow-[0_0_0_4px_var(--color-good-bg)]" : label.tone === "bad" ? "bg-bad-fg shadow-[0_0_0_4px_var(--color-bad-bg)]" : "bg-dim"}`} />
+            {label.text}
           </span>
         </div>
 

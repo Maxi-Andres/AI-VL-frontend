@@ -1,11 +1,14 @@
 // Spanish — agent (the /agent tab). Keys are the English texts exactly as in t("…") / msg("…").
-// Shared and kept elsewhere: "Connected", "Video quality and transport", "Waiting for the robot
+// Shared and kept elsewhere: "Video quality and transport", "Waiting for the robot
 // camera…", "NO VIDEO", "STOP" (drive.ts); "Connecting…", "Stopped", "Listening…",
 // "Transcribing…", "Didn't catch that — try again", "Nothing recognized" (live.ts); "LIVE" (fleet.ts).
 export const AGENT: Record<string, string> = {
   // The tab and the page
   "Agent": "Agente",
   "The agent works with the G1 only. Pick the G1 in the header.": "El agente funciona solo con el G1. Elige el G1 en la cabecera.",
+  "Robot online": "Robot en línea",
+  "Robot offline": "Robot desconectado",
+  "Robot state unknown": "Estado del robot desconocido",
   // The composer
   "Instruction": "Instrucción",
   "Type or speak…": "Escribe o habla…",
