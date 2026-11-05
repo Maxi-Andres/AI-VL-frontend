@@ -73,4 +73,7 @@ export const NAV: Record<string, string> = {
   "Switching the robot's mode…": "Cambiando el modo del robot…",
   "Walk": "Caminar",
   "Run": "Correr",
+  "The robot picks the speed from how open the way is": "El robot elige la velocidad según lo libre que esté el camino",
+  "It picks the speed: up to 0.9 m/s in the open, down to 0.3 near things and at the end, stopping sooner the faster it goes.": "Elige la velocidad: hasta 0.9 m/s en espacio abierto, baja a 0.3 cerca de cosas y al llegar, y frena antes cuanto más rápido va.",
+  "Walking to the point at up to {v} m/s · {err}": "Caminando al punto a hasta {v} m/s · {err}",
 };

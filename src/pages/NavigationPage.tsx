@@ -98,7 +98,8 @@ export function NavigationPage() {
   const [problem, setProblem] = useState<Status | null>(null);
   const [showObstacles, setShowObstacles] = useState(false);
   // How fast and in which mode, as on the drive pad (the same presets, lib/speeds.ts).
-  const [speed, setSpeed] = useState<Speed>("slow");
+  // "auto": the robot picks it from how open the way is (up to 0.9 m/s, 0.3 near things).
+  const [speed, setSpeed] = useState<Speed | "auto">("auto");
   const [mode, setMode] = useState<"walk" | "run">("walk");
   const [dx, setDx] = useState(1);
   const [dy, setDy] = useState(0);
@@ -201,7 +202,7 @@ export function NavigationPage() {
     setProposal(null);
     setProblem(null);
     try {
-      const a = await walkGoto(rel.dx, rel.dy, rel.dyaw, SPEEDS.g1[speed], mode);
+      const a = await walkGoto(rel.dx, rel.dy, rel.dyaw, speed === "auto" ? "auto" : SPEEDS.g1[speed], mode);
       if (a.walk) setWalk(a.walk);
       if (!a.ok) setProblem({ tone: "error", text: a.error ?? t("The robot refused") });
     } catch (e) {
@@ -282,6 +283,12 @@ export function NavigationPage() {
               ))}
             </Segmented>
             <Segmented className="flex rounded-lg bg-subtle p-0.5" pill="bg-panel shadow-card">
+              <button type="button" onClick={() => setSpeed("auto")} data-on={speed === "auto"}
+                title={t("The robot picks the speed from how open the way is")}
+                className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-bold transition-colors ${
+                  speed === "auto" ? "text-fg" : "text-muted hover:text-fg"}`}>
+                {t("Auto")}
+              </button>
               {SPEED_NAMES.map((sp) => (
                 <button key={sp} type="button" onClick={() => setSpeed(sp)} data-on={speed === sp}
                   title={t("Up to {v} m/s", { v: SPEEDS.g1[sp].vx })}
@@ -293,9 +300,11 @@ export function NavigationPage() {
             </Segmented>
           </div>
           <p className="text-[11.5px] text-muted">
-            {t("Up to {v} m/s; the faster, the sooner it stops for something in front ({d} m).", {
-              v: SPEEDS.g1[speed].vx, d: (0.5 + Math.max(0, SPEEDS.g1[speed].vx - 0.3)).toFixed(1),
-            })}
+            {speed === "auto"
+              ? t("It picks the speed: up to 0.9 m/s in the open, down to 0.3 near things and at the end, stopping sooner the faster it goes.")
+              : t("Up to {v} m/s; the faster, the sooner it stops for something in front ({d} m).", {
+                v: SPEEDS.g1[speed].vx, d: (0.5 + Math.max(0, SPEEDS.g1[speed].vx - 0.3)).toFixed(1),
+              })}
           </p>
           <div className="grid grid-cols-2 gap-1.5">
             {PRESETS.map(({ label, icon: Icon, dx: px, dy: py, dyaw }) => (

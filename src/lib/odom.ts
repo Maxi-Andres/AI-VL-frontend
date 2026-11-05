@@ -225,6 +225,8 @@ export interface WalkStatus {
   blocked?: { dist_m: number; reason?: string } | null;
   /** The way it planned round what the lidar saw, odom frame, start to goal. */
   path?: [number, number][] | null;
+  /** With speed "auto": the top speed it chose a moment ago, from how open the way is. */
+  speed_now?: number;
   /** "lidar" when the walk looks where it goes, "none" when it walks blind. */
   eyes?: "lidar" | "none";
 }
@@ -257,7 +259,9 @@ export function walkLine(w: WalkStatus | null): Status | null {
             ? t("Turning to face the way · {err}", { err })
             : w.phase === "mode"
               ? t("Switching the robot's mode…")
-            : t("Walking to the point · {err}", { err }),
+            : w.speed_now
+              ? t("Walking to the point at up to {v} m/s · {err}", { v: w.speed_now.toFixed(1), err })
+              : t("Walking to the point · {err}", { err }),
       };
     case "success":
       return { tone: "ok", text: t("Arrived · {err}", { err }) };

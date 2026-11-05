@@ -55,7 +55,7 @@ async function answer(r: Response, what: string): Promise<WalkAnswer> {
  * from anything but Walk or Run. */
 export async function walkGoto(
   dx: number, dy: number, dyaw: number,
-  speed?: { vx: number; vy: number; vyaw: number }, mode?: "walk" | "run",
+  speed?: { vx: number; vy: number; vyaw: number } | "auto", mode?: "walk" | "run",
 ): Promise<WalkAnswer> {
   const r = await backendFetch("/api/walk", {
     method: "POST",
