@@ -16,6 +16,8 @@ import { NumberField } from "../components/ui/NumberField";
 import { StatusText, type Status } from "../components/ui/StatusText";
 import { StopButton } from "../components/ui/StopButton";
 import { Switch } from "../components/ui/Switch";
+import { Segmented } from "../components/ui/Segmented";
+import { SPEED_LABEL, SPEED_NAMES, SPEEDS, type Speed } from "../lib/speeds";
 import { useCan } from "../auth/permissions";
 import {
   useCloudSource,
@@ -95,6 +97,9 @@ export function NavigationPage() {
   const [planning, setPlanning] = useState(false);
   const [problem, setProblem] = useState<Status | null>(null);
   const [showObstacles, setShowObstacles] = useState(false);
+  // How fast and in which mode, as on the drive pad (the same presets, lib/speeds.ts).
+  const [speed, setSpeed] = useState<Speed>("slow");
+  const [mode, setMode] = useState<"walk" | "run">("walk");
   const [dx, setDx] = useState(1);
   const [dy, setDy] = useState(0);
   const [turnDeg, setTurnDeg] = useState(0);
@@ -196,7 +201,7 @@ export function NavigationPage() {
     setProposal(null);
     setProblem(null);
     try {
-      const a = await walkGoto(rel.dx, rel.dy, rel.dyaw);
+      const a = await walkGoto(rel.dx, rel.dy, rel.dyaw, SPEEDS.g1[speed], mode);
       if (a.walk) setWalk(a.walk);
       if (!a.ok) setProblem({ tone: "error", text: a.error ?? t("The robot refused") });
     } catch (e) {
@@ -265,6 +270,33 @@ export function NavigationPage() {
           <h2 className="flex items-center gap-1.5 text-[13px] font-extrabold tracking-wide text-fg">
             <IconWalk size={16} />{t("Walk to a point")}
           </h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Segmented className="flex rounded-lg bg-subtle p-0.5" pill="bg-panel shadow-card">
+              {(["walk", "run"] as const).map((m) => (
+                <button key={m} type="button" onClick={() => setMode(m)} data-on={mode === m}
+                  title={t("The robot switches to this mode before walking, only from Walk or Run")}
+                  className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-bold transition-colors ${
+                    mode === m ? "text-fg" : "text-muted hover:text-fg"}`}>
+                  {m === "walk" ? t("Walk") : t("Run")}
+                </button>
+              ))}
+            </Segmented>
+            <Segmented className="flex rounded-lg bg-subtle p-0.5" pill="bg-panel shadow-card">
+              {SPEED_NAMES.map((sp) => (
+                <button key={sp} type="button" onClick={() => setSpeed(sp)} data-on={speed === sp}
+                  title={t("Up to {v} m/s", { v: SPEEDS.g1[sp].vx })}
+                  className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-bold transition-colors ${
+                    speed === sp ? "text-fg" : "text-muted hover:text-fg"}`}>
+                  {t(SPEED_LABEL[sp])}
+                </button>
+              ))}
+            </Segmented>
+          </div>
+          <p className="text-[11.5px] text-muted">
+            {t("Up to {v} m/s; the faster, the sooner it stops for something in front ({d} m).", {
+              v: SPEEDS.g1[speed].vx, d: (0.5 + Math.max(0, SPEEDS.g1[speed].vx - 0.3)).toFixed(1),
+            })}
+          </p>
           <div className="grid grid-cols-2 gap-1.5">
             {PRESETS.map(({ label, icon: Icon, dx: px, dy: py, dyaw }) => (
               <Button key={label} variant="secondary" disabled={blocked}

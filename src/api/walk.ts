@@ -50,12 +50,17 @@ async function answer(r: Response, what: string): Promise<WalkAnswer> {
   }
 }
 
-/** MOVES THE ROBOT: dx m forward, dy m left, dyaw rad left, from where it stands now. */
-export async function walkGoto(dx: number, dy: number, dyaw: number): Promise<WalkAnswer> {
+/** MOVES THE ROBOT: dx m forward, dy m left, dyaw rad left, from where it stands now; at most
+ * `speed` (m/s, m/s, rad/s), in `mode` — the robot switches walk <-> run first, and refuses to
+ * from anything but Walk or Run. */
+export async function walkGoto(
+  dx: number, dy: number, dyaw: number,
+  speed?: { vx: number; vy: number; vyaw: number }, mode?: "walk" | "run",
+): Promise<WalkAnswer> {
   const r = await backendFetch("/api/walk", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ robot: "g1", op: "goto", dx, dy, dyaw }),
+    body: JSON.stringify({ robot: "g1", op: "goto", dx, dy, dyaw, speed, mode }),
   });
   return answer(r, "POST /api/walk");
 }

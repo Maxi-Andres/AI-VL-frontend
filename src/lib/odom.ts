@@ -212,7 +212,7 @@ export type WalkState =
 export interface WalkStatus {
   id?: number;
   state: WalkState;
-  phase?: "align" | "translate" | "turn" | "done";
+  phase?: "mode" | "align" | "translate" | "turn" | "done";
   request?: { dx: number; dy: number; dyaw: number };
   start?: Pose | null;
   goal?: Pose | null;
@@ -255,6 +255,8 @@ export function walkLine(w: WalkStatus | null): Status | null {
           ? t("Turning in place · {err}", { err })
           : w.phase === "align"
             ? t("Turning to face the way · {err}", { err })
+            : w.phase === "mode"
+              ? t("Switching the robot's mode…")
             : t("Walking to the point · {err}", { err }),
       };
     case "success":

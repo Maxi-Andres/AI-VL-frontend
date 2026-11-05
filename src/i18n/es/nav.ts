@@ -67,4 +67,10 @@ export const NAV: Record<string, string> = {
   "Waiting: {reason}": "Esperando: {reason}",
   "Click the floor: walk there · left drag: rotate · right drag: move · wheel: zoom": "Clic en el piso: caminar ahí · arrastrar con el izquierdo: girar · con el derecho: mover · rueda: zoom",
   "Turning to face the way · {err}": "Girando hacia el camino · {err}",
+  "The robot switches to this mode before walking, only from Walk or Run": "El robot cambia a este modo antes de caminar, solo desde Walk o Run",
+  "Up to {v} m/s": "Hasta {v} m/s",
+  "Up to {v} m/s; the faster, the sooner it stops for something in front ({d} m).": "Hasta {v} m/s; cuanto más rápido, antes frena ante algo adelante ({d} m).",
+  "Switching the robot's mode…": "Cambiando el modo del robot…",
+  "Walk": "Caminar",
+  "Run": "Correr",
 };
