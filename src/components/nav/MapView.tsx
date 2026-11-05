@@ -11,7 +11,7 @@ import { useT } from "../../i18n";
  * standing still. What the lidar sees is drawn as dark squares (obstacles 10 cm..1.5 m over
  * the floor), in the same odometry frame as the trail.
  */
-export function MapView({ pose, trail, goal, preview, start, lidar }: {
+export function MapView({ pose, trail, goal, preview, start, lidar, path }: {
   pose: Pose | null;
   trail: Pose[];
   /** The running (or last) walk's target. */
@@ -21,6 +21,8 @@ export function MapView({ pose, trail, goal, preview, start, lidar }: {
   start: Pose | null;
   /** The obstacle map; ignored when it is not in the odometry frame (it would not line up). */
   lidar: LidarFrame | null;
+  /** The running walk's planned way, drawn dashed from the robot to the goal. */
+  path?: [number, number][] | null;
 }) {
   const t = useT();
   const view = useRef<View | null>(null);
@@ -64,6 +66,11 @@ export function MapView({ pose, trail, goal, preview, start, lidar }: {
           <polyline points={trail.map((p) => `${p.x},${-p.y}`).join(" ")} fill="none"
             className="stroke-accent2" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round"
             vectorEffect="non-scaling-stroke" opacity={0.8} />
+        )}
+        {path && path.length > 1 && (
+          <polyline points={path.map(([x, y]) => `${x},${-y}`).join(" ")} fill="none"
+            className="stroke-accent" strokeWidth={2} strokeDasharray="6 4"
+            vectorEffect="non-scaling-stroke" />
         )}
         {start && (
           <rect x={start.x - 6 * px} y={-start.y - 6 * px} width={12 * px} height={12 * px}

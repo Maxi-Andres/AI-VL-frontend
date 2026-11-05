@@ -168,6 +168,8 @@ export interface WalkStatus {
   limit_s?: number;
   /** Set while something is in the way and the robot waits for it to move off. */
   blocked?: { dist_m: number } | null;
+  /** The way it planned round what the lidar saw, odom frame, start to goal. */
+  path?: [number, number][] | null;
   /** "lidar" when the walk looks where it goes, "none" when it walks blind. */
   eyes?: "lidar" | "none";
 }
