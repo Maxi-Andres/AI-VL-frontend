@@ -10,6 +10,7 @@ import { AgentPage } from "./pages/AgentPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { FleetPage } from "./pages/FleetPage";
 import { MemoryPage } from "./pages/MemoryPage";
+import { NavigationPage } from "./pages/NavigationPage";
 
 // Lazy: three.js and the URDF loader are most of this page's weight, and no other page uses
 // them — the drive pad must not pay for a 3D engine it never draws.
@@ -39,6 +40,7 @@ function AppRoutes() {
           <Route path="live" element={<LivePage />} />
           <Route path="drive" element={<RequirePermission perm="operate"><ControlPage /></RequirePermission>} />
           <Route path="agent" element={<RequirePermission perm="operate"><AgentPage /></RequirePermission>} />
+          <Route path="nav" element={<NavigationPage />} />
           <Route path="memory" element={<MemoryPage />} />
           <Route path="settings" element={<SettingsPage />} />
           {/* The two pages Settings replaced: old links and bookmarks still land. */}

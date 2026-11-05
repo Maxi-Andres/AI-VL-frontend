@@ -1,0 +1,45 @@
+// Spanish — navigation (the /nav page: the G1 walking to a point on its own odometry).
+// Keys are the English texts exactly as in t("…") / msg("…").
+export const NAV: Record<string, string> = {
+  "Navigation": "Navegación",
+  "Map of the robot's walk, seen from above": "Mapa del recorrido del robot, visto desde arriba",
+  "grid {step} m": "cuadrícula {step} m",
+  // The walk's status
+  "{cm} cm and {deg}° off": "a {cm} cm y {deg}°",
+  "Starting the walk…": "Empezando a caminar…",
+  "Turning in place · {err}": "Girando en el lugar · {err}",
+  "Walking to the point · {err}": "Caminando al punto · {err}",
+  "Arrived · {err}": "Llegó · {err}",
+  "Stopped, but further off than expected · {err}": "Se detuvo, pero más lejos de lo esperado · {err}",
+  "Stopped: {reason}": "Detenido: {reason}",
+  "The walk failed: {reason}": "La caminata falló: {reason}",
+  "This robot cannot walk to a point (the relay has no odometry bridge).": "Este robot no puede caminar a un punto (el relay no tiene el lector de odometría).",
+  // Presets
+  "1 m forward": "1 m adelante",
+  "2 m forward": "2 m adelante",
+  "50 cm back": "50 cm atrás",
+  "Turn 90° left": "Girar 90° a la izquierda",
+  "Turn 90° right": "Girar 90° a la derecha",
+  "Turn around": "Darse vuelta",
+  // Why it cannot walk
+  "Waiting for live odometry from the robot.": "Esperando la odometría en vivo del robot.",
+  "A walk is running: stop it first.": "Hay una caminata en curso: detenla primero.",
+  "At most {m} m and half a turn per walk.": "Como máximo {m} m y media vuelta por caminata.",
+  "Nothing to do: set a distance or a turn.": "Nada que hacer: indica una distancia o un giro.",
+  // Panels
+  "Where it is": "Dónde está",
+  "heading": "rumbo",
+  "No pose yet.": "Todavía sin posición.",
+  "The robot's own odometry: its origin is where it was switched on, not a place in the room.": "La odometría propia del robot: su origen es donde se encendió, no un lugar de la sala.",
+  "Walk to a point": "Caminar a un punto",
+  "Forward, m": "Adelante, m",
+  "Left, m": "Izquierda, m",
+  "Turn left, °": "Giro a la izquierda, °",
+  "First straight to the point keeping its heading, then it turns in place. The dashed ring on the map is where it would end.": "Primero va derecho al punto manteniendo el rumbo, después gira en el lugar. El círculo punteado en el mapa es donde terminaría.",
+  "Walk": "Caminar",
+  "Stop the walk": "Detener la caminata",
+  "It has no eyes yet: nothing stops it before an obstacle. Keep the remote in hand and the way clear. Any stop, or a move from the drive pad, ends the walk.": "Todavía no tiene ojos: nada lo frena antes de un obstáculo. Ten el control remoto en la mano y el camino libre. Cualquier parada, o un movimiento desde el pad de manejo, termina la caminata.",
+  "Clear the trail": "Borrar el recorrido",
+  "Live odometry · {hz} Hz": "Odometría en vivo · {hz} Hz",
+  "The robot's odometry stopped updating": "La odometría del robot dejó de actualizarse",
+};

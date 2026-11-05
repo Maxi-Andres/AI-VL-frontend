@@ -7,6 +7,7 @@ import {
   IconLayoutGrid,
   IconMan,
   IconMessageChatbot,
+  IconRoute,
   IconSettings,
   IconSteeringWheel,
 } from "@tabler/icons-react";
@@ -30,6 +31,7 @@ const TABS: { to: string; label: string; icon: typeof IconBroadcast; perm?: Perm
   // Carries out an instruction with the robot's tools: it moves the arm, so "operate" like Drive.
   { to: "/agent", label: msg("Agent"), icon: IconMessageChatbot, perm: "operate" },
   { to: "/joints", label: msg("Joints"), icon: IconMan },
+  { to: "/nav", label: msg("Navigation"), icon: IconRoute },
   { to: "/memory", label: msg("Memory"), icon: IconBrain },
   // Everyone has Settings: Profile is there. The team and the robot sections show by role.
   { to: "/settings", label: msg("Settings"), icon: IconSettings },

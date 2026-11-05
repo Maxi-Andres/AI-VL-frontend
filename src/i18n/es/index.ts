@@ -10,6 +10,7 @@ import { JOINTS } from "./joints";
 import { LAYOUT } from "./layout";
 import { LIVE } from "./live";
 import { MEMORY } from "./memory";
+import { NAV } from "./nav";
 import { SERVER } from "./server";
 import { SETTINGS } from "./settings";
 
@@ -21,6 +22,7 @@ export const ES: Record<string, string> = {
   ...DRIVE,
   ...AGENT,
   ...JOINTS,
+  ...NAV,
   ...MEMORY,
   ...SETTINGS,
   ...AUTH,
