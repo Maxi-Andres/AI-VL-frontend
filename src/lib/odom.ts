@@ -51,6 +51,50 @@ export function parseOdomMessage(text: string): OdomMessage | null {
   };
 }
 
+/** The lidar's obstacle map (g1_lidar_bridge in robot-command-relay, coarsened for the page):
+ * occupied squares of `res` metres in the odometry frame — square (ix, iy) covers
+ * [ix*res, (ix+1)*res). `odom` false = no odometry on the robot: the squares are then in the
+ * robot's own frame and do not line up with the trail. */
+export interface LidarFrame {
+  ageMs: number;
+  ptsS: number;
+  floor: number;
+  tiltDeg: number;
+  odom: boolean;
+  res: number;
+  cells: [number, number][];
+}
+
+export type LidarMessage =
+  | { kind: "frame"; frame: LidarFrame }
+  | { kind: "stale" }
+  | { kind: "error"; error: string; final: boolean };
+
+export function parseLidarMessage(text: string): LidarMessage | null {
+  let d: unknown;
+  try {
+    d = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!d || typeof d !== "object") return null;
+  const o = d as Record<string, unknown>;
+  if (typeof o.error === "string") return { kind: "error", error: o.error, final: !!o.final };
+  if (o.stale === true || !num(o.age_ms) || o.age_ms < 0) return { kind: "stale" };
+  if (!num(o.res) || !Array.isArray(o.cells)) return null;
+  const cells = o.cells.filter(
+    (c): c is [number, number] => Array.isArray(c) && c.length === 2 && num(c[0]) && num(c[1]),
+  );
+  return {
+    kind: "frame",
+    frame: {
+      ageMs: o.age_ms, ptsS: num(o.pts_s) ? o.pts_s : 0, floor: num(o.floor) ? o.floor : 0,
+      tiltDeg: num(o.tilt_deg) ? o.tilt_deg : 0, odom: o.odom === 1 || o.odom === true,
+      res: o.res, cells,
+    },
+  };
+}
+
 /** A new trail point only once the robot has moved this far: standing still adds nothing, and
  * the torso's sway in place (~10 cm turning) stays a smudge rather than thousands of points. */
 export const TRAIL_STEP_M = 0.03;
@@ -122,6 +166,10 @@ export interface WalkStatus {
   reason?: string | null;
   elapsed_s?: number;
   limit_s?: number;
+  /** Set while something is in the way and the robot waits for it to move off. */
+  blocked?: { dist_m: number } | null;
+  /** "lidar" when the walk looks where it goes, "none" when it walks blind. */
+  eyes?: "lidar" | "none";
 }
 
 export const walkRunning = (w: WalkStatus | null) =>
@@ -137,6 +185,11 @@ export function walkLine(w: WalkStatus | null): Status | null {
     case "starting":
       return { tone: "busy", text: t("Starting the walk…") };
     case "running":
+      if (w.blocked)
+        return {
+          tone: "warn",
+          text: t("Something {d} m ahead: waiting for the way to clear", { d: w.blocked.dist_m.toFixed(2) }),
+        };
       return {
         tone: "busy",
         text: w.phase === "turn"

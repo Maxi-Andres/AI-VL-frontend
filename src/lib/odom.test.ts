@@ -5,6 +5,7 @@ import {
   extendTrail,
   fitView,
   goalFrom,
+  parseLidarMessage,
   parseOdomMessage,
   walkLine,
   wrap,
@@ -73,5 +74,26 @@ describe("walkLine", () => {
     expect(walkLine({ state: "success", error: { pos_m: 0.04, yaw_deg: -2 } })?.text).toBe(
       "Arrived · 4 cm and 2° off",
     );
+  });
+});
+
+describe("parseLidarMessage", () => {
+  it("reads the obstacle map and keeps only well-formed squares", () => {
+    const m = parseLidarMessage(
+      '{"t":1,"age_ms":40,"pts_s":200000,"floor":-1.19,"tilt_deg":30,"odom":1,"res":0.1,"cells":[[1,2],[3],"x",[4,5]]}',
+    );
+    expect(m?.kind).toBe("frame");
+    if (m?.kind === "frame") {
+      expect(m.frame.cells).toEqual([[1, 2], [4, 5]]);
+      expect(m.frame.odom).toBe(true);
+    }
+  });
+  it("is stale before the lidar ever sent", () => {
+    expect(parseLidarMessage('{"t":1,"age_ms":-1}')).toEqual({ kind: "stale" });
+  });
+  it("says when a walk waits for its way to clear", () => {
+    expect(walkLine({ state: "running", blocked: { dist_m: 0.42 } })).toEqual({
+      tone: "warn", text: "Something 0.42 m ahead: waiting for the way to clear",
+    });
   });
 });

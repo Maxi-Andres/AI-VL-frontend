@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { fitView, type Pose, type View } from "../../lib/odom";
+import { fitView, type LidarFrame, type Pose, type View } from "../../lib/odom";
 import { useT } from "../../i18n";
 
 /**
@@ -8,9 +8,10 @@ import { useT } from "../../i18n";
  *
  * Presentational: it draws what it is given. The view follows the robot only when something
  * would leave it (85 % of the way to an edge), so the grid does not crawl under a robot
- * standing still. Later the lidar's points go here as one more layer.
+ * standing still. What the lidar sees is drawn as dark squares (obstacles 10 cm..1.5 m over
+ * the floor), in the same odometry frame as the trail.
  */
-export function MapView({ pose, trail, goal, preview, start }: {
+export function MapView({ pose, trail, goal, preview, start, lidar }: {
   pose: Pose | null;
   trail: Pose[];
   /** The running (or last) walk's target. */
@@ -18,6 +19,8 @@ export function MapView({ pose, trail, goal, preview, start }: {
   /** Where the walk being composed would end, drawn dashed before it is sent. */
   preview: Pose | null;
   start: Pose | null;
+  /** The obstacle map; ignored when it is not in the odometry frame (it would not line up). */
+  lidar: LidarFrame | null;
 }) {
   const t = useT();
   const view = useRef<View | null>(null);
@@ -51,6 +54,12 @@ export function MapView({ pose, trail, goal, preview, start }: {
             className={Math.abs(y % 1) < 1e-6 ? "stroke-line" : "stroke-subtle"}
             strokeWidth={1} vectorEffect="non-scaling-stroke" />
         ))}
+        {lidar && lidar.odom && lidar.cells.length > 0 && (
+          // One path for every square: thousands of <rect>s would make each frame a DOM storm.
+          <path className="fill-fg" opacity={0.55}
+            d={lidar.cells.map(([ix, iy]) =>
+              `M${ix * lidar.res} ${-(iy + 1) * lidar.res}h${lidar.res}v${lidar.res}h${-lidar.res}z`).join("")} />
+        )}
         {trail.length > 1 && (
           <polyline points={trail.map((p) => `${p.x},${-p.y}`).join(" ")} fill="none"
             className="stroke-accent2" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round"

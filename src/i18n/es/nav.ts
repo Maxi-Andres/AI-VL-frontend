@@ -42,4 +42,12 @@ export const NAV: Record<string, string> = {
   "Clear the trail": "Borrar el recorrido",
   "Live odometry · {hz} Hz": "Odometría en vivo · {hz} Hz",
   "The robot's odometry stopped updating": "La odometría del robot dejó de actualizarse",
+  // The lidar
+  "Something {d} m ahead: waiting for the way to clear": "Algo a {d} m adelante: esperando que se libere el camino",
+  "It stops half a metre before something in its way and waits 3 s for it to move; it does not go around it yet. It does not watch while turning in place. Keep the remote in hand.": "Se detiene medio metro antes de algo en su camino y espera 3 s a que se corra; todavía no lo rodea. No mira mientras gira en el lugar. Ten el control remoto en la mano.",
+  "Without the lidar it does not walk: point the lidar at PC2 (tools/livox_set_host.py on the robot). Keep the remote in hand.": "Sin el lidar no camina: apunta el lidar a PC2 (tools/livox_set_host.py en el robot). Ten el control remoto en la mano.",
+  "Lidar · {k}k points/s · floor {floor} m below · tilt {tilt}°": "Lidar · {k}k puntos/s · piso {floor} m abajo · inclinación {tilt}°",
+  "Lidar without odometry: its map would not line up": "Lidar sin odometría: su mapa no coincidiría",
+  "No lidar points: is it pointed at PC2?": "Sin puntos del lidar: ¿está apuntado a PC2?",
+  "Connecting to the lidar…": "Conectando con el lidar…",
 };

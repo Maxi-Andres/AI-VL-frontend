@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { WS_ODOM_URL } from "../config";
 import { t } from "../i18n";
-import { parseOdomMessage, type OdomFrame } from "../lib/odom";
+import { WS_LIDAR_URL } from "../config";
+import { parseLidarMessage, parseOdomMessage, type LidarFrame, type OdomFrame } from "../lib/odom";
 
 /**
  * The G1's live pose for the Navigation page: /ws/odom (backend -> executor -> relay ->
@@ -10,8 +11,8 @@ import { parseOdomMessage, type OdomFrame } from "../lib/odom";
  */
 export type OdomLink = "connecting" | "live" | "stale" | "error";
 
-export interface OdomSourceState {
-  frame: OdomFrame | null;
+export interface StreamState<F> {
+  frame: F | null;
   link: OdomLink;
   error: string | null;
   /** Poses per second actually received, over the last 2 s. */
@@ -23,8 +24,20 @@ const RETRY_MAX_MS = 10000;
 /** Over this, the robot's odometry has stopped updating even if lines still arrive. */
 export const ODOM_STALE_MS = 500;
 
-export function useOdomSource(): OdomSourceState {
-  const [state, setState] = useState<OdomSourceState>({
+export type OdomSourceState = StreamState<OdomFrame>;
+export type LidarSourceState = StreamState<LidarFrame>;
+
+export const useOdomSource = () => useRobotStream(WS_ODOM_URL, parseOdomMessage);
+/** The lidar's obstacle map (/ws/lidar), the same way: read-only, reconnecting. */
+export const useLidarSource = () => useRobotStream(WS_LIDAR_URL, parseLidarMessage);
+
+type Parsed<F> =
+  | { kind: "frame"; frame: F & { ageMs: number } }
+  | { kind: "stale" }
+  | { kind: "error"; error: string; final: boolean };
+
+function useRobotStream<F>(url: string, parse: (text: string) => Parsed<F> | null): StreamState<F> {
+  const [state, setState] = useState<StreamState<F>>({
     frame: null, link: "connecting", error: null, hz: 0,
   });
   const stamps = useRef<number[]>([]);
@@ -46,9 +59,9 @@ export function useOdomSource(): OdomSourceState {
 
     const connect = () => {
       if (cancelled) return;
-      ws = new WebSocket(WS_ODOM_URL);
+      ws = new WebSocket(url);
       ws.onmessage = (ev) => {
-        const msg = parseOdomMessage(String(ev.data));
+        const msg = parse(String(ev.data));
         if (!msg) return;
         if (msg.kind === "error") {
           lastError = msg.error;
@@ -78,7 +91,9 @@ export function useOdomSource(): OdomSourceState {
       window.clearTimeout(retry);
       ws?.close();
     };
-  }, []);
+    // `parse` is a module-level function per stream; the url decides the socket.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url]);
 
   return state;
 }

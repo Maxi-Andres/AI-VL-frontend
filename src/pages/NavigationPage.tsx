@@ -14,7 +14,12 @@ import { NumberField } from "../components/ui/NumberField";
 import { StatusText, type Status } from "../components/ui/StatusText";
 import { StopButton } from "../components/ui/StopButton";
 import { useCan } from "../auth/permissions";
-import { useOdomSource, type OdomSourceState } from "../hooks/useOdomSource";
+import {
+  useLidarSource,
+  useOdomSource,
+  type LidarSourceState,
+  type OdomSourceState,
+} from "../hooks/useOdomSource";
 import { walkCancel, walkGoto, walkStatus } from "../api/walk";
 import {
   deg,
@@ -54,6 +59,8 @@ export function NavigationPage() {
   const t = useT();
   const can = useCan();
   const odom = useOdomSource();
+  const lidar = useLidarSource();
+  const seeing = lidar.link === "live" && !!lidar.frame?.odom;
   const [trail, setTrail] = useState<Pose[]>([]);
   const [walk, setWalk] = useState<WalkStatus | null>(null);
   const [problem, setProblem] = useState<Status | null>(null);
@@ -124,10 +131,13 @@ export function NavigationPage() {
   return (
     <main className="grid gap-4 p-4 lg:h-full lg:grid-cols-[minmax(0,1fr)_380px] lg:overflow-hidden">
       <div className="flex min-h-0 min-w-0 flex-col gap-3">
-        <LinkBar odom={odom} />
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <LinkBar odom={odom} />
+          <LidarBar lidar={lidar} />
+        </div>
         <div className="h-[60vh] min-h-0 lg:h-auto lg:flex-1">
           <MapView pose={pose} trail={trail} goal={walk?.goal ?? null} start={walk?.start ?? null}
-            preview={preview} />
+            preview={preview} lidar={lidar.frame} />
         </div>
       </div>
       <aside className="flex min-w-0 flex-col gap-4 overflow-y-auto rounded-2xl border border-line bg-panel p-4 shadow-card">
@@ -184,7 +194,9 @@ export function NavigationPage() {
         </section>
 
         <p className="rounded-xl bg-warn-bg p-3 text-[12px] font-semibold text-warn-fg">
-          {t("It has no eyes yet: nothing stops it before an obstacle. Keep the remote in hand and the way clear. Any stop, or a move from the drive pad, ends the walk.")}
+          {seeing
+            ? t("It stops half a metre before something in its way and waits 3 s for it to move; it does not go around it yet. It does not watch while turning in place. Keep the remote in hand.")
+            : t("Without the lidar it does not walk: point the lidar at PC2 (tools/livox_set_host.py on the robot). Keep the remote in hand.")}
         </p>
 
         <Button variant="secondary" onClick={() => setTrail(pose ? [pose] : [])}
@@ -203,6 +215,26 @@ function Reading({ label, value }: { label: string; value: string }) {
       <div className="text-[14px] font-extrabold tabular-nums text-fg">{value}</div>
     </div>
   );
+}
+
+function LidarBar({ lidar }: { lidar: LidarSourceState }) {
+  const t = useT();
+  const f = lidar.frame;
+  const status: Status =
+    lidar.link === "live" && f
+      ? f.odom
+        ? { tone: "ok", text: t("Lidar · {k}k points/s · floor {floor} m below · tilt {tilt}°", {
+            k: Math.round(f.ptsS / 1000), floor: Math.abs(f.floor).toFixed(2), tilt: f.tiltDeg.toFixed(0),
+          }) }
+        : { tone: "warn", text: t("Lidar without odometry: its map would not line up") }
+      : lidar.link === "stale"
+        ? { tone: "warn", text: t("No lidar points: is it pointed at PC2?") }
+        : lidar.link === "error"
+          ? { tone: "error", text: lidar.error ?? t("Connection to the backend closed") }
+          : { tone: "busy", text: t("Connecting to the lidar…") };
+  const tone = status.tone === "ok" ? "text-good-fg" : status.tone === "error" ? "text-bad-fg"
+    : status.tone === "warn" ? "text-warn-fg" : "text-muted";
+  return <StatusText status={status} className={`text-[12.5px] font-semibold ${tone}`} />;
 }
 
 function LinkBar({ odom }: { odom: OdomSourceState }) {
