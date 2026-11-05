@@ -73,13 +73,18 @@ export function loadG1Model(onMeshError?: (path: string) => void): Promise<URDFR
   });
 }
 
-/** Pose the model's joints from a joint frame (the robot's own readings): every joint the
- * frame carries; the others stay where they are. */
-export function poseG1(robot: URDFRobot, frame: JointFrame | null): void {
+/** Pose the model from a joint frame (the robot's own readings): every joint the frame carries
+ * (the others stay where they are) and, with `tilt`, the pelvis's roll and pitch from its IMU —
+ * without them a squatting robot is drawn upright with its legs folded under it, sitting on air
+ * (2026-11-05). ZYX is ROS's rpy convention (R = Rz·Ry·Rx); yaw is left to the caller (the
+ * Joints page ignores it, the Navigation page takes it from the odometry). */
+export function poseG1(robot: URDFRobot, frame: JointFrame | null, tilt = true): void {
   if (!frame) return;
   for (const j of JOINTS) {
     const r = readJoint(frame, j);
     const joint = robot.joints[j.urdf];
     if (r && joint) joint.setJointValue(r.q);
   }
+  const [roll, pitch] = tilt && frame.imu ? frame.imu : [0, 0];
+  robot.rotation.set(roll, pitch, 0, "ZYX");
 }

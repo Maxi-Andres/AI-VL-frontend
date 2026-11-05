@@ -173,10 +173,10 @@ export function NavScene({ pose, trail, goal, preview, path, cloud, obstacles, j
     holder.add(arrow);
     let model: URDFRobot | null = null;
     // Feet on the floor: the model's lowest point at z = 0 (in the holder's own frame). Again
-    // every GROUND_MS as the joints move: a robot that squats, sits or stands up changes how far
-    // its pelvis is from the floor, and a lift worked out once leaves it buried or floating.
+    // every GROUND_MS as the joints and the pelvis tilt move (the Joints page does it every
+    // frame): a robot that squats, sits or stands changes how far its pelvis is from the floor.
     let grounded = 0;
-    const GROUND_MS = 500;
+    const GROUND_MS = 100;
     const ground = () => {
       if (!model) return;
       model.position.z = 0;

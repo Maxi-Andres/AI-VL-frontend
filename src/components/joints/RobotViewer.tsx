@@ -505,7 +505,8 @@ export function RobotViewer({
     }
     const [roll, pitch] = showTilt && frame.imu ? frame.imu : [0, 0];
     // ZYX is ROS's rpy convention (R = Rz·Ry·Rx), with yaw left out on purpose: heading is not
-    // what this page is about, and spinning the model would fight the camera.
+    // what this page is about, and spinning the model would fight the camera. (lib/g1Model's
+    // poseG1 does the same for the Navigation page.)
     model.robot.rotation.set(roll, pitch, 0, "ZYX");
     model.ghost.rotation.copy(model.robot.rotation);
     standOnFloor(model);
