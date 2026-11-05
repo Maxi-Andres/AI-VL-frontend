@@ -214,7 +214,7 @@ export interface WalkStatus {
   elapsed_s?: number;
   limit_s?: number;
   /** Set while something is in the way and the robot waits for it to move off. */
-  blocked?: { dist_m: number } | null;
+  blocked?: { dist_m: number; reason?: string } | null;
   /** The way it planned round what the lidar saw, odom frame, start to goal. */
   path?: [number, number][] | null;
   /** "lidar" when the walk looks where it goes, "none" when it walks blind. */
@@ -234,6 +234,8 @@ export function walkLine(w: WalkStatus | null): Status | null {
     case "starting":
       return { tone: "busy", text: t("Starting the walk…") };
     case "running":
+      if (w.blocked?.reason)
+        return { tone: "warn", text: t("Waiting: {reason}", { reason: w.blocked.reason }) };
       if (w.blocked)
         return {
           tone: "warn",

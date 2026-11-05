@@ -65,4 +65,5 @@ export const NAV: Record<string, string> = {
   "Accept and walk": "Aceptar y caminar",
   "Show what the planner avoids": "Mostrar lo que evita el planificador",
   "Lidar · {k}k points/s · floor {floor} m below · {n} points shown": "Lidar · {k}k puntos/s · piso {floor} m abajo · {n} puntos mostrados",
+  "Waiting: {reason}": "Esperando: {reason}",
 };
