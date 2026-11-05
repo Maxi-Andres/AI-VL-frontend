@@ -32,6 +32,9 @@ export const AGENT: Record<string, string> = {
   // Tools and their results
   "pick up": "agarrar",
   "look": "mirar",
+  "put it in": "dejar en",
+  "walk": "caminar",
+  "turn": "girar",
   "{tool}: done": "{tool}: hecho",
   "{tool}: done, holding it": "{tool}: hecho, lo tengo agarrado",
   "{tool} failed: {why}": "{tool} falló: {why}",

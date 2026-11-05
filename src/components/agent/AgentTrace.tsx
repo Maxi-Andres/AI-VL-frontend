@@ -8,7 +8,10 @@ import { msg, useT } from "../../i18n";
  * Marked with msg(): translated where drawn. */
 const TOOL_LABEL: Record<string, string> = {
   pick: msg("pick up"),
+  place: msg("put it in"),
   look: msg("look"),
+  walk: msg("walk"),
+  turn: msg("turn"),
 };
 
 interface Props {
