@@ -172,17 +172,26 @@ export function NavScene({ pose, trail, goal, preview, path, cloud, obstacles, j
     arrow.position.z = 0.05;
     holder.add(arrow);
     let model: URDFRobot | null = null;
+    // Feet on the floor: the model's lowest point at z = 0 (in the holder's own frame). Again
+    // every GROUND_MS as the joints move: a robot that squats, sits or stands up changes how far
+    // its pelvis is from the floor, and a lift worked out once leaves it buried or floating.
+    let grounded = 0;
+    const GROUND_MS = 500;
+    const ground = () => {
+      if (!model) return;
+      model.position.z = 0;
+      holder.updateMatrixWorld(true);
+      const box = new Box3().setFromObject(model);
+      model.position.z = -holder.worldToLocal(box.min.clone()).z;
+      grounded = performance.now();
+    };
     loadG1Model()
       .then((r) => {
         if (disposed) return;
         model = r;
         poseG1(r, latest.current.joints);
         holder.add(r);
-        holder.updateMatrixWorld(true);
-        // Feet on the floor: the model's lowest point at z = 0 (in the holder's own frame).
-        const box = new Box3().setFromObject(r);
-        const lowest = holder.worldToLocal(box.min.clone()).z;
-        r.position.z = -lowest;
+        ground();
         holder.remove(arrow);
         setLoaded(true);
         dirty = true;
@@ -290,7 +299,10 @@ export function NavScene({ pose, trail, goal, preview, path, cloud, obstacles, j
         }
       }
       latest.current = p;
-      if (model && p.joints) poseG1(model, p.joints);
+      if (model && p.joints) {
+        poseG1(model, p.joints);
+        if (performance.now() - grounded > GROUND_MS) ground();
+      }
       if (p.cloud !== lastCloud) {
         lastCloud = p.cloud;
         const pos = p.cloud?.positions ?? new Float32Array(0);
