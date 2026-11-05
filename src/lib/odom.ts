@@ -95,6 +95,53 @@ export function parseLidarMessage(text: string): LidarMessage | null {
   };
 }
 
+/** The 3D cloud (g1_lidar_bridge's "cloud" lines): `positions` is x, y, z in metres — x, y in the
+ * odometry frame, z over the floor — three numbers per point, ready for a three.js buffer. */
+export interface CloudFrame {
+  ageMs: number;
+  t: number;
+  res: number;
+  count: number;
+  positions: Float32Array;
+}
+
+export type CloudMessage =
+  | { kind: "frame"; frame: CloudFrame }
+  | { kind: "stale" }
+  | { kind: "error"; error: string; final: boolean };
+
+/** Base64 of little-endian int16 centimetres -> metres. */
+export function decodeCloud(b64: string): Float32Array {
+  const bin = atob(b64);
+  const n = Math.floor(bin.length / 2);
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    let v = bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8);
+    if (v >= 0x8000) v -= 0x10000;
+    out[i] = v / 100;
+  }
+  return out;
+}
+
+export function parseCloudMessage(text: string): CloudMessage | null {
+  let d: unknown;
+  try {
+    d = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!d || typeof d !== "object") return null;
+  const o = d as Record<string, unknown>;
+  if (typeof o.error === "string") return { kind: "error", error: o.error, final: !!o.final };
+  if (o.stale === true) return { kind: "stale" };
+  if (o.kind !== "cloud" || typeof o.xyz !== "string" || !num(o.res)) return null;
+  const positions = decodeCloud(o.xyz);
+  return {
+    kind: "frame",
+    frame: { ageMs: 0, t: num(o.t) ? o.t : 0, res: o.res, count: positions.length / 3, positions },
+  };
+}
+
 /** A new trail point only once the robot has moved this far: standing still adds nothing, and
  * the torso's sway in place (~10 cm turning) stays a smudge rather than thousands of points. */
 export const TRAIL_STEP_M = 0.03;

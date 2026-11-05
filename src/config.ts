@@ -48,6 +48,9 @@ export const WS_ODOM_URL = wsUrl("/ws/odom?robot=g1");
 /** What the G1's Mid-360 sees around it, as an obstacle map (read-only, 2 Hz, 10 cm squares). */
 export const WS_LIDAR_URL = wsUrl("/ws/lidar?robot=g1");
 
+/** The 3D point cloud around the G1 for the Navigation page's view (~1 Hz, ~100 KB a message). */
+export const WS_LIDAR_CLOUD_URL = wsUrl("/ws/lidar-cloud?robot=g1");
+
 /** The robot's own microphone, listened to on the server for "Bender, …" (G1). Open = the
  * robot's mic is on; closing the socket switches it off. */
 export function robotEarUrl(robot: string): string {

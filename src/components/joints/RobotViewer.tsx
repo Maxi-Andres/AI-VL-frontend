@@ -18,9 +18,8 @@ import {
   WebGLRenderer,
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
-import URDFLoader, { type URDFJoint, type URDFRobot } from "urdf-loader";
+import type { URDFJoint, URDFRobot } from "urdf-loader";
+import { loadG1Model } from "../../lib/g1Model";
 import { JOINTS, JOINT_BY_URDF, readJoint, tempLevel, type JointFrame } from "../../lib/g1Joints";
 import { liveStalls, type StallAlert } from "../../lib/jointControl";
 import { StatusText } from "../ui/StatusText";
@@ -74,8 +73,6 @@ interface Props {
   /** Joints that stopped against something, newest first (useJointControl's `stalls`). */
   stalls?: StallAlert[];
 }
-
-const MODEL_URL = `${import.meta.env.BASE_URL}g1/g1.urdf`;
 
 /** Text colour per temperature band — the same hues the parts are painted in. */
 const TEMP_TEXT: Record<string, string> = {
@@ -311,18 +308,10 @@ export function RobotViewer({
     scene.add(upright);
 
     let disposed = false;
-    const loader = new URDFLoader();
-    loader.parseCollision = false;
     let robot: URDFRobot | null = null;
-    // Completion is counted HERE, not by a LoadingManager. three's FileLoader shares a download
-    // already in flight with a second loader WITHOUT telling that loader's manager, so after a
-    // quick remount (React's development double-mount, or leaving the page and coming straight
-    // back) the new manager saw only the URDF, reported "done" with no meshes in the robot, and
-    // the model was stood on the grid at y = -Infinity: an empty scene (2026-10-14).
-    let pending = 0;
     let finished = false;
     const finish = () => {
-      if (disposed || finished || !robot || pending > 0) return;
+      if (disposed || finished || !robot) return;
       finished = true;
       const parts = new Map<string, Part[]>();
       const meshes: Mesh[] = [];
@@ -374,44 +363,15 @@ export function RobotViewer({
       modelRef.current = { robot, ghost: ghostRobot, ghostMeshes, parts, meshes, upright };
       setLoaded(true);
     };
-    // meshopt-compressed GLB: the whole original geometry in ~3 MB (scripts/build_g1_model.py).
-    const gltf = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-    loader.loadMeshCb = (path, manager, done) => {
-      pending += 1;
-      gltf.manager = manager;
-      gltf.load(
-        path,
-        ({ scene: file }) => {
-          // One mesh per file, the original geometry with its normals baked by the build script.
-          // Handed over as a bare Mesh so urdf-loader paints it with the URDF's colour (it only
-          // does that for a Mesh, not for the glTF's group around it).
-          let geometry: Mesh["geometry"] | null = null;
-          file.traverse((o) => {
-            if (!geometry && (o as Mesh).isMesh) geometry = (o as Mesh).geometry;
-          });
-          done(geometry ? new Mesh(geometry, new MeshStandardMaterial()) : new Group());
-          pending -= 1;
-          finish();
-        },
-        undefined,
-        (err) => {
-          setLoadError({ path });
-          done(new Group(), err as Error);
-          pending -= 1;
-          finish();
-        },
-      );
-    };
-    loader.load(
-      MODEL_URL,
-      (r) => {
+    // The URDF and every mesh, counted to the last one (lib/g1Model.ts says why).
+    loadG1Model((path) => setLoadError({ path }))
+      .then((r) => {
+        if (disposed) return;
         robot = r;
         upright.add(r);
         finish();
-      },
-      undefined,
-      (e) => setLoadError({ error: String(e) }),
-    );
+      })
+      .catch((e: unknown) => setLoadError({ error: String(e) }));
 
     // ---- picking: hover on move, select on a click that was not a drag ----
     const raycaster = new Raycaster();

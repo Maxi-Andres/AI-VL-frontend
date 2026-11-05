@@ -24,8 +24,9 @@ instruction with its tools — pick, look — and a chat beside its camera shows
 `POST /api/agent` is a Server-Sent Events stream read with `fetch`, `src/lib/sse.ts`), `/settings` (on-robot config and
 live video tuning in one page with a section menu; `/robot` and `/video` redirect there), `/joints` (the G1 in 3D, posed live from its joint state;
 `#replay` opens it on a recorded walk; "Take control" moves the arms, waist and fingers over a separate socket,
-`/ws/joint-control` — every limit is on the robot, the page only names targets). `/nav` (Navigation: the G1's own odometry as a map seen from above, with the trail it walked;
-"Walk to a point" sends `POST /api/walk` and the loop runs on the robot — the lidar's points join this map later). The 3D model in `public/g1/` is built by
+`/ws/joint-control` — every limit is on the robot, the page only names targets). `/nav` (Navigation: the G1 in 3D — the Joints page's model, `src/lib/g1Model.ts`, posed live —
+standing in its lidar's point cloud, with the trail the ROBOT recorded and the way it plans; a walk is planned first
+(`POST /api/walk {op: plan}`), drawn, and only an accept sends the goto; the loop runs on the robot). The 3D model in `public/g1/` is built by
 `scripts/build_g1_model.py` from Unitree's g1_description; do not hand-edit it.
 There is no `/about` since 2026-10-07: its only live fact, the backend URL, is on the Robot
 page. It talks **only** to the backend — it never knows the iacore service

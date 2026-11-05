@@ -1,8 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { WS_ODOM_URL } from "../config";
+import { WS_LIDAR_CLOUD_URL, WS_LIDAR_URL, WS_ODOM_URL } from "../config";
 import { t } from "../i18n";
-import { WS_LIDAR_URL } from "../config";
-import { parseLidarMessage, parseOdomMessage, type LidarFrame, type OdomFrame } from "../lib/odom";
+import {
+  parseCloudMessage,
+  parseLidarMessage,
+  parseOdomMessage,
+  type CloudFrame,
+  type LidarFrame,
+  type OdomFrame,
+} from "../lib/odom";
 
 /**
  * The G1's live pose for the Navigation page: /ws/odom (backend -> executor -> relay ->
@@ -30,6 +36,9 @@ export type LidarSourceState = StreamState<LidarFrame>;
 export const useOdomSource = () => useRobotStream(WS_ODOM_URL, parseOdomMessage);
 /** The lidar's obstacle map (/ws/lidar), the same way: read-only, reconnecting. */
 export const useLidarSource = () => useRobotStream(WS_LIDAR_URL, parseLidarMessage);
+/** The 3D cloud (/ws/lidar-cloud), ~1 Hz. Stale only after 3 s without one (it is slow). */
+export const useCloudSource = () => useRobotStream(WS_LIDAR_CLOUD_URL, parseCloudMessage);
+export type CloudSourceState = StreamState<CloudFrame>;
 
 type Parsed<F> =
   | { kind: "frame"; frame: F & { ageMs: number } }
