@@ -51,7 +51,6 @@ export const NAV: Record<string, string> = {
   "The robot and what its lidar sees, in 3D": "El robot y lo que ve su lidar, en 3D",
   "Keep the robot in the middle as it walks": "Mantener al robot en el centro mientras camina",
   "Follow": "Seguir",
-  "Left drag: rotate · right drag: move · wheel: zoom": "Arrastrar con el izquierdo: girar · con el derecho: mover · rueda: zoom",
   "grid 0.5 m": "cuadrícula 0.5 m",
   "Loading the robot model…": "Cargando el modelo del robot…",
   "The robot moved since the way was planned: plan it again.": "El robot se movió desde que se planeó el camino: vuelve a planearlo.",
@@ -66,4 +65,6 @@ export const NAV: Record<string, string> = {
   "Show what the planner avoids": "Mostrar lo que evita el planificador",
   "Lidar · {k}k points/s · floor {floor} m below · {n} points shown": "Lidar · {k}k puntos/s · piso {floor} m abajo · {n} puntos mostrados",
   "Waiting: {reason}": "Esperando: {reason}",
+  "Click the floor: walk there · left drag: rotate · right drag: move · wheel: zoom": "Clic en el piso: caminar ahí · arrastrar con el izquierdo: girar · con el derecho: mover · rueda: zoom",
+  "Turning to face the way · {err}": "Girando hacia el camino · {err}",
 };

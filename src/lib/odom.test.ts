@@ -7,6 +7,7 @@ import {
   goalFrom,
   parseLidarMessage,
   parseOdomMessage,
+  relativeTo,
   walkLine,
   wrap,
 } from "./odom";
@@ -95,5 +96,16 @@ describe("parseLidarMessage", () => {
     expect(walkLine({ state: "running", blocked: { dist_m: 0.42 } })).toEqual({
       tone: "warn", text: "Something 0.42 m ahead: waiting for the way to clear",
     });
+  });
+});
+
+describe("relativeTo", () => {
+  it("undoes goalFrom: a point marked on the map becomes a request from where the robot is", () => {
+    const p = { x: 1, y: -2, yaw: 2.5 };
+    const g = goalFrom(p, 0.7, -1.8, 0.4);
+    const r = relativeTo(p, g);
+    expect(r.dx).toBeCloseTo(0.7);
+    expect(r.dy).toBeCloseTo(-1.8);
+    expect(r.dyaw).toBeCloseTo(0.4);
   });
 });

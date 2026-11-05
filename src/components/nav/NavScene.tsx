@@ -16,10 +16,13 @@ import {
   MeshBasicMaterial,
   MeshStandardMaterial,
   PerspectiveCamera,
+  Plane,
   Points,
   PointsMaterial,
+  Raycaster,
   RingGeometry,
   Scene,
+  Vector2,
   Vector3,
   WebGLRenderer,
 } from "three";
@@ -78,9 +81,11 @@ interface Props {
   obstacles: LidarFrame | null;
   /** The robot's joint readings, to pose the model live; null keeps it standing still. */
   joints: JointFrame | null;
+  /** A click on the floor (not a drag), in the odometry frame: where the operator points. */
+  onPick?: (x: number, y: number) => void;
 }
 
-export function NavScene({ pose, trail, goal, preview, path, cloud, obstacles, joints }: Props) {
+export function NavScene({ pose, trail, goal, preview, path, cloud, obstacles, joints, onPick }: Props) {
   const t = useT();
   const hostRef = useRef<HTMLDivElement>(null);
   const [follow, setFollow] = useState(true);
@@ -90,6 +95,10 @@ export function NavScene({ pose, trail, goal, preview, path, cloud, obstacles, j
     update: (p: Props, follow: boolean) => void;
   } | null>(null);
   const latest = useRef<Props>({ pose, trail, goal, preview, path, cloud, obstacles, joints });
+  const pickRef = useRef(onPick);
+  useEffect(() => {
+    pickRef.current = onPick;
+  });
   const viewed = useRef(false);
 
   // ---- the scene, once ----
@@ -229,6 +238,29 @@ export function NavScene({ pose, trail, goal, preview, path, cloud, obstacles, j
     ro.observe(host);
     resize();
 
+    // A click on the floor names a point: down and up within a few pixels (a drag orbits).
+    const raycaster = new Raycaster();
+    const floor = new Plane(new Vector3(0, 1, 0), 0);
+    let down: { x: number; y: number } | null = null;
+    const el = renderer.domElement;
+    const onDown = (ev: PointerEvent) => {
+      down = ev.button === 0 ? { x: ev.clientX, y: ev.clientY } : null;
+    };
+    const onUp = (ev: PointerEvent) => {
+      const d = down;
+      down = null;
+      if (!d || Math.hypot(ev.clientX - d.x, ev.clientY - d.y) > 5 || !pickRef.current) return;
+      const rect = el.getBoundingClientRect();
+      raycaster.setFromCamera(new Vector2(
+        ((ev.clientX - rect.left) / rect.width) * 2 - 1,
+        -((ev.clientY - rect.top) / rect.height) * 2 + 1,
+      ), camera);
+      const hit = raycaster.ray.intersectPlane(floor, new Vector3());
+      if (hit) pickRef.current(hit.x, -hit.z);       // scene (x, 0, z) is world (x, -z)
+    };
+    el.addEventListener("pointerdown", onDown);
+    el.addEventListener("pointerup", onUp);
+
     const themeWatch = new MutationObserver(paintGrid);
     themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
@@ -364,6 +396,8 @@ export function NavScene({ pose, trail, goal, preview, path, cloud, obstacles, j
       cancelAnimationFrame(raf);
       ro.disconnect();
       themeWatch.disconnect();
+      el.removeEventListener("pointerdown", onDown);
+      el.removeEventListener("pointerup", onUp);
       controls.dispose();
       scene.traverse((o) => {
         const any = o as Mesh;
@@ -410,7 +444,7 @@ export function NavScene({ pose, trail, goal, preview, path, cloud, obstacles, j
         </button>
       </div>
       <div className="pointer-events-none absolute bottom-3 left-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-muted">
-        <span>{t("Left drag: rotate · right drag: move · wheel: zoom")}</span>
+        <span>{t("Click the floor: walk there · left drag: rotate · right drag: move · wheel: zoom")}</span>
         <span className="flex items-center gap-1"><IconArrowsMaximize size={12} />{t("grid 0.5 m")}</span>
         {!loaded && <span>{t("Loading the robot model…")}</span>}
       </div>

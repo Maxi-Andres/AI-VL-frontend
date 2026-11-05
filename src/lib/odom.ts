@@ -197,6 +197,14 @@ export const rad = (degrees: number) => (degrees * Math.PI) / 180;
 // ------------------------------------------------------------------------------------------
 // The walk
 // ------------------------------------------------------------------------------------------
+/** Where `target` is from `p`, in the robot's own terms: dx forward, dy left, dyaw left — what
+ * a walk request takes. The inverse of goalFrom. */
+export function relativeTo(p: Pose, target: Pose): { dx: number; dy: number; dyaw: number } {
+  const ex = target.x - p.x, ey = target.y - p.y;
+  const c = Math.cos(p.yaw), s = Math.sin(p.yaw);
+  return { dx: c * ex + s * ey, dy: -s * ex + c * ey, dyaw: wrap(target.yaw - p.yaw) };
+}
+
 export type WalkState =
   | "idle" | "starting" | "running" | "success" | "uncertain" | "failure" | "cancelled"
   | "unavailable";
@@ -204,7 +212,7 @@ export type WalkState =
 export interface WalkStatus {
   id?: number;
   state: WalkState;
-  phase?: "translate" | "turn" | "done";
+  phase?: "align" | "translate" | "turn" | "done";
   request?: { dx: number; dy: number; dyaw: number };
   start?: Pose | null;
   goal?: Pose | null;
@@ -245,7 +253,9 @@ export function walkLine(w: WalkStatus | null): Status | null {
         tone: "busy",
         text: w.phase === "turn"
           ? t("Turning in place · {err}", { err })
-          : t("Walking to the point · {err}", { err }),
+          : w.phase === "align"
+            ? t("Turning to face the way · {err}", { err })
+            : t("Walking to the point · {err}", { err }),
       };
     case "success":
       return { tone: "ok", text: t("Arrived · {err}", { err }) };

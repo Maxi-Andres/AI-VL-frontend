@@ -32,6 +32,7 @@ import {
   extendTrail,
   goalFrom,
   rad,
+  relativeTo,
   walkLine,
   walkRunning,
   wrap,
@@ -61,8 +62,8 @@ const PRESETS = [
 
 interface Proposal {
   plan: WalkPlan;
-  dx: number;
-  dy: number;
+  /** Where it goes, in the odometry frame: fixed on the floor, whatever the robot does. */
+  target: Pose;
   turnDeg: number;
 }
 
@@ -88,6 +89,9 @@ export function NavigationPage() {
   const [trail, setTrail] = useState<Pose[]>([]);
   const [walk, setWalk] = useState<WalkStatus | null>(null);
   const [proposal, setProposal] = useState<Proposal | null>(null);
+  // The point asked for, ANCHORED on the floor (odometry frame): it stays where it was marked
+  // while the robot moves (it used to be "x m ahead of wherever the robot is now", 2026-11-05).
+  const [target, setTarget] = useState<Pose | null>(null);
   const [planning, setPlanning] = useState(false);
   const [problem, setProblem] = useState<Status | null>(null);
   const [showObstacles, setShowObstacles] = useState(false);
@@ -152,13 +156,21 @@ export function NavigationPage() {
             ? t("Nothing to do: set a distance or a turn.")
             : null;
 
-  const plan = async (fx: number, fy: number, fdeg: number) => {
+  // Ask the robot for the way to `tg` from where it stands now; nothing moves.
+  const planTo = async (tg: Pose) => {
+    if (!pose) return;
+    setTarget(tg);
     setProblem(null);
     setProposal(null);
+    const rel = relativeTo(pose, tg);
+    if (Math.hypot(rel.dx, rel.dy) > MAX_M) {
+      setProblem({ tone: "blocked", text: t("At most {m} m and half a turn per walk.", { m: MAX_M }) });
+      return;
+    }
     setPlanning(true);
     try {
-      const a = await walkPlan(fx, fy, rad(fdeg));
-      if (a.ok && a.plan) setProposal({ plan: a.plan, dx: fx, dy: fy, turnDeg: fdeg });
+      const a = await walkPlan(rel.dx, rel.dy, rel.dyaw);
+      if (a.ok && a.plan) setProposal({ plan: a.plan, target: tg, turnDeg: Math.round(deg(rel.dyaw)) });
       else setProblem({ tone: "error", text: a.error ?? t("The robot refused") });
     } catch (e) {
       setProblem({ tone: "error", text: String(e) });
@@ -167,13 +179,24 @@ export function NavigationPage() {
     }
   };
 
+  const plan = (fx: number, fy: number, fdeg: number) => {
+    if (pose) planTo(goalFrom(pose, fx, fy, rad(fdeg)));
+  };
+
+  // A click on the floor: go there, facing the way it came.
+  const onPick = (x: number, y: number) => {
+    if (!pose || blocked) return;
+    planTo({ x, y, yaw: Math.atan2(y - pose.y, x - pose.x) });
+  };
+
   const accept = async () => {
-    if (!proposal) return;
-    const { dx: fx, dy: fy, turnDeg: fdeg } = proposal;
+    if (!proposal || !pose) return;
+    // From where it stands NOW (it may have swayed a few cm since the plan) to the same spot.
+    const rel = relativeTo(pose, proposal.target);
     setProposal(null);
     setProblem(null);
     try {
-      const a = await walkGoto(fx, fy, rad(fdeg));
+      const a = await walkGoto(rel.dx, rel.dy, rel.dyaw);
       if (a.walk) setWalk(a.walk);
       if (!a.ok) setProblem({ tone: "error", text: a.error ?? t("The robot refused") });
     } catch (e) {
@@ -195,8 +218,12 @@ export function NavigationPage() {
     clearTrail().catch(() => {});
   };
 
-  const preview = pose && !running && !proposal && !nothing && !tooFar
-    ? goalFrom(pose, dx, dy, rad(turnDeg)) : null;
+  // Arrived: the mark has done its job.
+  useEffect(() => {
+    if (walk?.state === "success") setTarget(null);
+  }, [walk?.state, walk?.id]);
+
+  const preview = !running && !proposal ? target : null;
   const goal = running ? walk?.goal ?? null : proposal?.plan.goal ?? null;
   const path = running ? walk?.path ?? null : proposal?.plan.path ?? null;
   const detour = !!proposal?.plan.path && proposal.plan.path.length > 2;
@@ -212,7 +239,8 @@ export function NavigationPage() {
           <Suspense fallback={<div className="h-full rounded-2xl border border-line bg-panel" />}>
             <NavScene pose={pose} trail={trail} goal={goal} preview={preview} path={path}
               cloud={cloud.frame} obstacles={showObstacles ? lidar.frame : null}
-              joints={joints.link === "live" ? joints.frame : null} />
+              joints={joints.link === "live" ? joints.frame : null}
+              onPick={can("operate") ? onPick : undefined} />
           </Suspense>
         </div>
       </div>
