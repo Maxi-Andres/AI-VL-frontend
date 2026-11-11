@@ -47,7 +47,7 @@ import { msg, useT } from "../i18n";
 const NavScene = lazy(() => import("../components/nav/NavScene").then((m) => ({ default: m.NavScene })));
 
 /** Most one walk may cover, as the relay enforces it (relay_server.WALK_MAX_M). */
-const MAX_M = 3;
+const MAX_M = 10;
 const POLL_MS = 400;
 /** A plan is for where the robot stood when it was made: moved this much, it is stale. */
 const PLAN_STALE_M = 0.1;
@@ -364,7 +364,7 @@ export function NavigationPage() {
 
         <p className="rounded-xl bg-warn-bg p-3 text-[12px] font-semibold text-warn-fg">
           {seeing
-            ? t("It plans its way round what the lidar sees (the dashed line), keeping 35 cm clear, and stops half a metre before anything that steps in front. It does not watch while turning in place. Keep the remote in hand.")
+            ? t("It plans its way round what the lidar sees (the dashed line), keeping 30 cm clear, and stops half a metre before anything that steps in front. It does not watch while turning in place. Keep the remote in hand.")
             : t("Without the lidar it does not walk: point the lidar at PC2 (tools/livox_set_host.py on the robot). Keep the remote in hand.")}
         </p>
 
