@@ -12,6 +12,8 @@ const TOOL_LABEL: Record<string, string> = {
   look: msg("look"),
   navigate: msg("go"),
   command: msg("move"),
+  search: msg("search the web"),
+  remember: msg("remember"),
 };
 
 interface Props {

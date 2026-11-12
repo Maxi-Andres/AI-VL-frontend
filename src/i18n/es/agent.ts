@@ -35,6 +35,8 @@ export const AGENT: Record<string, string> = {
   "put it in": "dejar en",
   "go": "ir",
   "move": "movimiento",
+  "search the web": "buscar en internet",
+  remember: "recordar",
   "{tool}: done": "{tool}: hecho",
   "{tool}: done, holding it": "{tool}: hecho, lo tengo agarrado",
   "{tool} failed: {why}": "{tool} falló: {why}",
