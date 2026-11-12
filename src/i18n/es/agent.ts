@@ -39,4 +39,12 @@ export const AGENT: Record<string, string> = {
   "{tool}: done, holding it": "{tool}: hecho, lo tengo agarrado",
   "{tool} failed: {why}": "{tool} falló: {why}",
   "no reason given": "sin motivo informado",
+  // The robot's own mic in the agent's mode
+  "Robot mic · VLM": "Mic del robot · VLM",
+  "The robot's mic is on: say “Bender, …” and the agent does it":
+    "El mic del robot está prendido: decí “Bender, …” y lo hace el agente",
+  "The robot's mic is in the VLM mode: press to give “Bender, …” to the agent":
+    "El mic del robot está en modo VLM: tocá para que “Bender, …” vaya al agente",
+  "Switch the robot's mic on: say “Bender, …” and the agent does it":
+    "Prendé el mic del robot: decí “Bender, …” y lo hace el agente",
 };

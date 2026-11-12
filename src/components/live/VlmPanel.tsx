@@ -74,6 +74,10 @@ export interface VoiceControls {
   robotMic: boolean;
   /** Listening through it, Alexa-style, for "Bender, …". On = the robot's mic is on. */
   robotEar: boolean;
+  /** Who answers "Bender, …" now: "vlm" = this chat; "agent" = the agent (switched on from the
+   * Agent page, or the robot is walking). */
+  robotEarMode: "vlm" | "agent";
+  /** Switch it on in the vlm mode (from the agent mode it changes mode), or off. */
   onToggleRobotEar: () => void;
   /** One line about the robot's mic ("listening for Bender", what it heard, why it stopped). */
   robotEarStatus: string;
@@ -382,38 +386,39 @@ export function VlmPanel({
             placeholder={t("Ask about the frame, or say “search…” to look it up on the internet")}
             aria-label={t("Question about the frame")}
             className="block max-h-32 min-h-[52px] w-full resize-none bg-transparent px-3 pt-2.5 text-[13px] text-fg outline-none [field-sizing:content] placeholder:text-dim" />
-          <div className="flex items-center gap-1 px-2 pb-2">
+          <div className="flex flex-wrap items-center gap-1 px-2 pb-2">
+            {/* Labelled, not icons alone (2026-11-12: "no se entiende mucho qué hace cada cosa"). */}
             {voice.micSupported && (
-              <button type="button" onClick={voice.onListenOnce} disabled={!canAsk || busy || hearing || voice.voiceMode}
-                title={t("Speak a question — it is sent when you stop talking")} aria-label={t("Speak a question")}
-                className={`grid size-7 cursor-pointer place-items-center rounded-lg transition duration-200 active:scale-90 disabled:cursor-default ${
-                  hearing && !voice.voiceMode ? "animate-pulse bg-bad-bg text-bad-fg" : "text-muted hover:bg-subtle hover:text-fg disabled:opacity-40 disabled:hover:bg-transparent"}`}>
-                <IconMicrophone size={15} />
-              </button>
+              <Chip on={hearing && !voice.voiceMode} pulse onClick={voice.onListenOnce}
+                disabled={!canAsk || busy || hearing || voice.voiceMode}
+                title={t("Speak a question — it is sent when you stop talking")}
+                icon={<IconMicrophone size={14} />} label={t("Speak")} />
             )}
             {voice.micSupported && (
-              <Toggle on={voice.voiceMode} onClick={voice.onToggleVoiceMode}
+              <Chip on={voice.voiceMode} onClick={voice.onToggleVoiceMode}
                 title={voice.listenMode === "wake"
                   ? voice.voiceMode ? t("Hands-free on: say “robot”, then your question") : t("Hands-free off: say “robot”, then your question")
                   : voice.voiceMode ? t("Hands-free on: just speak — each question is sent by itself") : t("Hands-free off: just speak — each question is sent by itself")}
-                icon={voice.voiceMode ? <IconHeadset size={15} /> : <IconHeadsetOff size={15} />} />
+                icon={voice.voiceMode ? <IconHeadset size={14} /> : <IconHeadsetOff size={14} />} label={t("Hands-free")} />
             )}
             {voice.robotMic && (
-              <Toggle on={voice.robotEar} onClick={voice.onToggleRobotEar}
-                title={voice.robotEar ? t("The robot's own microphone on: say “Bender, …”") : t("The robot's own microphone off: say “Bender, …”")}
-                icon={voice.robotEar ? <IconMicrophone2 size={15} /> : <IconMicrophone2Off size={15} />} />
+              <Chip on={voice.robotEar} onClick={voice.onToggleRobotEar}
+                title={!voice.robotEar ? t("The robot's own microphone off: say “Bender, …”")
+                  : voice.robotEarMode === "agent" ? t("The robot's mic is in the agent's mode: “Bender, …” goes to the agent. Press to answer here instead.")
+                    : t("The robot's own microphone on: say “Bender, …”")}
+                icon={voice.robotEar ? <IconMicrophone2 size={14} /> : <IconMicrophone2Off size={14} />}
+                label={voice.robotEar && voice.robotEarMode === "agent" ? t("Robot mic · agent") : t("Robot mic")} />
             )}
             {voice.speechSupported && (
-              <Toggle on={voice.spokenMode} onClick={voice.onToggleSpokenMode}
+              <Chip on={voice.spokenMode} onClick={voice.onToggleSpokenMode}
                 title={voice.spokenMode ? t("Speak answers on") : t("Speak answers off")}
-                icon={voice.spokenMode ? <IconVolume size={15} /> : <IconVolumeOff size={15} />} />
+                icon={voice.spokenMode ? <IconVolume size={14} /> : <IconVolumeOff size={14} />} label={t("Out loud")} />
             )}
-            <button type="button" onClick={() => setSettings((s) => !s)} aria-expanded={settings} title={t("Voice and model settings")}
-              className={`grid size-7 cursor-pointer place-items-center rounded-lg transition active:scale-90 ${settings ? "bg-subtle text-fg" : "text-muted hover:bg-subtle hover:text-fg"}`}>
-              <IconAdjustmentsHorizontal size={15} className={`transition-transform duration-300 ${settings ? "rotate-90" : ""}`} />
-            </button>
-            <span className="ml-1 hidden truncate text-[11px] text-dim sm:inline">{t("Enter to send")}</span>
+            <Chip on={settings} onClick={() => setSettings((v) => !v)} title={t("Voice and model settings")}
+              icon={<IconAdjustmentsHorizontal size={14} className={`transition-transform duration-300 ${settings ? "rotate-90" : ""}`} />}
+              label={t("Settings")} />
             <button type="button" onClick={send} disabled={!canAsk || busy || !prompt.trim()} aria-label={t("Ask")}
+              title={t("Enter to send")}
               className="ml-auto flex cursor-pointer items-center gap-1 rounded-lg bg-fg px-3 py-1.5 text-[12.5px] font-bold text-bg transition active:scale-95 disabled:cursor-default disabled:opacity-35">
               {t("Ask")}<IconArrowUp size={14} />
             </button>
@@ -630,6 +635,20 @@ function FoundList({ found, raw }: { found: Found[]; raw: string }) {
       </ul>
       <Raw text={raw} />
     </div>
+  );
+}
+
+/** A voice control with its name on it; green while on. */
+function Chip({ on, onClick, title, icon, label, disabled = false, pulse = false }: {
+  on: boolean; onClick: () => void; title: string; icon: ReactNode; label: string;
+  disabled?: boolean; pulse?: boolean;
+}) {
+  return (
+    <button type="button" onClick={onClick} disabled={disabled} aria-pressed={on} title={title}
+      className={`flex h-7 cursor-pointer items-center gap-1 rounded-lg px-2 text-[11.5px] font-bold transition duration-200 active:scale-95 disabled:cursor-default disabled:opacity-40 ${
+        on ? `${pulse ? "animate-pulse bg-bad-bg text-bad-fg" : "bg-good-bg text-good-fg"}` : "text-muted hover:bg-subtle hover:text-fg disabled:hover:bg-transparent"}`}>
+      {icon}<span className="whitespace-nowrap">{label}</span>
+    </button>
   );
 }
 

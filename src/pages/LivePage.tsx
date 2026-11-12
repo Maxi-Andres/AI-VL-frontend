@@ -766,7 +766,9 @@ export function LivePage() {
                   status: va.status,
                   robotMic: va.robotMic,
                   robotEar: va.robotEar,
-                  onToggleRobotEar: va.toggleRobotEar,
+                  robotEarMode: va.earModeNow ?? va.earMode,
+                  // Live switches the robot's mic in the vlm mode: "Bender, …" answered here.
+                  onToggleRobotEar: () => va.toggleRobotEar("vlm"),
                   robotEarStatus: va.robotEarStatus,
                   speaking: va.speaking,
                   onSpeak: (text) => va.speak(text ?? vlmOutput),

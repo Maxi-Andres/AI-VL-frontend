@@ -4,6 +4,8 @@ import {
   IconArrowUp,
   IconMessageChatbot,
   IconMicrophone,
+  IconMicrophone2,
+  IconMicrophone2Off,
 } from "@tabler/icons-react";
 import { runAgent, stopAgent } from "../api/agent";
 import { setRobotCamera, transcribeAudio } from "../api/backend";
@@ -22,6 +24,7 @@ import { usePresence } from "../hooks/usePresence";
 import { useRobotCameraView } from "../hooks/useRobotCameraView";
 import { useRobotTransports } from "../hooks/useRobotTransports";
 import { agentChat } from "../lib/agentTrace";
+import type { AgentEvent } from "../types";
 import { msg, useT } from "../i18n";
 
 // The backend's limit on an instruction (AgentRequest in AI-VL-backend/app.py).
@@ -125,6 +128,28 @@ export function AgentPage() {
       .then(() => setStatus({ tone: "stopped", text: msg("Stopped") }))
       .catch((e) => setStatus({ tone: "error", text: e instanceof Error ? e.message : String(e) }));
   }, [va]);
+
+  // "Bender, …" said to the robot in the agent's mode (or while it walks): the gateway runs it
+  // and the robot speaks the reply; the run shows here as a turn of its own, like a typed one.
+  const voiceRun = useRef<number | null>(null);
+  useEffect(() => va.onAgentEvents((event) => {
+    const at = Date.now();
+    if (event.type === "heard") {
+      const id = nextId.current++;
+      voiceRun.current = id;
+      dispatch({ type: "start", id, text: event.text ?? "", at });
+      return;
+    }
+    const id = voiceRun.current;
+    if (id === null) return;
+    if (event.type === "end") {
+      dispatch({ type: "end", id, at });
+      voiceRun.current = null;
+      return;
+    }
+    dispatch({ type: "event", id, event: event as unknown as AgentEvent, at });
+  }), [va.onAgentEvents]);
+  const earInAgentMode = va.robotEar && (va.earModeNow ?? va.earMode) === "agent";
 
   // Leaving mid-run: STOP, and stop reading.
   useEffect(() => {
@@ -242,6 +267,21 @@ export function AgentPage() {
       <aside className="flex min-h-[480px] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-card">
         <div className="flex items-center gap-2 border-b border-line px-4 py-3 text-sm font-extrabold">
           <IconMessageChatbot size={17} className="text-accent" />{t("Agent")}
+          {isG1 && va.robotMic && (
+            // The robot's own mic in the AGENT's mode: "Bender, …" goes to the agent (the robot
+            // says "Modo agente"). Switched on from Live it is in the VLM mode: pressing here
+            // changes it to this one.
+            <button type="button" onClick={() => va.toggleRobotEar("agent")} aria-pressed={earInAgentMode}
+              title={[earInAgentMode ? t("The robot's mic is on: say “Bender, …” and the agent does it")
+                : va.robotEar ? t("The robot's mic is in the VLM mode: press to give “Bender, …” to the agent")
+                  : t("Switch the robot's mic on: say “Bender, …” and the agent does it"),
+              va.robotEarStatus].filter(Boolean).join(" · ")}
+              className={`flex h-7 cursor-pointer items-center gap-1 rounded-lg px-2 text-[11.5px] font-bold transition active:scale-95 ${
+                earInAgentMode ? "bg-good-bg text-good-fg" : "text-muted hover:bg-subtle hover:text-fg"}`}>
+              {va.robotEar ? <IconMicrophone2 size={14} /> : <IconMicrophone2Off size={14} />}
+              <span className="whitespace-nowrap">{va.robotEar && !earInAgentMode ? t("Robot mic · VLM") : t("Robot mic")}</span>
+            </button>
+          )}
           <StatusText status={status && { ...status, text: t(status.text) }}
             className="ml-auto min-w-0 truncate text-xs font-semibold text-muted" />
         </div>

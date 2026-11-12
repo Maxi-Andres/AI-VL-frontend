@@ -223,7 +223,15 @@ export const LIVE: Record<string, string> = {
   "Listening… speak your question": "Escuchando… di tu pregunta",
   "Didn't catch that — say \"robot\" to try again": "No se entendió — di \"robot\" para intentar de nuevo",
   "Microphone error: {error}": "Error del micrófono: {error}",
+  "Bender heard: “{text}”": "Bender oyó: “{text}”",
   "Bender heard: “{text}” — the agent takes it": "Bender oyó: “{text}” — se lo paso al agente",
+  // The voice controls under the question box, with their names on them
+  "Hands-free": "Manos libres",
+  "Robot mic": "Mic del robot",
+  "Robot mic · agent": "Mic del robot · agente",
+  "Out loud": "En voz alta",
+  "The robot's mic is in the agent's mode: “Bender, …” goes to the agent. Press to answer here instead.":
+    "El mic del robot está en modo agente: “Bender, …” va al agente. Tocá para que conteste acá.",
   "Bender: “{text}”": "Bender: “{text}”",
   "Stopped — say your question": "Me callé — decí tu pregunta",
   "This browser cannot listen for a wake word — choose “Just speak”": "Este navegador no puede escuchar una palabra de activación — elige “Solo habla”",

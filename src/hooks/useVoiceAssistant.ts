@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { transcribeAudio } from "../api/backend";
 import { useRobot } from "../components/layout/RobotContext";
 import { robotEarUrl } from "../config";
-import { earStatus, ROBOTS_WITH_MIC, spokenRequest } from "../lib/robotEar";
+import { earStatus, ROBOTS_WITH_MIC, spokenRequest, type AgentEarEvent, type EarMode } from "../lib/robotEar";
 import type { VoicePhase } from "../types";
 import { useAudioRecorder } from "./useAudioRecorder";
 import { useRobotEar } from "./useRobotEar";
@@ -24,10 +24,12 @@ import { t } from "../i18n";
  * single question — the mic button in the chat.
  *
  * A second way in: the ROBOT's own microphone (the G1's, through its relay), listened to on
- * the server for its name, "Bender", like Alexa. Since 2026-11-12 the gateway holds that ear
- * and hands what follows "Bender" to the AGENT, which answers (or acts) and speaks through the
- * robot; this page only switches the mic on and off and shows what was heard and replied. While
- * this page speaks through the robot the ear is muted, so it never answers its own voice.
+ * the server for its name, "Bender", like Alexa. The gateway holds that ear; switched on from
+ * Live it is in the "vlm" mode — "Bender, qué ves" is answered here, a bare "Bender" gets a
+ * spoken "¿Sí?" and the next phrase is the question — and from the Agent page in the "agent"
+ * mode, where the gateway hands it to the agent, which answers (or acts) through the robot.
+ * While the robot walks it is always the agent's. The robot says the mode out loud. While this
+ * page speaks through the robot the ear is muted, so it never answers its own voice.
  *
  * The toggles persist in localStorage so they survive reloads. The caller
  * provides `askPrompt`, which captures the current frame, queries the VLM and
@@ -37,6 +39,7 @@ const LS_VOICE = "aivl.voiceMode";
 const LS_SPOKEN = "aivl.spokenMode";
 const LS_FILLER = "aivl.fillerMode";
 const LS_ROBOT_EAR = "aivl.robotEar";
+const LS_ROBOT_EAR_MODE = "aivl.robotEarMode";
 const LS_LISTEN = "aivl.listenMode";
 // What Whisper makes of noise or breath on a quiet mic: never worth a question to the VLM.
 const NOT_A_QUESTION = /^(\W*|gracias\W*|subt[ií]tulos.*|thank you\W*|\.+)$/i;
@@ -127,6 +130,20 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
   const [robotEar, setRobotEar] = useState(() => readFlag(LS_ROBOT_EAR));
   const robotEarRef = useRef(robotEar);
   robotEarRef.current = robotEar;
+  // Which page switched it on: Live = "vlm", Agent = "agent" (the gateway routes by it).
+  const [earMode, setEarMode] = useState<EarMode>(() =>
+    typeof localStorage !== "undefined" && localStorage.getItem(LS_ROBOT_EAR_MODE) === "agent" ? "agent" : "vlm");
+  // The Agent page shows the agent's runs on what the robot heard; it listens here.
+  const agentListeners = useRef(new Set<(event: AgentEarEvent) => void>());
+  const onAgentEvents = useCallback((fn: (event: AgentEarEvent) => void) => {
+    agentListeners.current.add(fn);
+    return () => {
+      agentListeners.current.delete(fn);
+    };
+  }, []);
+  // A request from the robot's ear that came while another was still being answered: asked
+  // as soon as that one ends (it used to be dropped).
+  const nextRequest = useRef<string | null>(null);
   // Switched OFF in another tab of this browser: off here too. Only off: syncing "on" would
   // make every tab take the robot's ear from the others (one ear per robot).
   useEffect(() => {
@@ -335,6 +352,33 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
     setAcking(false);
   }, []);
 
+  // A "Bender, …" in the vlm mode, from the robot's own microphone: the same answer as a spoken
+  // question, no recording here.
+  const handleEarCommandRef = useRef<(text: string) => Promise<void>>(async () => {});
+  const handleEarCommand = useCallback(async (text: string) => {
+    if (busyRef.current) {
+      nextRequest.current = text;
+      return;
+    }
+    busyRef.current = true;
+    ackDone(); // the question is in: whatever the answer says mutes the ear as usual
+    speech.cancel(); // a new question interrupts a spoken answer
+    let spoke = false;
+    try {
+      setStatus(t("Bender heard: “{text}”", { text }));
+      spoke = await answerText(text);
+    } catch (e) {
+      setStatus(t("Voice error: {error}", { error: e instanceof Error ? e.message : String(e) }));
+    } finally {
+      busyRef.current = false;
+      const next = nextRequest.current;
+      nextRequest.current = null;
+      if (next) void handleEarCommandRef.current(next);
+      else if (!spoke) setPhase(voiceModeRef.current || robotEarRef.current ? "listening" : "off");
+    }
+  }, [speech, answerText, ackDone]);
+  handleEarCommandRef.current = handleEarCommand;
+
   // "¿Sí?" after a bare "Bender": the ear stays open for the question (see `acking`).
   const acknowledge = () => {
     setAcking(true);
@@ -347,21 +391,34 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
 
   const ear = useRobotEar({
     url: robotEarUrl(robot),
+    mode: earMode,
     enabled: robotEar && robotMic,
     muted: speech.speaking && !acking,
     // "Bender" while it talks cuts it off (2026-10-28) — unless the answer says "Bender" itself.
     barge: !saysName,
-    // What the robot hears after "Bender" is the AGENT's (the gateway hands it over and the
-    // robot speaks the reply, 2026-11-12): the page only shows it, and never answers it too.
-    onCommand: (text) => setStatus(t("Bender heard: “{text}” — the agent takes it", { text })),
-    onWake: () => {},
-    onBarge: (text) => {
+    // The gateway says who answers each one ("to"): this page in the vlm mode; the agent in the
+    // agent mode and while the robot walks — then the page only shows it, never answers it too.
+    onCommand: (text, to) => {
+      if (to === "page") void handleEarCommand(text);
+      else setStatus(t("Bender heard: “{text}” — the agent takes it", { text }));
+    },
+    onWake: (to) => {
+      if (to === "page" && spokenModeRef.current && !busyRef.current) acknowledge();
+    },
+    onBarge: (text, to) => {
       speech.cancel(); // what was still to come of that answer is dropped too (speechQueue)
-      setStatus(text ? t("Bender heard: “{text}” — the agent takes it", { text }) : t("Stopped — say your question"));
+      if (to === "agent") {
+        setStatus(text ? t("Bender heard: “{text}” — the agent takes it", { text }) : t("Stopped — say your question"));
+        return;
+      }
+      setStatus(text ? t("Bender heard: “{text}”", { text }) : t("Stopped — say your question"));
+      if (text) void handleEarCommand(text);
+      else if (spokenModeRef.current) acknowledge();
     },
     onAgent: (event) => {
       if (event.type === "reply" && event.text) setStatus(t("Bender: “{text}”", { text: event.text }));
       else if (event.type === "error" && event.text) setStatus(t("Voice error: {error}", { error: event.text }));
+      agentListeners.current.forEach((fn) => fn(event));
     },
   });
 
@@ -419,14 +476,18 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
     void handleWakeRef.current();
   }, []);
 
-  const toggleRobotEar = useCallback(() => {
-    setRobotEar((v) => {
-      const next = !v;
-      if (typeof localStorage !== "undefined")
-        localStorage.setItem(LS_ROBOT_EAR, next ? "1" : "0");
-      return next;
-    });
-  }, []);
+  // The robot mic's switch on a page: Live switches it in the vlm mode, Agent in the agent
+  // mode. Pressed where it is already on in that mode it goes off; on in the other mode, it
+  // changes mode (the robot says so) without switching the mic off.
+  const toggleRobotEar = useCallback((mode: EarMode) => {
+    const off = robotEarRef.current && earMode === mode;
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(LS_ROBOT_EAR, off ? "0" : "1");
+      if (!off) localStorage.setItem(LS_ROBOT_EAR_MODE, mode);
+    }
+    if (!off) setEarMode(mode);
+    setRobotEar(!off);
+  }, [earMode]);
 
   const toggleSpokenMode = useCallback(() => {
     setSpokenMode((v) => {
@@ -465,7 +526,11 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
     // The robot's own microphone ("Bender, …"), where the selected robot has one.
     robotMic,
     robotEar,
+    /** The mode its switch asked for, and the one the gateway says it is in (walking: agent). */
+    earMode,
+    earModeNow: ear.mode,
     toggleRobotEar,
+    onAgentEvents,
     robotEarStatus: robotMic && robotEar ? earStatus(ear) : "",
     phase,
     speaking: speech.speaking,

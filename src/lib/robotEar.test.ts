@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { EAR_OFF, earEvent, earStatus, ROBOTS_WITH_MIC, spokenRequest, type EarView } from "./robotEar";
 
-const listening: EarView = { state: "listening", heard: "", error: null };
+const listening: EarView = { state: "listening", heard: "", error: null, mode: null };
 
 describe("earEvent", () => {
   it("answers only the 'command' events, with just the request", () => {
@@ -10,12 +10,13 @@ describe("earEvent", () => {
     expect(earEvent(listening, { type: "command", text: "qué ves" }).action).toEqual({
       kind: "command",
       text: "qué ves",
+      to: "page", // an older gateway said nothing: the page answered, as it did
     });
     expect(earEvent(listening, { type: "command", text: "" }).action).toBeNull();
   });
 
   it("a bare 'Bender' asks for the acknowledgement", () => {
-    expect(earEvent(listening, { type: "wake" }).action).toEqual({ kind: "wake" });
+    expect(earEvent(listening, { type: "wake" }).action).toEqual({ kind: "wake", to: "page" });
   });
 
   it("an error turns it off with the reason, and junk changes nothing", () => {
@@ -34,12 +35,29 @@ describe("earEvent", () => {
   });
 });
 
+describe("who answers it (the gateway's mode)", () => {
+  it("is the page in the vlm mode and the agent in the agent mode", () => {
+    // Catches: the page answering with the VLM what the agent is already doing (or moving for).
+    expect(earEvent(listening, { type: "command", text: "date la vuelta", to: "agent" }).action)
+      .toEqual({ kind: "command", text: "date la vuelta", to: "agent" });
+    expect(earEvent(listening, { type: "command", text: "qué ves", to: "page" }).action)
+      .toEqual({ kind: "command", text: "qué ves", to: "page" });
+  });
+
+  it("keeps the mode the gateway says it is in, and ignores a mode it does not know", () => {
+    expect(earEvent(listening, { type: "mode", mode: "agent" }).view.mode).toBe("agent");
+    expect(earEvent(listening, { type: "mode", mode: "dance" }).view.mode).toBeNull();
+  });
+});
+
 describe("the agent's answer to what the robot heard", () => {
   it("comes as agent events, and junk inside them changes nothing", () => {
     expect(earEvent(listening, { type: "agent", event: { type: "reply", text: "Listo." } }).action)
       .toEqual({ kind: "agent", event: { type: "reply", text: "Listo." } });
     expect(earEvent(listening, { type: "agent", event: { type: "tool", tool: "navigate" } }).action)
-      .toEqual({ kind: "agent", event: { type: "tool" } });
+      .toEqual({ kind: "agent", event: { type: "tool", tool: "navigate" } });
+    expect(earEvent(listening, { type: "agent", event: { type: "reply", text: 3 } }).action)
+      .toEqual({ kind: "agent", event: { type: "reply" } });
     expect(earEvent(listening, { type: "agent", event: "nope" }).action).toBeNull();
     expect(earEvent(listening, { type: "agent" }).action).toBeNull();
   });
@@ -48,8 +66,9 @@ describe("the agent's answer to what the robot heard", () => {
 describe("cutting the robot off", () => {
   it("is a barge, with the new request or none", () => {
     const v = earEvent(EAR_OFF, { type: "listening" }).view;
-    expect(earEvent(v, { type: "barge", text: "" }).action).toEqual({ kind: "barge", text: "" });
-    expect(earEvent(v, { type: "barge", text: "qué hora es" }).action).toEqual({ kind: "barge", text: "qué hora es" });
+    expect(earEvent(v, { type: "barge", text: "" }).action).toEqual({ kind: "barge", text: "", to: "page" });
+    expect(earEvent(v, { type: "barge", text: "qué hora es", to: "agent" }).action)
+      .toEqual({ kind: "barge", text: "qué hora es", to: "agent" });
   });
 });
 

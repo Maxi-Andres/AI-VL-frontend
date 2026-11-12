@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { EAR_OFF, earEvent, type AgentEarEvent, type EarView } from "../lib/robotEar";
+import { EAR_OFF, earEvent, type AgentEarEvent, type EarMode, type EarTo, type EarView } from "../lib/robotEar";
 import { t } from "../i18n";
 
 /**
@@ -18,6 +18,7 @@ import { t } from "../i18n";
  */
 export function useRobotEar({
   url,
+  mode,
   enabled,
   muted,
   barge,
@@ -27,12 +28,14 @@ export function useRobotEar({
   onAgent,
 }: {
   url: string;
+  /** Who answers "Bender, …" (sent when it opens, and again whenever it changes). */
+  mode: EarMode;
   enabled: boolean;
   muted: boolean;
   barge: boolean;
-  onCommand: (text: string) => void;
-  onWake: () => void;
-  onBarge: (text: string) => void;
+  onCommand: (text: string, to: EarTo) => void;
+  onWake: (to: EarTo) => void;
+  onBarge: (text: string, to: EarTo) => void;
   /** What the agent does with what the robot heard (the gateway runs it). */
   onAgent: (event: AgentEarEvent) => void;
 }): EarView {
@@ -44,6 +47,8 @@ export function useRobotEar({
   const wsRef = useRef<WebSocket | null>(null);
   const mutedRef = useRef({ muted, barge });
   mutedRef.current = { muted, barge };
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
 
   useEffect(() => {
     if (!enabled) {
@@ -51,7 +56,7 @@ export function useRobotEar({
       return;
     }
     setView({ ...EAR_OFF, state: "connecting" });
-    const ws = new WebSocket(url);
+    const ws = new WebSocket(`${url}&mode=${modeRef.current}`);
     wsRef.current = ws;
     let closedHere = false;
     ws.onopen = () => ws.send(JSON.stringify({ type: "mute", on: mutedRef.current.muted, barge: mutedRef.current.barge }));
@@ -64,9 +69,9 @@ export function useRobotEar({
       }
       const { view: next, action } = earEvent(viewRef.current, raw);
       setView(next);
-      if (action?.kind === "command") callbacks.current.onCommand(action.text);
-      else if (action?.kind === "wake") callbacks.current.onWake();
-      else if (action?.kind === "barge") callbacks.current.onBarge(action.text);
+      if (action?.kind === "command") callbacks.current.onCommand(action.text, action.to);
+      else if (action?.kind === "wake") callbacks.current.onWake(action.to);
+      else if (action?.kind === "barge") callbacks.current.onBarge(action.text, action.to);
       else if (action?.kind === "agent") callbacks.current.onAgent(action.event);
     };
     ws.onclose = () => {
@@ -86,6 +91,12 @@ export function useRobotEar({
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "mute", on: muted, barge }));
   }, [muted, barge]);
+
+  // A new mode goes over the open socket: reconnecting would switch the mic off for everyone.
+  useEffect(() => {
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "mode", mode }));
+  }, [mode]);
 
   return view;
 }
