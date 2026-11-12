@@ -380,7 +380,7 @@ export function VlmPanel({
             placeholder={t("Ask about the frame, or say “search…” to look it up on the internet")}
             aria-label={t("Question about the frame")}
             className="block max-h-32 min-h-[52px] w-full resize-none bg-transparent px-3 pt-2.5 text-[13px] text-fg outline-none [field-sizing:content] placeholder:text-dim" />
-          <div className="flex flex-wrap items-center gap-1 px-2 pb-2">
+          <div className="flex flex-wrap items-center gap-1 px-2">
             {/* Labelled, not icons alone (2026-11-12: "no se entiende mucho qué hace cada cosa").
                 Three: this computer's mic (hands-free), the robot's mic, and answers out loud. The
                 one-question "Speak" button went the same day: hands-free does it and more. */}
@@ -404,6 +404,9 @@ export function VlmPanel({
                 title={voice.spokenMode ? t("Speak answers on") : t("Speak answers off")}
                 icon={voice.spokenMode ? <IconVolume size={14} /> : <IconVolumeOff size={14} />} label={t("Out loud")} />
             )}
+          </div>
+          {/* Settings on the line below, with Ask: the line above is only what listens and speaks. */}
+          <div className="flex items-center gap-1 px-2 pb-2">
             <Chip on={settings} onClick={() => setSettings((v) => !v)} title={t("Voice and model settings")}
               icon={<IconAdjustmentsHorizontal size={14} className={`transition-transform duration-300 ${settings ? "rotate-90" : ""}`} />}
               label={t("Settings")} />
