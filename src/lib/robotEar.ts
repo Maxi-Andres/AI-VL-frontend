@@ -1,8 +1,9 @@
 // The robot's ear, as the page sees it: what each event from /ws/robot-ear means.
 //
 // The G1's own microphone is listened to on the server (backend -> iacore's ear, see
-// AI-VL-core/src/ear_common.py): the page never gets audio, only these events. It answers the
-// "command" ones like a spoken question, says "¿Sí?" on a bare "wake", and shows the rest.
+// AI-VL-core/src/ear_common.py): the page never gets audio, only these events. Since 2026-11-12
+// the gateway holds the ear and hands "Bender, …" to the agent, which answers through the robot
+// ("agent" events): the page shows what was heard and what the agent did, and answers nothing.
 import { t } from "../i18n";
 
 export type EarState = "off" | "connecting" | "listening" | "hearing" | "error";
@@ -19,7 +20,14 @@ export type EarAction =
   | { kind: "command"; text: string }
   | { kind: "wake" }
   | { kind: "barge"; text: string }
+  | { kind: "agent"; event: AgentEarEvent }
   | null;
+
+/** One step of the agent's run on something the robot heard (its trace event, as /api/agent). */
+export interface AgentEarEvent {
+  type: string;
+  text?: string;
+}
 
 export const EAR_OFF: EarView = { state: "off", heard: "", error: null };
 
@@ -46,6 +54,14 @@ export function earEvent(view: EarView, raw: unknown): { view: EarView; action: 
       return text
         ? { view: { ...view, state: "listening" }, action: { kind: "command", text } }
         : { view, action: null };
+    case "agent": {
+      const ev = (raw as { event?: unknown }).event;
+      if (typeof ev !== "object" || ev === null || typeof (ev as { type?: unknown }).type !== "string") {
+        return { view, action: null };
+      }
+      const { type, text: evText } = ev as { type: string; text?: unknown };
+      return { view, action: { kind: "agent", event: { type, ...(typeof evText === "string" ? { text: evText } : {}) } } };
+    }
     case "error":
       return {
         view: { ...view, state: "error", error: typeof e.error === "string" ? e.error : "error" },

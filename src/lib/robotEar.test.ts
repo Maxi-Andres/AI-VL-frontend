@@ -34,6 +34,17 @@ describe("earEvent", () => {
   });
 });
 
+describe("the agent's answer to what the robot heard", () => {
+  it("comes as agent events, and junk inside them changes nothing", () => {
+    expect(earEvent(listening, { type: "agent", event: { type: "reply", text: "Listo." } }).action)
+      .toEqual({ kind: "agent", event: { type: "reply", text: "Listo." } });
+    expect(earEvent(listening, { type: "agent", event: { type: "tool", tool: "navigate" } }).action)
+      .toEqual({ kind: "agent", event: { type: "tool" } });
+    expect(earEvent(listening, { type: "agent", event: "nope" }).action).toBeNull();
+    expect(earEvent(listening, { type: "agent" }).action).toBeNull();
+  });
+});
+
 describe("cutting the robot off", () => {
   it("is a barge, with the new request or none", () => {
     const v = earEvent(EAR_OFF, { type: "listening" }).view;

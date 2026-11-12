@@ -24,10 +24,10 @@ import { t } from "../i18n";
  * single question — the mic button in the chat.
  *
  * A second way in: the ROBOT's own microphone (the G1's, through its relay), listened to on
- * the server for its name, "Bender", like Alexa. "Bender, qué ves" is answered at once; a bare
- * "Bender" gets a spoken "¿Sí?" and the next phrase is the question. Its switch is the robot
- * mic itself: on opens it, off closes it. While the answer is spoken the robot's ear is muted,
- * so it never answers its own voice.
+ * the server for its name, "Bender", like Alexa. Since 2026-11-12 the gateway holds that ear
+ * and hands what follows "Bender" to the AGENT, which answers (or acts) and speaks through the
+ * robot; this page only switches the mic on and off and shows what was heard and replied. While
+ * this page speaks through the robot the ear is muted, so it never answers its own voice.
  *
  * The toggles persist in localStorage so they survive reloads. The caller
  * provides `askPrompt`, which captures the current frame, queries the VLM and
@@ -118,9 +118,6 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
   const askPromptStreamRef = useRef(askPromptStream);
   askPromptStreamRef.current = askPromptStream;
   const busyRef = useRef(false); // one command at a time
-  // A request from the robot's ear that came while another was still being answered: asked
-  // as soon as that one ends (it used to be dropped).
-  const nextRequest = useRef<string | null>(null);
   const [saysName, setSaysName] = useState(false);
   // "¿Sí?" (declared further down, next to the robot's ear): a ref, so the device's handlers
   // above it call the current one.
@@ -338,32 +335,6 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
     setAcking(false);
   }, []);
 
-  // A "Bender, …" command from the robot's own microphone: the same answer, no recording here.
-  const handleEarCommandRef = useRef<(text: string) => Promise<void>>(async () => {});
-  const handleEarCommand = useCallback(async (text: string) => {
-    if (busyRef.current) {
-      nextRequest.current = text;
-      return;
-    }
-    busyRef.current = true;
-    ackDone(); // the question is in: whatever the answer says mutes the ear as usual
-    speech.cancel(); // a new question interrupts a spoken answer
-    let spoke = false;
-    try {
-      setStatus(t("Bender heard: “{text}”", { text }));
-      spoke = await answerText(text);
-    } catch (e) {
-      setStatus(t("Voice error: {error}", { error: e instanceof Error ? e.message : String(e) }));
-    } finally {
-      busyRef.current = false;
-      const next = nextRequest.current;
-      nextRequest.current = null;
-      if (next) void handleEarCommandRef.current(next);
-      else if (!spoke) setPhase(voiceModeRef.current || robotEarRef.current ? "listening" : "off");
-    }
-  }, [speech, answerText, ackDone]);
-  handleEarCommandRef.current = handleEarCommand;
-
   // "¿Sí?" after a bare "Bender": the ear stays open for the question (see `acking`).
   const acknowledge = () => {
     setAcking(true);
@@ -380,15 +351,17 @@ export function useVoiceAssistant({ askPromptStream, phrase = "robot" }: Args) {
     muted: speech.speaking && !acking,
     // "Bender" while it talks cuts it off (2026-10-28) — unless the answer says "Bender" itself.
     barge: !saysName,
-    onCommand: (text) => void handleEarCommand(text),
-    onWake: () => {
-      if (spokenModeRef.current && !busyRef.current) acknowledge();
-    },
+    // What the robot hears after "Bender" is the AGENT's (the gateway hands it over and the
+    // robot speaks the reply, 2026-11-12): the page only shows it, and never answers it too.
+    onCommand: (text) => setStatus(t("Bender heard: “{text}” — the agent takes it", { text })),
+    onWake: () => {},
     onBarge: (text) => {
       speech.cancel(); // what was still to come of that answer is dropped too (speechQueue)
-      setStatus(text ? t("Bender heard: “{text}”", { text }) : t("Stopped — say your question"));
-      if (text) void handleEarCommand(text);
-      else if (spokenModeRef.current) acknowledge();
+      setStatus(text ? t("Bender heard: “{text}” — the agent takes it", { text }) : t("Stopped — say your question"));
+    },
+    onAgent: (event) => {
+      if (event.type === "reply" && event.text) setStatus(t("Bender: “{text}”", { text: event.text }));
+      else if (event.type === "error" && event.text) setStatus(t("Voice error: {error}", { error: event.text }));
     },
   });
 

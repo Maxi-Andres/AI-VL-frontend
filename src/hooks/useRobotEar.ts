@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { EAR_OFF, earEvent, type EarView } from "../lib/robotEar";
+import { EAR_OFF, earEvent, type AgentEarEvent, type EarView } from "../lib/robotEar";
 import { t } from "../i18n";
 
 /**
@@ -9,7 +9,8 @@ import { t } from "../i18n";
  * once. `muted` (the page is speaking) is passed on so the ear never answers the robot's own
  * voice; with `barge` it still hears its name, and `onBarge` is "stop talking" (with the new
  * request, or "" for a bare "Bender"). The ear finds "Bender, …" itself: `onCommand` gets just
- * the request.
+ * the request — which the gateway has already handed to the agent; `onAgent` gets what the agent
+ * does with it.
  *
  * There is ONE ear per robot (the backend's rule): opening it on a page takes it from any other,
  * and switching it off here sends {"type": "off"} first, which switches it off for every page —
@@ -23,6 +24,7 @@ export function useRobotEar({
   onCommand,
   onWake,
   onBarge,
+  onAgent,
 }: {
   url: string;
   enabled: boolean;
@@ -31,12 +33,14 @@ export function useRobotEar({
   onCommand: (text: string) => void;
   onWake: () => void;
   onBarge: (text: string) => void;
+  /** What the agent does with what the robot heard (the gateway runs it). */
+  onAgent: (event: AgentEarEvent) => void;
 }): EarView {
   const [view, setView] = useState<EarView>(EAR_OFF);
   const viewRef = useRef(view);
   viewRef.current = view;
-  const callbacks = useRef({ onCommand, onWake, onBarge });
-  callbacks.current = { onCommand, onWake, onBarge };
+  const callbacks = useRef({ onCommand, onWake, onBarge, onAgent });
+  callbacks.current = { onCommand, onWake, onBarge, onAgent };
   const wsRef = useRef<WebSocket | null>(null);
   const mutedRef = useRef({ muted, barge });
   mutedRef.current = { muted, barge };
@@ -63,6 +67,7 @@ export function useRobotEar({
       if (action?.kind === "command") callbacks.current.onCommand(action.text);
       else if (action?.kind === "wake") callbacks.current.onWake();
       else if (action?.kind === "barge") callbacks.current.onBarge(action.text);
+      else if (action?.kind === "agent") callbacks.current.onAgent(action.event);
     };
     ws.onclose = () => {
       if (closedHere) return;
