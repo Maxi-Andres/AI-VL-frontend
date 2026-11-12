@@ -10,8 +10,8 @@ const TOOL_LABEL: Record<string, string> = {
   pick: msg("pick up"),
   place: msg("put it in"),
   look: msg("look"),
-  walk: msg("walk"),
-  turn: msg("turn"),
+  navigate: msg("go"),
+  command: msg("move"),
 };
 
 interface Props {
