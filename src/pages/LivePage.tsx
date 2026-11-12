@@ -753,7 +753,6 @@ export function LivePage() {
                   onToggleVoiceMode: va.toggleVoiceMode,
                   listenMode: va.listenMode,
                   onListenModeChange: va.setListenMode,
-                  onListenOnce: va.listenOnce,
                   phase: va.phase,
                   volume: toRobotSpeaker
                     ? { value: robotVolume.volume, max: robotVolume.max, where: "robot", onChange: robotVolume.change }

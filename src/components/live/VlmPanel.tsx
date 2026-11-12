@@ -4,11 +4,10 @@ import {
   IconAdjustmentsHorizontal,
   IconArrowUp,
   IconChevronDown,
-  IconHeadset,
-  IconHeadsetOff,
   IconMessage,
   IconMessageOff,
   IconMicrophone,
+  IconMicrophoneOff,
   IconMicrophone2,
   IconMicrophone2Off,
   IconPlayerStopFilled,
@@ -52,8 +51,6 @@ export interface VoiceControls {
   /** How hands-free listens: "open" = just speak; "wake" = say "robot" first. */
   listenMode: "open" | "wake";
   onListenModeChange: (m: "open" | "wake") => void;
-  /** The mic button: one spoken question, sent when the speaker stops. */
-  onListenOnce: () => void;
   /** Where the voice loop is: off, listening, recording, transcribing, thinking, speaking. */
   phase: string;
   /** How loud answers play — this device's or the robot speaker's, whichever speaks. */
@@ -384,19 +381,15 @@ export function VlmPanel({
             aria-label={t("Question about the frame")}
             className="block max-h-32 min-h-[52px] w-full resize-none bg-transparent px-3 pt-2.5 text-[13px] text-fg outline-none [field-sizing:content] placeholder:text-dim" />
           <div className="flex flex-wrap items-center gap-1 px-2 pb-2">
-            {/* Labelled, not icons alone (2026-11-12: "no se entiende mucho qué hace cada cosa"). */}
-            {voice.micSupported && (
-              <Chip on={hearing && !voice.voiceMode} pulse onClick={voice.onListenOnce}
-                disabled={!canAsk || busy || hearing || voice.voiceMode}
-                title={t("Speak a question — it is sent when you stop talking")}
-                icon={<IconMicrophone size={14} />} label={t("Speak")} />
-            )}
+            {/* Labelled, not icons alone (2026-11-12: "no se entiende mucho qué hace cada cosa").
+                Three: this computer's mic (hands-free), the robot's mic, and answers out loud. The
+                one-question "Speak" button went the same day: hands-free does it and more. */}
             {voice.micSupported && (
               <Chip on={voice.voiceMode} onClick={voice.onToggleVoiceMode}
                 title={voice.listenMode === "wake"
                   ? voice.voiceMode ? t("Hands-free on: say “robot”, then your question") : t("Hands-free off: say “robot”, then your question")
                   : voice.voiceMode ? t("Hands-free on: just speak — each question is sent by itself") : t("Hands-free off: just speak — each question is sent by itself")}
-                icon={voice.voiceMode ? <IconHeadset size={14} /> : <IconHeadsetOff size={14} />} label={t("Hands-free")} />
+                icon={voice.voiceMode ? <IconMicrophone size={14} /> : <IconMicrophoneOff size={14} />} label={t("Hands-free")} />
             )}
             {voice.robotMic && (
               <Chip on={voice.robotEar} onClick={voice.onToggleRobotEar}
