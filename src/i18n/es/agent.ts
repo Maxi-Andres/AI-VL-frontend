@@ -47,4 +47,10 @@ export const AGENT: Record<string, string> = {
     "El mic del robot está en modo VLM: tocá para que “Bender, …” vaya al agente",
   "Switch the robot's mic on: say “Bender, …” and the agent does it":
     "Prendé el mic del robot: decí “Bender, …” y lo hace el agente",
+  // Voice on the Agent page: this computer's mic, and where the answers are spoken
+  "This computer's mic: say “robot”, then the instruction":
+    "El mic de esta compu: decí “robot” y después la instrucción",
+  "This computer's mic: just speak — each phrase is sent to the agent":
+    "El mic de esta compu: hablá nomás — cada frase va al agente",
+  "Where the answers are spoken": "Dónde se dicen las respuestas",
 };

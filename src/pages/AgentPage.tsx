@@ -6,9 +6,12 @@ import {
   IconMicrophone,
   IconMicrophone2,
   IconMicrophone2Off,
+  IconMicrophoneOff,
+  IconVolume,
+  IconVolumeOff,
 } from "@tabler/icons-react";
 import { runAgent, stopAgent } from "../api/agent";
-import { setRobotCamera, transcribeAudio } from "../api/backend";
+import { setRobotCamera } from "../api/backend";
 import { AgentTrace } from "../components/agent/AgentTrace";
 import { robotState } from "../components/layout/PresencePills";
 import { useRobot } from "../components/layout/RobotContext";
@@ -16,11 +19,12 @@ import { useVideoTransport } from "../components/layout/VideoTransportContext";
 import { useVoiceAssistantContext } from "../components/layout/VoiceAssistantContext";
 import { RobotCameraSwitch } from "../components/live/RobotCameraSwitch";
 import { RobotPicture } from "../components/live/RobotPicture";
+import { Chip } from "../components/ui/Chip";
 import { Conversations } from "../components/ui/Conversations";
+import { Segmented } from "../components/ui/Segmented";
 import { VideoTransportSwitch } from "../components/live/VideoTransportSwitch";
 import { StatusText, type Status } from "../components/ui/StatusText";
 import { StopButton } from "../components/ui/StopButton";
-import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { useChats } from "../hooks/useChats";
 import { usePresence } from "../hooks/usePresence";
 import { useRobotCameraView } from "../hooks/useRobotCameraView";
@@ -42,6 +46,10 @@ const MAX_CHARS = 1000;
  *
  * One run at a time from this page; the server refuses a second one from anywhere (it comes
  * back as an error line).
+ *
+ * Voice, the same three switches as Live: this computer's mic (hands-free: every phrase heard
+ * is an instruction), the robot's mic ("Bender, …", in the agent's mode) and answers out loud,
+ * through this device or the robot's speaker.
  *
  * The conversations are kept per person, like Live's (useChats, kind "agent"): every finished
  * turn — typed, spoken here, or "Bender, …" heard by the robot while this page is open — is
@@ -121,15 +129,18 @@ export function AgentPage() {
 
   // The reply is spoken the way the rest of the app speaks answers: only when spoken answers
   // are on (the voice assistant's switch), with its voice and its output.
-  const { va } = useVoiceAssistantContext();
+  const { va, registerAsk } = useVoiceAssistantContext();
   const speakRef = useRef<(text: string) => void>(() => {});
   speakRef.current = (reply: string) => {
     if (va.spokenMode) va.speak(reply);
   };
 
-  const send = useCallback(async (raw: string) => {
+  // Resolves with the reply (null: none, or not sent). `voiced`: asked by hands-free, which
+  // speaks the reply itself, so it is not spoken here too.
+  const send = useCallback(async (raw: string, voiced = false): Promise<string | null> => {
     const instruction = raw.trim().slice(0, MAX_CHARS);
-    if (!instruction || runRef.current) return;
+    if (!instruction || runRef.current) return null;
+    let reply: string | null = null;
     const id = nextId.current++;
     const ctl = new AbortController();
     runRef.current = { id, ctl };
@@ -140,19 +151,37 @@ export function AgentPage() {
     try {
       await runAgent(instruction, (event) => {
         dispatch({ type: "event", id, event, at: Date.now() });
-        if (event.type === "reply" && event.text) speakRef.current(event.text);
+        if (event.type === "reply" && event.text) {
+          reply = event.text;
+          if (!voiced) speakRef.current(event.text);
+        }
       }, ctl.signal);
       dispatch({ type: "end", id, at: Date.now() });
       toSave.current.add(id);
     } catch (e) {
-      if (ctl.signal.aborted) return; // the page went away
+      if (ctl.signal.aborted) return null; // the page went away
       dispatch({ type: "failed", id, at: Date.now(), text: e instanceof Error ? e.message : String(e) });
       toSave.current.add(id);
     } finally {
       if (runRef.current?.id === id) runRef.current = null;
       if (alive.current) setBusy(false);
     }
+    return reply;
   }, []);
+
+  // Hands-free (this computer's mic) on this page: what it hears goes to the agent, not to the
+  // vision chat, and the reply comes back to be spoken the way hands-free speaks.
+  const sendRef = useRef(send);
+  sendRef.current = send;
+  useEffect(() => {
+    if (!isG1) return;
+    registerAsk(async (prompt, onDelta) => {
+      const reply = await sendRef.current(prompt, true);
+      if (reply) onDelta(reply);
+      return reply;
+    });
+    return () => registerAsk(null);
+  }, [isG1, registerAsk]);
 
   const stop = useCallback(() => {
     va.stopSpeak();
@@ -203,42 +232,6 @@ export function AgentPage() {
     };
   }, []);
 
-  // Push-to-talk, the same path as the Live page's spoken command: record one utterance (it
-  // ends on silence), transcribe it on the server, and send what was said.
-  const recorder = useAudioRecorder();
-  const [listening, setListening] = useState(false);
-  const listen = useCallback(async () => {
-    if (recorder.recording) {
-      recorder.abort(); // pressed again: end the utterance now, with what it has
-      return;
-    }
-    if (listening || runRef.current) return;
-    setListening(true);
-    setStatus({ tone: "busy", text: msg("Listening…") });
-    try {
-      const blob = await recorder.recordUtterance();
-      if (!alive.current) return;
-      if (!blob) {
-        setStatus({ tone: "warn", text: msg("Didn't catch that — try again") });
-        return;
-      }
-      setStatus({ tone: "busy", text: msg("Transcribing…") });
-      const res = await transcribeAudio(blob);
-      if (!alive.current) return;
-      const said = res.text?.trim();
-      if (res.error || !said) {
-        setStatus(res.error ? { tone: "error", text: res.error } : { tone: "warn", text: msg("Nothing recognized") });
-        return;
-      }
-      setStatus(null);
-      void send(said);
-    } catch (e) {
-      if (alive.current) setStatus({ tone: "error", text: e instanceof Error ? e.message : String(e) });
-    } finally {
-      if (alive.current) setListening(false);
-    }
-  }, [listening, recorder, send]);
-
   // The running tool's seconds: one tick a second, only while a run is open.
   const [now, setNow] = useState(() => Date.now());
   const running = turns.some((turn) => turn.running);
@@ -257,7 +250,8 @@ export function AgentPage() {
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [turns]);
 
-  const canSend = isG1 && !busy && !listening && !!text.trim();
+  const canSend = isG1 && !busy && !!text.trim();
+  const voiceStatus = [va.status, va.robotEarStatus].filter(Boolean).join(" · ");
 
   return (
     <main className="grid gap-4 p-4 lg:h-full lg:grid-cols-[minmax(0,1fr)_420px] lg:overflow-hidden">
@@ -305,23 +299,12 @@ export function AgentPage() {
       <aside className="flex min-h-[480px] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-card">
         <div className="flex items-center gap-2 border-b border-line px-4 py-3 text-sm font-extrabold">
           <IconMessageChatbot size={17} className="text-accent" />{t("Agent")}
-          {isG1 && va.robotMic && (
-            // The robot's own mic in the AGENT's mode: "Bender, …" goes to the agent (the robot
-            // says "Modo agente"). Switched on from Live it is in the VLM mode: pressing here
-            // changes it to this one.
-            <button type="button" onClick={() => va.toggleRobotEar("agent")} aria-pressed={earInAgentMode}
-              title={[earInAgentMode ? t("The robot's mic is on: say “Bender, …” and the agent does it")
-                : va.robotEar ? t("The robot's mic is in the VLM mode: press to give “Bender, …” to the agent")
-                  : t("Switch the robot's mic on: say “Bender, …” and the agent does it"),
-              va.robotEarStatus].filter(Boolean).join(" · ")}
-              className={`flex h-7 cursor-pointer items-center gap-1 rounded-lg px-2 text-[11.5px] font-bold transition active:scale-95 ${
-                earInAgentMode ? "bg-good-bg text-good-fg" : "text-muted hover:bg-subtle hover:text-fg"}`}>
-              {va.robotEar ? <IconMicrophone2 size={14} /> : <IconMicrophone2Off size={14} />}
-              <span className="whitespace-nowrap">{va.robotEar && !earInAgentMode ? t("Robot mic · VLM") : t("Robot mic")}</span>
-            </button>
+          {status ? (
+            <StatusText status={{ ...status, text: t(status.text) }}
+              className="ml-auto min-w-0 truncate text-xs font-semibold text-muted" />
+          ) : voiceStatus && (
+            <span title={voiceStatus} className="ml-auto min-w-0 truncate text-xs font-semibold text-muted">{voiceStatus}</span>
           )}
-          <StatusText status={status && { ...status, text: t(status.text) }}
-            className="ml-auto min-w-0 truncate text-xs font-semibold text-muted" />
         </div>
 
         <div className="border-b border-line px-3 py-1.5">
@@ -341,29 +324,60 @@ export function AgentPage() {
 
         <div className="flex items-end gap-2 border-t border-line p-3">
           {isG1 ? (
-            <div className="flex min-w-0 flex-1 items-end rounded-[14px] border border-line bg-bg transition focus-within:border-accent focus-within:shadow-[0_0_0_4px_var(--color-good-bg)]">
-              <textarea value={text} rows={1} maxLength={MAX_CHARS} aria-label={t("Instruction")}
-                onChange={(e) => setText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    if (canSend) void send(text);
-                  }
-                }}
-                placeholder={busy ? t("The robot is working on it…") : t("Type or speak…")}
-                className="block max-h-28 min-h-[42px] min-w-0 flex-1 resize-none bg-transparent px-3 py-2.5 text-[13px] text-fg outline-none placeholder:text-dim" />
-              {recorder.supported && (
-                <button type="button" onClick={() => void listen()} disabled={busy && !recorder.recording}
-                  aria-pressed={recorder.recording} title={t("Speak the instruction: it is transcribed and sent")}
-                  className={`m-1 grid size-9 shrink-0 cursor-pointer place-items-center rounded-lg border transition active:scale-95 disabled:cursor-default disabled:opacity-40 ${
-                    recorder.recording ? "animate-pulse border-bad-fg/40 bg-bad-bg text-bad-fg" : "border-line text-muted hover:bg-subtle hover:text-fg"}`}>
-                  <IconMicrophone size={17} />
+            <div className="min-w-0 flex-1 rounded-[14px] border border-line bg-bg transition focus-within:border-accent focus-within:shadow-[0_0_0_4px_var(--color-good-bg)]">
+              <div className="flex items-end">
+                <textarea value={text} rows={1} maxLength={MAX_CHARS} aria-label={t("Instruction")}
+                  onChange={(e) => setText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      if (canSend) void send(text);
+                    }
+                  }}
+                  placeholder={busy ? t("The robot is working on it…") : t("Type or speak…")}
+                  className="block max-h-28 min-h-[42px] min-w-0 flex-1 resize-none bg-transparent px-3 py-2.5 text-[13px] text-fg outline-none placeholder:text-dim" />
+                <button type="button" onClick={() => void send(text)} disabled={!canSend} title={t("Send")}
+                  className="m-1 grid size-9 shrink-0 cursor-pointer place-items-center rounded-lg bg-fg text-bg transition active:scale-95 disabled:cursor-default disabled:opacity-35">
+                  <IconArrowUp size={17} />
                 </button>
-              )}
-              <button type="button" onClick={() => void send(text)} disabled={!canSend} title={t("Send")}
-                className="m-1 ml-0 grid size-9 shrink-0 cursor-pointer place-items-center rounded-lg bg-fg text-bg transition active:scale-95 disabled:cursor-default disabled:opacity-35">
-                <IconArrowUp size={17} />
-              </button>
+              </div>
+              {/* Voice, as on Live: this computer's mic, the robot's mic, and answers out loud
+                  (here or on the robot's speaker). */}
+              <div className="flex flex-wrap items-center gap-1 px-2 pb-2">
+                {va.micSupported && (
+                  <Chip on={va.voiceMode} onClick={va.toggleVoiceMode}
+                    title={va.listenMode === "wake"
+                      ? t("This computer's mic: say “robot”, then the instruction")
+                      : t("This computer's mic: just speak — each phrase is sent to the agent")}
+                    icon={va.voiceMode ? <IconMicrophone size={14} /> : <IconMicrophoneOff size={14} />} label={t("Hands-free")} />
+                )}
+                {va.robotMic && (
+                  // The robot's own mic in the AGENT's mode: "Bender, …" goes to the agent (the
+                  // robot says "Modo agente"). Switched on from Live it is in the VLM mode:
+                  // pressing here changes it to this one.
+                  <Chip on={earInAgentMode} onClick={() => va.toggleRobotEar("agent")}
+                    title={earInAgentMode ? t("The robot's mic is on: say “Bender, …” and the agent does it")
+                      : va.robotEar ? t("The robot's mic is in the VLM mode: press to give “Bender, …” to the agent")
+                        : t("Switch the robot's mic on: say “Bender, …” and the agent does it")}
+                    icon={va.robotEar ? <IconMicrophone2 size={14} /> : <IconMicrophone2Off size={14} />}
+                    label={va.robotEar && !earInAgentMode ? t("Robot mic · VLM") : t("Robot mic")} />
+                )}
+                {va.speechSupported && (
+                  <Chip on={va.spokenMode} onClick={va.toggleSpokenMode}
+                    title={va.spokenMode ? t("Speak answers on") : t("Speak answers off")}
+                    icon={va.spokenMode ? <IconVolume size={14} /> : <IconVolumeOff size={14} />} label={t("Out loud")} />
+                )}
+                {va.speechSupported && va.spokenMode && va.robotSpeaker && (
+                  <Segmented className="flex rounded-lg bg-subtle p-0.5" title={t("Where the answers are spoken")}>
+                    {(["browser", "robot"] as const).map((o) => (
+                      <button key={o} type="button" onClick={() => va.onSpeechOutputChange(o)} data-on={va.speechOutput === o}
+                        className={`cursor-pointer rounded-md px-2 py-0.5 text-[11px] font-bold transition-colors ${va.speechOutput === o ? "text-fg" : "text-muted"}`}>
+                        {o === "browser" ? t("This device") : t("Robot")}
+                      </button>
+                    ))}
+                  </Segmented>
+                )}
+              </div>
             </div>
           ) : (
             <p className="m-0 min-w-0 flex-1 self-center text-[12.5px] text-muted">
