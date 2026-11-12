@@ -200,22 +200,25 @@ export function AgentPage() {
 
   // "Bender, …" said to the robot in the agent's mode (or while it walks): the gateway runs it
   // and the robot speaks the reply; the run shows here as a turn of its own, like a typed one.
-  const voiceRun = useRef<number | null>(null);
+  // The gateway's run number -> this page's turn: a run taken over by a new "Bender, …" ends
+  // after the new one started, and its "end" closed the NEW turn (2026-11-12).
+  const voiceRuns = useRef(new Map<number, number>());
   const onAgentEvents = va.onAgentEvents;
   useEffect(() => onAgentEvents((event) => {
     const at = Date.now();
+    const run = event.run ?? 0;              // an older gateway numbers nothing: one at a time
     if (event.type === "heard") {
       const id = nextId.current++;
-      voiceRun.current = id;
+      voiceRuns.current.set(run, id);
       dispatch({ type: "start", id, text: event.text ?? "", at });
       return;
     }
-    const id = voiceRun.current;
-    if (id === null) return;
+    const id = voiceRuns.current.get(run);
+    if (id === undefined) return;
     if (event.type === "end") {
       dispatch({ type: "end", id, at });
       toSave.current.add(id);
-      voiceRun.current = null;
+      voiceRuns.current.delete(run);
       return;
     }
     dispatch({ type: "event", id, event: event as unknown as AgentEvent, at });

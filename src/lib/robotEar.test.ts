@@ -51,6 +51,14 @@ describe("who answers it (the gateway's mode)", () => {
 });
 
 describe("the agent's answer to what the robot heard", () => {
+  it("says which run each event belongs to", () => {
+    // Catches: the "end" of a run taken over closing the turn of the run that took over.
+    expect(earEvent(listening, { type: "agent", run: 7, event: { type: "end" } }).action)
+      .toEqual({ kind: "agent", event: { type: "end", run: 7 } });
+    expect(earEvent(listening, { type: "agent", run: "7", event: { type: "end", run: 3 } }).action)
+      .toEqual({ kind: "agent", event: { type: "end" } });
+  });
+
   it("comes as agent events, and junk inside them changes nothing", () => {
     expect(earEvent(listening, { type: "agent", event: { type: "reply", text: "Listo." } }).action)
       .toEqual({ kind: "agent", event: { type: "reply", text: "Listo." } });

@@ -38,6 +38,9 @@ export type EarAction =
 export interface AgentEarEvent {
   type: string;
   text?: string;
+  /** Which run it belongs to (the gateway numbers them): a run taken over ends after the new
+   * one started, and its "end" must close its own turn. */
+  run?: number;
   [key: string]: unknown;
 }
 
@@ -79,6 +82,9 @@ export function earEvent(view: EarView, raw: unknown): { view: EarView; action: 
       }
       const event = { ...(ev as AgentEarEvent) };
       if (typeof event.text !== "string") delete event.text;
+      const run = (raw as { run?: unknown }).run;
+      if (typeof run === "number") event.run = run;
+      else delete event.run;
       return { view, action: { kind: "agent", event } };
     }
     case "error":
