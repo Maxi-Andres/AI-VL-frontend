@@ -170,30 +170,6 @@ export interface Presence {
   cameras?: Record<string, boolean> | null;
 }
 
-/** Payload of POST /api/command — the Unitree command interpreter.
- * Maps a spoken/typed command to ONE skill + params (what the robot should do).
- * This is the interpreter's decision only; no motion happens yet. */
-export interface CommandResponse {
-  error?: string;
-  /** False only when the model returned no parseable JSON (skill falls back to
-   * "unknown"). */
-  ok: boolean;
-  model: string;
-  /** Which robot's catalog was used ("g1" | "go2"). */
-  robot: string;
-  /** Chosen skill name (e.g. "walk", "stop", "arm_action", "unknown"). */
-  skill: string;
-  /** Skill-specific parameters (e.g. {direction, speed} for "walk"). */
-  params: Record<string, unknown>;
-  /** Short spoken confirmation, in the command's language (for TTS). */
-  say: string;
-  /** The command text the interpreter received (the transcript). */
-  understood: string;
-  /** Raw model output (for debugging when ok is false). */
-  content: string;
-  elapsed_ms: number;
-}
-
 /** Payload of POST /api/execute — the robot executor's result for one skill. */
 export interface ExecuteResponse {
   ok: boolean;

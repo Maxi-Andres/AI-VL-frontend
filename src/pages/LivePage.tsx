@@ -3,11 +3,8 @@ import {
   askVlm,
   askVlmStream,
   detectFrame,
-  executeCommand,
   fetchClasses,
-  interpretCommand,
   setRobotCamera,
-  transcribeAudio,
 } from "../api/backend";
 import type { ChatTurn, ContextUsage } from "../api/backend";
 import { VideoStage } from "../components/live/VideoStage";
@@ -15,12 +12,10 @@ import { RobotCameraStage } from "../components/live/RobotCameraStage";
 import { ClassChips } from "../components/live/ClassChips";
 import { YoloPanel } from "../components/live/YoloPanel";
 import { VLM_IMG_DEFAULT, VlmPanel } from "../components/live/VlmPanel";
-import { CommandPanel } from "../components/live/CommandPanel";
 import { useStatus } from "../components/layout/StatusContext";
 import { useRobot } from "../components/layout/RobotContext";
 import { sentAsHistory } from "../lib/chatMemory";
 import { fmtMs } from "../lib/format";
-import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { useCamera } from "../hooks/useCamera";
 import { useDetectionSocket } from "../hooks/useDetectionSocket";
 import { useOptions } from "../hooks/useOptions";
@@ -46,11 +41,9 @@ import {
   IconPlayerStopFilled,
   IconScan,
   IconSparkles,
-  IconTerminal2,
   IconVideo,
 } from "@tabler/icons-react";
 import type {
-  CommandResponse,
   ConfigState,
   DetectedObject,
   DetectionMessage,
@@ -86,7 +79,7 @@ export function LivePage() {
   // mirror for whoever may only watch. This device's webcam is a choice, never the default.
   const [source, setSource] = useState<"own" | "robot" | "view">(mayOperate ? "robot" : "view");
   // Presentation only: which side-panel tab is open.
-  const [panel, setPanel] = useState<"vlm" | "yolo" | "command">("vlm");
+  const [panel, setPanel] = useState<"vlm" | "yolo">("vlm");
   const [robotCamStatus, setRobotCamStatus] = useState<Status | null>(null);
   const viewing = source !== "own"; // true when we're a /ws/view consumer
   // Master YOLO on/off (shared session flag). Default OFF so no GPU is used until
@@ -128,35 +121,8 @@ export function LivePage() {
   // Free-prompt text lives here (not in VlmPanel) so dictation can populate it.
   const [prompt, setPrompt] = useState("");
 
-  // --- Robot command interpreter state (verification view) ---
-  const cmdRecorder = useAudioRecorder();
-  // Robot is chosen globally in the header now (shared context).
+  // The robot is chosen globally in the header (shared context).
   const { robot: cmdRobot } = useRobot();
-  const [cmdModel, setCmdModel] = useState("");
-  const [cmdText, setCmdText] = useState("");
-  const [cmdBusy, setCmdBusy] = useState(false);
-  const [cmdStatus, setCmdStatus] = useState("");
-  const [cmdResult, setCmdResult] = useState<CommandResponse | null>(null);
-  const [executing, setExecuting] = useState(false);
-  const [executeStatus, setExecuteStatus] = useState<Status | null>(null);
-  // Execution switches (persisted): master arm + auto-run. Default OFF (safe).
-  const [execEnabled, setExecEnabled] = useState(
-    () => typeof localStorage !== "undefined" &&
-      localStorage.getItem("aivl.execEnabled") === "1");
-  // Always start each session SAFE ON / AUTO OFF (not persisted on purpose): never
-  // dangerous and never automatic until you explicitly enable it.
-  const [autoRun, setAutoRun] = useState(false);
-  const [safeMode, setSafeMode] = useState(true);
-  // Refs so runInterpret (auto-run) / executeResult always see the latest toggles.
-  const execEnabledRef = useRef(execEnabled);
-  execEnabledRef.current = execEnabled;
-  const autoRunRef = useRef(autoRun);
-  autoRunRef.current = autoRun;
-  const safeModeRef = useRef(safeMode);
-  safeModeRef.current = safeMode;
-  const cmdAbortRef = useRef<AbortController | null>(null);
-  useEffect(() => () => cmdAbortRef.current?.abort(), []);
-
   const initialized = useRef(false);
   const lastFrameTsRef = useRef(0); // for measuring the actual processed FPS
   const fpsEmaRef = useRef(0);
@@ -177,10 +143,6 @@ export function LivePage() {
     setVlmModel(d.vlm_model);
     setScope(d.scope);
     setVariant(d.variant);
-    // Command parsing needs no reasoning: prefer an *-instruct model (much faster
-    // time-to-answer) when one is installed, else fall back to the VLM default.
-    const instruct = options.vlm_models.find((m) => m.includes("instruct"));
-    setCmdModel(instruct ?? d.vlm_model);
     fetchClasses(d.yolo_model).then(setClassOptions).catch(console.error);
   }, [options]);
 
@@ -577,139 +539,6 @@ export function LivePage() {
     [askPromptStream, va],
   );
 
-  const toggleExecEnabled = useCallback(() => {
-    setExecEnabled((v) => {
-      const next = !v;
-      if (typeof localStorage !== "undefined")
-        localStorage.setItem("aivl.execEnabled", next ? "1" : "0");
-      return next;
-    });
-  }, []);
-  const toggleAutoRun = useCallback(() => setAutoRun((v) => !v), []);
-  const toggleSafeMode = useCallback(() => setSafeMode((v) => !v), []);
-
-  // Send ONE interpreted result to the robot executor. Shared by the manual button
-  // and auto-run. No-op unless execution is armed (checked by callers).
-  const executeResult = useCallback(async (res: CommandResponse | null) => {
-    if (!res || res.skill === "unknown") return;
-    setExecuting(true);
-    setExecuteStatus({ tone: "busy", text: t("Sending to the robot…") });
-    try {
-      const r = await executeCommand(
-        res.robot, res.skill, res.params, safeModeRef.current);
-      if (r.ok) {
-        const detail = r.detail ?? t("sent");
-        setExecuteStatus({
-          tone: "ok",
-          text: r.dry_run ? t("{detail} (dry-run, not moved)", { detail }) : detail,
-        });
-      } else if (r.blocked) {
-        setExecuteStatus({ tone: "blocked", text: r.error ?? t("blocked by SAFE_MODE") });
-      } else {
-        setExecuteStatus({ tone: "error", text: r.error ?? r.detail ?? t("failed") });
-      }
-    } catch (e) {
-      setExecuteStatus({
-        tone: "error",
-        text: t("Request failed: {error}", { error: e instanceof Error ? e.message : String(e) }),
-      });
-    } finally {
-      setExecuting(false);
-    }
-  }, [t]);
-
-  // --- Robot command interpreter (verification) ---
-  // Send a command text to the interpreter and show the chosen skill + JSON.
-  const runInterpret = useCallback(
-    async (text: string) => {
-      const said = text.trim();
-      if (!said) return;
-      cmdAbortRef.current?.abort();
-      const ac = new AbortController();
-      cmdAbortRef.current = ac;
-      setCmdBusy(true);
-      setCmdStatus(t("Interpreting…"));
-      try {
-        const res = await interpretCommand(said, cmdModel, cmdRobot, ac.signal);
-        if (res.error) {
-          setCmdStatus(t("Error: {error}", { error: res.error }));
-          return;
-        }
-        setCmdResult(res);
-        setCmdStatus(
-          [res.model, fmtMs(res.elapsed_ms),
-            ...(res.ok ? [] : [t("(invalid JSON — fell back to unknown)")])].join(" · "),
-        );
-        // Auto-run: fire immediately when armed + auto (no button needed).
-        if (execEnabledRef.current && autoRunRef.current) void executeResult(res);
-      } catch (e) {
-        if (e instanceof DOMException && e.name === "AbortError") return;
-        setCmdStatus(t("Request failed: {error}", { error: e instanceof Error ? e.message : String(e) }));
-      } finally {
-        setCmdBusy(false);
-      }
-    },
-    [cmdModel, cmdRobot, executeResult, t],
-  );
-
-  const handleInterpret = useCallback(
-    () => void runInterpret(cmdText),
-    [runInterpret, cmdText],
-  );
-
-  // Speak one command: record → transcribe → interpret. Reuses the same STT path
-  // as the voice assistant; here the transcript feeds the interpreter, not the VLM.
-  const handleRecordCommand = useCallback(async () => {
-    if (cmdBusy || cmdRecorder.recording) return;
-    setCmdBusy(true);
-    setCmdStatus(t("Listening… speak a command"));
-    try {
-      const blob = await cmdRecorder.recordUtterance();
-      if (!blob) {
-        setCmdStatus(t("Didn't catch that — try again"));
-        return;
-      }
-      setCmdStatus(t("Transcribing…"));
-      const res = await transcribeAudio(blob);
-      const text = res.text?.trim();
-      if (res.error || !text) {
-        setCmdStatus(res.error ? t("Error: {error}", { error: res.error }) : t("Nothing recognized"));
-        return;
-      }
-      setCmdText(text);
-      await runInterpret(text); // manages its own busy/status from here
-    } catch (e) {
-      setCmdStatus(t("Voice error: {error}", { error: e instanceof Error ? e.message : String(e) }));
-    } finally {
-      setCmdBusy(false);
-    }
-  }, [cmdBusy, cmdRecorder, runInterpret, t]);
-
-  // Manual trigger: send the current interpreted skill to the robot.
-  const handleExecuteOnRobot = useCallback(
-    () => void executeResult(cmdResult), [executeResult, cmdResult]);
-
-  // Emergency stop: halt the robot NOW, regardless of the switches. Sends the
-  // `stop` skill (StopMove + cancels the executor's move loop) with safe_mode off
-  // (stop is never blocked). Named *Robot to avoid the camera's handleStop.
-  const handleStopRobot = useCallback(async () => {
-    setExecuting(true);
-    setExecuteStatus({ tone: "busy", text: t("Stopping the robot…") });
-    try {
-      const r = await executeCommand(cmdRobot, "stop", {}, false);
-      setExecuteStatus(r.ok
-        ? { tone: "stopped", text: t("Stopped") }
-        : { tone: "error", text: r.error ?? t("stop failed") });
-    } catch (e) {
-      setExecuteStatus({
-        tone: "error",
-        text: t("Stop failed: {error}", { error: e instanceof Error ? e.message : String(e) }),
-      });
-    } finally {
-      setExecuting(false);
-    }
-  }, [cmdRobot, t]);
-
   if (optionsError) {
     return (
       <main className="p-4 text-bad-fg">
@@ -865,14 +694,14 @@ export function LivePage() {
         </div>
       </div>
 
-      {/* Side panel: the AI, detection and the command interpreter, each with its own scroll. */}
+      {/* Side panel: the AI and detection, each with its own scroll. Robot commands are the
+          agent's (its command tool, 2026-11-12): the old Command tab here is gone. */}
       {mayAnalyze && (
         <aside className="flex min-h-[480px] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-card">
           <Segmented className="m-3 mb-0 flex gap-0.5 rounded-xl bg-subtle p-1">
             {([
               ["vlm", t("Ask VLM"), IconSparkles],
               ["yolo", t("Detection"), IconScan],
-              ["command", t("Command"), IconTerminal2],
             ] as const).map(([id, label, Icon]) => (
               <button key={id} type="button" onClick={() => setPanel(id)} data-on={panel === id}
                 className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg py-1.5 text-[12.5px] font-bold transition-colors ${
@@ -969,32 +798,6 @@ export function LivePage() {
                 onImgszChange={setImgsz}
                 onClassesChange={setClasses}
                 onMaxFpsChange={setMaxFps}
-              />
-            )}
-            {panel === "command" && (
-              <CommandPanel
-                models={options.vlm_models}
-                model={cmdModel}
-                onModelChange={setCmdModel}
-                text={cmdText}
-                onTextChange={setCmdText}
-                busy={cmdBusy}
-                status={cmdStatus}
-                result={cmdResult}
-                micSupported={cmdRecorder.supported}
-                recording={cmdRecorder.recording}
-                onInterpret={handleInterpret}
-                onRecord={handleRecordCommand}
-                onExecuteOnRobot={handleExecuteOnRobot}
-                onStop={handleStopRobot}
-                executing={executing}
-                executeStatus={executeStatus}
-                execEnabled={execEnabled}
-                onToggleExecEnabled={toggleExecEnabled}
-                autoRun={autoRun}
-                onToggleAutoRun={toggleAutoRun}
-                safeMode={safeMode}
-                onToggleSafeMode={toggleSafeMode}
               />
             )}
           </div>

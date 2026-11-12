@@ -3,7 +3,6 @@
 import { BACKEND_URL } from "../config";
 import { notifySignedOut } from "../auth/signedOut";
 import type {
-  CommandResponse,
   DetectedObject,
   ExecuteResponse,
   Options,
@@ -212,27 +211,6 @@ export async function askVlmStream(
   }
   emit(pending.replaceAll(SEP, ""));
   return full;
-}
-
-/**
- * Interpret a spoken/typed command into a Unitree G1 skill JSON. Returns the
- * chosen skill + params (the interpreter's decision only — nothing moves yet), so
- * the UI can show whether the command was understood correctly.
- */
-export async function interpretCommand(
-  text: string,
-  model?: string,
-  robot?: string,
-  signal?: AbortSignal,
-): Promise<CommandResponse> {
-  const r = await backendFetch(`/api/command`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, model, robot }),
-    signal,
-  });
-  if (!r.ok) throw new Error(`POST /api/command -> ${r.status}`);
-  return r.json();
 }
 
 /**
