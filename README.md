@@ -66,7 +66,7 @@ src/
   api/        backend REST helpers
   components/
     layout/   Header, StatusBadge, VoiceStatusBadge, Layout, status context
-    live/     VideoStage, RobotCameraStage, DetectionOverlay, YoloPanel, VlmPanel, CommandPanel
+    live/     VideoStage, RobotCameraStage, DetectionOverlay, YoloPanel, VlmPanel
     ui/       Button, Field, Select / MultiSelect primitives
   hooks/      useCamera, useDetectionSocket (frame pacing), useOptions,
               useAudioRecorder, useSpeech, useVoiceAssistant, useWakeWord
