@@ -53,4 +53,5 @@ export const AGENT: Record<string, string> = {
   "This computer's mic: just speak — each phrase is sent to the agent":
     "El mic de esta compu: hablá nomás — cada frase va al agente",
   "Where the answers are spoken": "Dónde se dicen las respuestas",
+  PC: "PC",
 };

@@ -297,14 +297,17 @@ export function AgentPage() {
 
       {/* The chat: its own scroll; the page never scrolls on desktop. */}
       <aside className="flex min-h-[480px] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-card">
-        <div className="flex items-center gap-2 border-b border-line px-4 py-3 text-sm font-extrabold">
+        <div className="flex items-center gap-2 border-b border-line px-4 py-2.5 text-sm font-extrabold">
           <IconMessageChatbot size={17} className="text-accent" />{t("Agent")}
           {status ? (
             <StatusText status={{ ...status, text: t(status.text) }}
-              className="ml-auto min-w-0 truncate text-xs font-semibold text-muted" />
-          ) : voiceStatus && (
-            <span title={voiceStatus} className="ml-auto min-w-0 truncate text-xs font-semibold text-muted">{voiceStatus}</span>
+              className="min-w-0 flex-1 truncate text-right text-xs font-semibold text-muted" />
+          ) : (
+            <span title={voiceStatus} className="min-w-0 flex-1 truncate text-right text-xs font-semibold text-muted">{voiceStatus}</span>
           )}
+          {/* Up here, always on screen and never squeezing the box where you type. */}
+          <StopButton onClick={stop} className="!px-3 !py-1.5 !text-xs"
+            title={t("Stop the instruction now: the arm goes home and lets go")} />
         </div>
 
         <div className="border-b border-line px-3 py-1.5">
@@ -322,23 +325,23 @@ export function AgentPage() {
           <AgentTrace turns={turns} now={now} />
         </div>
 
-        <div className="flex items-end gap-2 border-t border-line p-3">
+        <div className="border-t border-line p-3">
           {isG1 ? (
-            <div className="min-w-0 flex-1 rounded-[14px] border border-line bg-bg transition focus-within:border-accent focus-within:shadow-[0_0_0_4px_var(--color-good-bg)]">
-              <div className="flex items-end">
-                <textarea value={text} rows={1} maxLength={MAX_CHARS} aria-label={t("Instruction")}
-                  onChange={(e) => setText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      if (canSend) void send(text);
-                    }
-                  }}
-                  placeholder={busy ? t("The robot is working on it…") : t("Type or speak…")}
-                  className="block max-h-28 min-h-[42px] min-w-0 flex-1 resize-none bg-transparent px-3 py-2.5 text-[13px] text-fg outline-none placeholder:text-dim" />
-                <button type="button" onClick={() => void send(text)} disabled={!canSend} title={t("Send")}
-                  className="m-1 grid size-9 shrink-0 cursor-pointer place-items-center rounded-lg bg-fg text-bg transition active:scale-95 disabled:cursor-default disabled:opacity-35">
-                  <IconArrowUp size={17} />
+            <div className="rounded-[14px] border border-line bg-bg transition focus-within:border-accent">
+              <div className="flex items-start">
+              <textarea value={text} rows={1} maxLength={MAX_CHARS} aria-label={t("Instruction")}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (canSend) void send(text);
+                  }
+                }}
+                placeholder={busy ? t("The robot is working on it…") : t("Type or speak…")}
+                className="block max-h-28 min-h-[44px] min-w-0 flex-1 resize-none bg-transparent px-3 pt-2.5 text-[13px] text-fg outline-none [field-sizing:content] placeholder:text-dim" />
+                <button type="button" onClick={() => void send(text)} disabled={!canSend} title={t("Send")} aria-label={t("Send")}
+                  className="m-1.5 grid size-8 shrink-0 cursor-pointer place-items-center rounded-lg bg-fg text-bg transition active:scale-95 disabled:cursor-default disabled:opacity-35">
+                  <IconArrowUp size={16} />
                 </button>
               </div>
               {/* Voice, as on Live: this computer's mic, the robot's mic, and answers out loud
@@ -372,7 +375,7 @@ export function AgentPage() {
                     {(["browser", "robot"] as const).map((o) => (
                       <button key={o} type="button" onClick={() => va.onSpeechOutputChange(o)} data-on={va.speechOutput === o}
                         className={`cursor-pointer rounded-md px-2 py-0.5 text-[11px] font-bold transition-colors ${va.speechOutput === o ? "text-fg" : "text-muted"}`}>
-                        {o === "browser" ? t("This device") : t("Robot")}
+                        {o === "browser" ? t("PC") : t("Robot")}
                       </button>
                     ))}
                   </Segmented>
@@ -380,12 +383,10 @@ export function AgentPage() {
               </div>
             </div>
           ) : (
-            <p className="m-0 min-w-0 flex-1 self-center text-[12.5px] text-muted">
+            <p className="m-0 text-[12.5px] text-muted">
               {t("The agent works with the G1 only. Pick the G1 in the header.")}
             </p>
           )}
-          <StopButton onClick={stop} className="h-11"
-            title={t("Stop the instruction now: the arm goes home and lets go")} />
         </div>
       </aside>
     </main>
