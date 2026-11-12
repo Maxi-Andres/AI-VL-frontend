@@ -44,7 +44,7 @@ describe("runAgent", () => {
     expect(url).toMatch(/\/api\/agent$/);
     expect(init.method).toBe("POST");
     expect(init.credentials).toBe("include");
-    expect(JSON.parse(String(init.body))).toEqual({ text: "agarrá la botella" });
+    expect(JSON.parse(String(init.body))).toEqual({ text: "agarrá la botella", history: [] });
   });
 
   it("puts back together events cut across chunks, even inside a multi-byte character", async () => {

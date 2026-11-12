@@ -1,7 +1,7 @@
 // The /agent chat built from the stream's events: steps attach to their tool, results close it,
 // the reply ends the run, and a stream that ends without one still leaves a finished turn.
 import { describe, expect, it } from "vitest";
-import { agentChat, runningTool, savedTrace, turnFromSaved, type AgentAction, type AgentTurn, type ToolItem } from "./agentTrace";
+import { agentChat, runningTool, historyOf, savedTrace, turnFromSaved, type AgentAction, type AgentTurn, type ToolItem } from "./agentTrace";
 import type { AgentEvent } from "../types";
 
 const ev = (event: AgentEvent, at = 0): AgentAction => ({ type: "event", id: 1, event, at });
@@ -108,5 +108,31 @@ describe("saved agent turns", () => {
     const loaded = [turnFromSaved(9, { question: "x", answer: "", at: "2026-11-12T10:00:00Z" })];
     expect(play([start, { type: "load", turns: loaded }])).toEqual(loaded);
     expect(play([start, { type: "load", turns: [] }])).toEqual([]);
+  });
+});
+
+describe("historyOf", () => {
+  it("tells each finished turn: asked, done with its tools, answered", () => {
+    const turns = play([
+      start,
+      ev({ type: "tool", tool: "look", args: { question: "where?" } }, 1000),
+      ev({ type: "tool_result", tool: "look", result: { ok: true, answer: "on the table" } }, 2000),
+      ev({ type: "tool", tool: "pick", args: { object: "bottle" } }, 3000),
+      ev({ type: "tool_result", tool: "pick", result: { ok: false, error: "out of reach" } }, 4000),
+      ev({ type: "reply", text: "No llego." }, 5000),
+      { type: "end", id: 1, at: 5000 },
+    ]);
+    expect(historyOf(turns)).toEqual([{
+      question: "agarrá la botella ",
+      answer: "No llego.",
+      done: ['look({"question":"where?"}) -> ok: on the table', 'pick({"object":"bottle"}) -> failed: out of reach'],
+    }]);
+  });
+
+  it("leaves out a turn still running, and one that neither did nor said anything", () => {
+    const running = play([start]);
+    expect(historyOf(running)).toEqual([]);
+    const empty = play([start, { type: "end", id: 1, at: 10 }]);
+    expect(historyOf(empty)).toEqual([]);
   });
 });

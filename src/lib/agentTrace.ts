@@ -197,3 +197,32 @@ export function turnFromSaved(id: number, saved: { question: string; answer: str
     running: false, stopping: false, startedAt,
   };
 }
+
+/** An earlier turn as the agent is told it (AgentTurn in the backend and iacore). */
+export interface AgentHistoryTurn {
+  question: string;
+  answer: string;
+  /** Each tool it used: "pick({...}) -> ok", the same line the gateway makes for Bender. */
+  done: string[];
+}
+
+const HISTORY_TURNS = 50; // the backend's limit
+
+/** The conversation so far, oldest first, for the next instruction: finished turns that
+ * answered or did something, cut to the backend's limits. */
+export function historyOf(turns: AgentTurn[]): AgentHistoryTurn[] {
+  const out: AgentHistoryTurn[] = [];
+  for (const turn of turns) {
+    if (turn.running) continue;
+    const done = turn.items.flatMap((it) => {
+      if (it.kind !== "tool" || !it.result) return [];
+      const r = it.result;
+      const how = !r.ok ? `failed: ${r.error || "no reason"}` : r.answer ? `ok: ${r.answer}` : "ok";
+      return [`${it.tool}(${JSON.stringify(it.args)}) -> ${how}`.slice(0, 300)];
+    }).slice(-12);
+    const answer = (turn.reply ?? "").slice(0, 4000);
+    if (!answer && !done.length) continue;
+    out.push({ question: turn.instruction.slice(0, 1000), answer, done });
+  }
+  return out.slice(-HISTORY_TURNS);
+}

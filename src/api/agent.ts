@@ -3,6 +3,7 @@
 import { backendFetch } from "./backend";
 import { SseParser } from "../lib/sse";
 import type { AgentEvent } from "../types";
+import type { AgentHistoryTurn } from "../lib/agentTrace";
 
 /** Why a refusal came back, from the body the backend sends with it (`detail` or `error`). */
 async function refusal(r: Response, what: string): Promise<string> {
@@ -22,17 +23,21 @@ async function refusal(r: Response, what: string): Promise<string> {
  * refused request (403, 422, a 5xx) arrives as one `error` event, so the trace shows it like
  * any other. Throws only when the network itself fails or `signal` aborts.
  *
+ * `history` is the conversation so far (historyOf), so "now put it on the table" knows what
+ * "it" is; iacore sends the newest turns that fit to the model.
+ *
  * MAY MOVE THE ROBOT. Aborting `signal` stops reading, NOT the robot — that is stopAgent().
  */
 export async function runAgent(
   text: string,
   onEvent: (e: AgentEvent) => void,
   signal?: AbortSignal,
+  history: AgentHistoryTurn[] = [],
 ): Promise<void> {
   const r = await backendFetch(`/api/agent`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, history }),
     signal,
   });
   if (!r.ok || !r.body) {

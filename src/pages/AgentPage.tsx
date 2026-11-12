@@ -29,7 +29,7 @@ import { useChats } from "../hooks/useChats";
 import { usePresence } from "../hooks/usePresence";
 import { useRobotCameraView } from "../hooks/useRobotCameraView";
 import { useRobotTransports } from "../hooks/useRobotTransports";
-import { agentChat, savedTrace, turnFromSaved } from "../lib/agentTrace";
+import { agentChat, historyOf, savedTrace, turnFromSaved } from "../lib/agentTrace";
 import type { AgentEvent } from "../types";
 import { msg, useT } from "../i18n";
 
@@ -53,8 +53,8 @@ const MAX_CHARS = 1000;
  *
  * The conversations are kept per person, like Live's (useChats, kind "agent"): every finished
  * turn — typed, spoken here, or "Bender, …" heard by the robot while this page is open — is
- * saved with its trace, and "New" starts another. The agent itself does not see earlier turns:
- * each instruction runs on its own. Leaving the page while a run goes on presses STOP: nobody would be
+ * saved with its trace, and "New" starts another. Each instruction carries the open
+ * conversation's earlier turns (historyOf): what was asked, what the robot did, what it said. Leaving the page while a run goes on presses STOP: nobody would be
  * watching an arm that keeps moving (fail safe).
  */
 export function AgentPage() {
@@ -90,6 +90,9 @@ export function AgentPage() {
   const [videoMenu, setVideoMenu] = useState(false);
 
   const [turns, dispatch] = useReducer(agentChat, []);
+  // What the next instruction sends as the conversation so far (the open one's turns).
+  const turnsRef = useRef(turns);
+  turnsRef.current = turns;
   const [text, setText] = useState("");
   // A run's stream is open (from the POST until its end event): one at a time.
   const [busy, setBusy] = useState(false);
@@ -141,6 +144,7 @@ export function AgentPage() {
     const instruction = raw.trim().slice(0, MAX_CHARS);
     if (!instruction || runRef.current) return null;
     let reply: string | null = null;
+    const history = historyOf(turnsRef.current);
     const id = nextId.current++;
     const ctl = new AbortController();
     runRef.current = { id, ctl };
@@ -155,7 +159,7 @@ export function AgentPage() {
           reply = event.text;
           if (!voiced) speakRef.current(event.text);
         }
-      }, ctl.signal);
+      }, ctl.signal, history);
       dispatch({ type: "end", id, at: Date.now() });
       toSave.current.add(id);
     } catch (e) {
