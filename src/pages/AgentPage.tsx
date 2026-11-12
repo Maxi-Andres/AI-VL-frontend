@@ -16,14 +16,16 @@ import { useVideoTransport } from "../components/layout/VideoTransportContext";
 import { useVoiceAssistantContext } from "../components/layout/VoiceAssistantContext";
 import { RobotCameraSwitch } from "../components/live/RobotCameraSwitch";
 import { RobotPicture } from "../components/live/RobotPicture";
+import { Conversations } from "../components/ui/Conversations";
 import { VideoTransportSwitch } from "../components/live/VideoTransportSwitch";
 import { StatusText, type Status } from "../components/ui/StatusText";
 import { StopButton } from "../components/ui/StopButton";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
+import { useChats } from "../hooks/useChats";
 import { usePresence } from "../hooks/usePresence";
 import { useRobotCameraView } from "../hooks/useRobotCameraView";
 import { useRobotTransports } from "../hooks/useRobotTransports";
-import { agentChat } from "../lib/agentTrace";
+import { agentChat, savedTrace, turnFromSaved } from "../lib/agentTrace";
 import type { AgentEvent } from "../types";
 import { msg, useT } from "../i18n";
 
@@ -39,7 +41,12 @@ const MAX_CHARS = 1000;
  * G1 only: the backend's tools (pick, look) drive the G1's arm and its RealSense.
  *
  * One run at a time from this page; the server refuses a second one from anywhere (it comes
- * back as an error line). Leaving the page while a run goes on presses STOP: nobody would be
+ * back as an error line).
+ *
+ * The conversations are kept per person, like Live's (useChats, kind "agent"): every finished
+ * turn — typed, spoken here, or "Bender, …" heard by the robot while this page is open — is
+ * saved with its trace, and "New" starts another. The agent itself does not see earlier turns:
+ * each instruction runs on its own. Leaving the page while a run goes on presses STOP: nobody would be
  * watching an arm that keeps moving (fail safe).
  */
 export function AgentPage() {
@@ -85,6 +92,33 @@ export function AgentPage() {
   const nextId = useRef(1);
   const alive = useRef(true);
 
+  // The saved conversations. Opening one (or a new one) replaces the chat with what it kept;
+  // a turn is saved once its run is over (`toSave`, filled by its end).
+  const chats = useChats(true, "agent");
+  const saveChat = chats.save;
+  const toSave = useRef(new Set<number>());
+  useEffect(() => {
+    toSave.current.clear();
+    dispatch({ type: "load", turns: chats.history.map((m) => turnFromSaved(nextId.current++, m)) });
+    // Only when another conversation is opened: `history` also grows with every save.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chats.version]);
+  useEffect(() => {
+    for (const id of toSave.current) {
+      const turn = turns.find((x) => x.id === id);
+      if (!turn) {
+        toSave.current.delete(id);
+        continue;
+      }
+      if (turn.running) continue;
+      toSave.current.delete(id);
+      saveChat({
+        kind: "agent", question: turn.instruction, answer: turn.reply ?? "",
+        status: turn.stopping ? "stopped" : "", robot, trace: savedTrace(turn),
+      });
+    }
+  }, [turns, saveChat, robot]);
+
   // The reply is spoken the way the rest of the app speaks answers: only when spoken answers
   // are on (the voice assistant's switch), with its voice and its output.
   const { va } = useVoiceAssistantContext();
@@ -109,9 +143,11 @@ export function AgentPage() {
         if (event.type === "reply" && event.text) speakRef.current(event.text);
       }, ctl.signal);
       dispatch({ type: "end", id, at: Date.now() });
+      toSave.current.add(id);
     } catch (e) {
       if (ctl.signal.aborted) return; // the page went away
       dispatch({ type: "failed", id, at: Date.now(), text: e instanceof Error ? e.message : String(e) });
+      toSave.current.add(id);
     } finally {
       if (runRef.current?.id === id) runRef.current = null;
       if (alive.current) setBusy(false);
@@ -132,7 +168,8 @@ export function AgentPage() {
   // "Bender, …" said to the robot in the agent's mode (or while it walks): the gateway runs it
   // and the robot speaks the reply; the run shows here as a turn of its own, like a typed one.
   const voiceRun = useRef<number | null>(null);
-  useEffect(() => va.onAgentEvents((event) => {
+  const onAgentEvents = va.onAgentEvents;
+  useEffect(() => onAgentEvents((event) => {
     const at = Date.now();
     if (event.type === "heard") {
       const id = nextId.current++;
@@ -144,11 +181,12 @@ export function AgentPage() {
     if (id === null) return;
     if (event.type === "end") {
       dispatch({ type: "end", id, at });
+      toSave.current.add(id);
       voiceRun.current = null;
       return;
     }
     dispatch({ type: "event", id, event: event as unknown as AgentEvent, at });
-  }), [va.onAgentEvents]);
+  }), [onAgentEvents]);
   const earInAgentMode = va.robotEar && (va.earModeNow ?? va.earMode) === "agent";
 
   // Leaving mid-run: STOP, and stop reading.
@@ -284,6 +322,13 @@ export function AgentPage() {
           )}
           <StatusText status={status && { ...status, text: t(status.text) }}
             className="ml-auto min-w-0 truncate text-xs font-semibold text-muted" />
+        </div>
+
+        <div className="border-b border-line px-3 py-1.5">
+          <Conversations busy={running} chat={{
+            chats: chats.chats, current: chats.current, error: chats.error,
+            onOpen: (id) => void chats.open(id), onDelete: (id) => void chats.remove(id),
+          }} />
         </div>
 
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-4"

@@ -1,7 +1,7 @@
 // The /agent chat built from the stream's events: steps attach to their tool, results close it,
 // the reply ends the run, and a stream that ends without one still leaves a finished turn.
 import { describe, expect, it } from "vitest";
-import { agentChat, runningTool, type AgentAction, type AgentTurn, type ToolItem } from "./agentTrace";
+import { agentChat, runningTool, savedTrace, turnFromSaved, type AgentAction, type AgentTurn, type ToolItem } from "./agentTrace";
 import type { AgentEvent } from "../types";
 
 const ev = (event: AgentEvent, at = 0): AgentAction => ({ type: "event", id: 1, event, at });
@@ -78,5 +78,35 @@ describe("agentChat", () => {
     ], first);
     expect(both[0]).toBe(first[0]);
     expect(both[1]).toMatchObject({ instruction: "mirá", running: false, items: [{ kind: "error", text: "network down" }] });
+  });
+});
+
+describe("saved agent turns", () => {
+  it("come back as they were drawn, under a new id, never running", () => {
+    const [turn] = play([
+      start,
+      ev({ type: "plan", steps: ["look"] }),
+      ev({ type: "tool", tool: "look", args: { question: "where?" } }, 1000),
+      ev({ type: "tool_result", tool: "look", result: { ok: true, answer: "on the table" } }, 3000),
+      ev({ type: "reply", text: "Está en la mesa." }, 3500),
+      { type: "end", id: 1, at: 3600 },
+    ]);
+    // Through the server: JSON there and back.
+    const kept = JSON.parse(JSON.stringify(savedTrace(turn)));
+    expect(kept.id).toBeUndefined();
+    const back = turnFromSaved(7, { question: turn.instruction, answer: "Está en la mesa.", at: "2026-11-12T10:00:00Z", trace: kept });
+    expect(back).toEqual({ ...turn, id: 7 });
+  });
+
+  it("without a trace (too large to keep) are the instruction and the reply alone", () => {
+    const back = turnFromSaved(3, { question: "saludá", answer: "Listo.", at: "2026-11-12T10:00:00Z", trace: null });
+    expect(back).toMatchObject({ id: 3, instruction: "saludá", reply: "Listo.", items: [], running: false });
+    expect(back.startedAt).toBe(Date.parse("2026-11-12T10:00:00Z"));
+  });
+
+  it("replace the chat when a conversation is opened", () => {
+    const loaded = [turnFromSaved(9, { question: "x", answer: "", at: "2026-11-12T10:00:00Z" })];
+    expect(play([start, { type: "load", turns: loaded }])).toEqual(loaded);
+    expect(play([start, { type: "load", turns: [] }])).toEqual([]);
   });
 });

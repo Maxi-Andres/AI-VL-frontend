@@ -1,11 +1,15 @@
-// The vision assistant's conversations, kept on the server per person (chats.py): private to
-// whoever had them. The page asks the model; this only keeps what was said.
+// The conversations with the vision assistant (Live, kind "vlm") and with the agent (the Agent
+// page, kind "agent"), kept on the server per person (chats.py): private to whoever had them.
+// The page asks the model; this only keeps what was said.
 import { backendFetch } from "./backend";
 import { check, json } from "./fleet";
+
+export type ChatKind = "vlm" | "agent";
 
 export interface ChatSummary {
   id: string;
   title: string;
+  kind?: ChatKind;
   created_at: string;
   updated_at: string;
   messages?: number;
@@ -14,23 +18,27 @@ export interface ChatSummary {
 export interface ChatMessage {
   id: number;
   at: string;
-  kind: "question" | "analysis";
+  /** "question" | "analysis" in a Live chat, "agent" in an agent's. */
+  kind: "question" | "analysis" | "agent";
   question: string;
   answer: string;
   status: string;
   robot: string;
+  /** An agent's exchange: the trace as the page drew it (null when it was too large to keep). */
+  trace?: unknown;
 }
 
 export interface NewMessage {
-  kind: "question" | "analysis";
+  kind: "question" | "analysis" | "agent";
   question: string;
   answer: string;
   status: string;
   robot: string;
+  trace?: unknown;
 }
 
-export async function listChats(signal?: AbortSignal): Promise<ChatSummary[]> {
-  return (await check(await backendFetch("/api/chats", { signal }))).json();
+export async function listChats(kind: ChatKind = "vlm", signal?: AbortSignal): Promise<ChatSummary[]> {
+  return (await check(await backendFetch(`/api/chats?kind=${kind}`, { signal }))).json();
 }
 
 export async function getChat(id: string, signal?: AbortSignal): Promise<ChatSummary & { messages: ChatMessage[] }> {

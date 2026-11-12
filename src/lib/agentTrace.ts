@@ -53,7 +53,9 @@ export type AgentAction =
   /** The stream is over, with or without a reply. */
   | { type: "end"; id: number; at: number }
   /** The request itself failed (network down): said in the trace, the run is over. */
-  | { type: "failed"; id: number; text: string; at: number };
+  | { type: "failed"; id: number; text: string; at: number }
+  /** A saved conversation opened (or a new one started): its turns replace the chat. */
+  | { type: "load"; turns: AgentTurn[] };
 
 /** The open run of a tool: the newest one with that name still waiting for its result. A step
  * that names no open tool goes to the newest open one of any name. */
@@ -133,6 +135,7 @@ function applyEvent(turn: AgentTurn, ev: AgentEvent, at: number): AgentTurn {
 
 /** The chat reducer. Actions for a turn that is not in the chat are ignored. */
 export function agentChat(turns: AgentTurn[], action: AgentAction): AgentTurn[] {
+  if (action.type === "load") return action.turns;
   if (action.type === "start") {
     return [...turns, {
       id: action.id, instruction: action.text, items: [], running: true, stopping: false,
@@ -167,4 +170,30 @@ export function runningTool(turn: AgentTurn): ToolItem | null {
     if (it.kind === "tool" && it.endedAt === undefined) return it;
   }
   return null;
+}
+
+/** What is kept of a finished turn (chats.py, `trace`): all of it but its id, which is this
+ * page's own. */
+export function savedTrace(turn: AgentTurn): Omit<AgentTurn, "id"> {
+  const rest: Partial<AgentTurn> = { ...turn };
+  delete rest.id;
+  return { ...(rest as Omit<AgentTurn, "id">), running: false, stopping: false };
+}
+
+/** A saved exchange back as a turn: its trace when it was kept and reads as one, else the
+ * instruction and the reply alone. Never running. */
+export function turnFromSaved(id: number, saved: { question: string; answer: string; at: string; trace?: unknown }): AgentTurn {
+  const startedAt = Date.parse(saved.at) || 0;
+  const tr = saved.trace as Partial<AgentTurn> | null | undefined;
+  if (tr && typeof tr === "object" && Array.isArray(tr.items) && typeof tr.instruction === "string") {
+    return {
+      ...tr, id, instruction: tr.instruction, items: tr.items,
+      startedAt: typeof tr.startedAt === "number" ? tr.startedAt : startedAt,
+      running: false, stopping: false,
+    };
+  }
+  return {
+    id, instruction: saved.question, reply: saved.answer || undefined, items: [],
+    running: false, stopping: false, startedAt,
+  };
 }

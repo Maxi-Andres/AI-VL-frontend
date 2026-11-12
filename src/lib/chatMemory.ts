@@ -10,7 +10,7 @@ interface ShownTurn {
 }
 
 /** Whether a turn goes to the model as history (LivePage's filter, and iacore's). */
-export const sentAsHistory = (t: ShownTurn) => t.kind === "question" && !!t.question.trim() && !!t.answer.trim();
+export const sentAsHistory = (t: Omit<ShownTurn, "kind"> & { kind: string }) => t.kind === "question" && !!t.question.trim() && !!t.answer.trim();
 
 /** Ids of the first `count` turns that go as history: the ones that no longer do. */
 export function forgottenTurns(turns: ShownTurn[], count: number): Set<number> {
