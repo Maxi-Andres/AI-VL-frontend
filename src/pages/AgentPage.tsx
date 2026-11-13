@@ -25,16 +25,29 @@ import { Segmented } from "../components/ui/Segmented";
 import { VideoTransportSwitch } from "../components/live/VideoTransportSwitch";
 import { StatusText, type Status } from "../components/ui/StatusText";
 import { StopButton } from "../components/ui/StopButton";
-import { useChats } from "../hooks/useChats";
+import { announceSaved, lastChat, rememberChat, useChats } from "../hooks/useChats";
+import { addMessage } from "../api/chats";
 import { usePresence } from "../hooks/usePresence";
 import { useRobotCameraView } from "../hooks/useRobotCameraView";
 import { useRobotTransports } from "../hooks/useRobotTransports";
-import { agentChat, historyOf, savedTrace, turnFromSaved } from "../lib/agentTrace";
+import { agentChat, historyOf, savedTrace, turnFromSaved, type AgentTurn } from "../lib/agentTrace";
+import { attachPage, beginRun, endRun, liveRun, newTurnId, record } from "../lib/agentRun";
 import type { AgentEvent } from "../types";
 import { msg, useT } from "../i18n";
 
 // The backend's limit on an instruction (AgentRequest in AI-VL-backend/app.py).
 const MAX_CHARS = 1000;
+
+/** A run that ended while no Agent page was open: saved into the conversation it was asked in,
+ * and that conversation is the one the page opens next (agentRun.ts). */
+async function saveUnwatched(chat: string | null, turn: AgentTurn, robot: string): Promise<void> {
+  const saved = await addMessage(chat, {
+    kind: "agent", question: turn.instruction, answer: turn.reply ?? "",
+    status: turn.stopping ? "stopped" : "", robot, trace: savedTrace(turn),
+  });
+  if (lastChat("agent") === chat) rememberChat(saved.id, "agent");
+  announceSaved(saved.id, "agent");
+}
 
 /**
  * The agent: the robot's camera on the left, a chat on the right. A person types or says an
@@ -54,8 +67,12 @@ const MAX_CHARS = 1000;
  * The conversations are kept per person, like Live's (useChats, kind "agent"): every finished
  * turn — typed, spoken here, or "Bender, …" heard by the robot while this page is open — is
  * saved with its trace, and "New" starts another. Each instruction carries the open
- * conversation's earlier turns (historyOf): what was asked, what the robot did, what it said. Leaving the page while a run goes on presses STOP: nobody would be
- * watching an arm that keeps moving (fail safe).
+ * conversation's earlier turns (historyOf): what was asked, what the robot did, what it said.
+ *
+ * Leaving the page mid-run does NOT stop the run (it used to, and the turn was lost: switching to
+ * Navigation to watch the walk stopped it, 2026-11-13). The run lives in lib/agentRun: back on
+ * this page it shows from its first event, and one that ends elsewhere is saved all the same.
+ * STOP — here, or the Navigation page's for a walk — stops it.
  */
 export function AgentPage() {
   const t = useT();
@@ -94,23 +111,29 @@ export function AgentPage() {
   const turnsRef = useRef(turns);
   turnsRef.current = turns;
   const [text, setText] = useState("");
-  // A run's stream is open (from the POST until its end event): one at a time.
-  const [busy, setBusy] = useState(false);
+  // A run's stream is open (from the POST until its end event): one at a time, even across a
+  // visit to another page (agentRun).
+  const [busy, setBusy] = useState(() => liveRun() !== null);
   // The mic, the transcription and STOP report here. Texts are msg()-marked or the server's
   // own, translated where drawn, so the callbacks never depend on the language.
   const [status, setStatus] = useState<Status | null>(null);
-  const runRef = useRef<{ id: number; ctl: AbortController } | null>(null);
-  const nextId = useRef(1);
-  const alive = useRef(true);
 
   // The saved conversations. Opening one (or a new one) replaces the chat with what it kept;
   // a turn is saved once its run is over (`toSave`, filled by its end).
   const chats = useChats(true, "agent");
   const saveChat = chats.save;
+  // For a run that outlives this page (agentRun): the conversation it was asked in, the robot.
+  const chatRef = useRef(chats.current);
+  chatRef.current = chats.current;
+  const robotRef = useRef(robot);
+  robotRef.current = robot;
   const toSave = useRef(new Set<number>());
   useEffect(() => {
     toSave.current.clear();
-    dispatch({ type: "load", turns: chats.history.map((m) => turnFromSaved(nextId.current++, m)) });
+    dispatch({ type: "load", turns: chats.history.map((m) => turnFromSaved(newTurnId(), m)) });
+    // A run still going (started before this page opened, or before another conversation was
+    // opened): shown from its first event.
+    for (const action of liveRun()?.actions ?? []) dispatch(action);
     // Only when another conversation is opened: `history` also grows with every save.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chats.version]);
@@ -142,33 +165,31 @@ export function AgentPage() {
   // speaks the reply itself, so it is not spoken here too.
   const send = useCallback(async (raw: string, voiced = false): Promise<string | null> => {
     const instruction = raw.trim().slice(0, MAX_CHARS);
-    if (!instruction || runRef.current) return null;
+    if (!instruction || liveRun()) return null;
     let reply: string | null = null;
     const history = historyOf(turnsRef.current);
-    const id = nextId.current++;
-    const ctl = new AbortController();
-    runRef.current = { id, ctl };
+    const id = newTurnId();
     setBusy(true);
     setText("");
     setStatus(null);
-    dispatch({ type: "start", id, text: instruction, at: Date.now() });
+    const chat = chatRef.current;
+    beginRun(id, instruction, chat, Date.now());
+    let end: { turn: AgentTurn | null; taken: boolean };
     try {
       await runAgent(instruction, (event) => {
-        dispatch({ type: "event", id, event, at: Date.now() });
+        record({ type: "event", id, event, at: Date.now() });
         if (event.type === "reply" && event.text) {
           reply = event.text;
           if (!voiced) speakRef.current(event.text);
         }
-      }, ctl.signal, history);
-      dispatch({ type: "end", id, at: Date.now() });
-      toSave.current.add(id);
+      }, undefined, history);
+      end = endRun({ type: "end", id, at: Date.now() });
     } catch (e) {
-      if (ctl.signal.aborted) return null; // the page went away
-      dispatch({ type: "failed", id, at: Date.now(), text: e instanceof Error ? e.message : String(e) });
-      toSave.current.add(id);
-    } finally {
-      if (runRef.current?.id === id) runRef.current = null;
-      if (alive.current) setBusy(false);
+      end = endRun({ type: "failed", id, at: Date.now(), text: e instanceof Error ? e.message : String(e) });
+    }
+    // No Agent page open when it ended: save it here (an open one saves it through toSave).
+    if (!end.taken && end.turn) {
+      void saveUnwatched(chat, end.turn, robotRef.current).catch(() => undefined);
     }
     return reply;
   }, []);
@@ -189,14 +210,24 @@ export function AgentPage() {
 
   const stop = useCallback(() => {
     va.stopSpeak();
-    const run = runRef.current;
-    if (run) dispatch({ type: "stopping", id: run.id });
+    const run = liveRun();
+    if (run) record({ type: "stopping", id: run.id });
     setStatus({ tone: "busy", text: msg("Stopping…") });
     // The stream is NOT aborted: the run's last events and its reply still come down it.
     stopAgent()
       .then(() => setStatus({ tone: "stopped", text: msg("Stopped") }))
       .catch((e) => setStatus({ tone: "error", text: e instanceof Error ? e.message : String(e) }));
   }, [va]);
+
+  // The run's changes come here while this page is open, wherever the run was started from;
+  // its end is saved from here (toSave).
+  useEffect(() => attachPage((action) => {
+    dispatch(action);
+    if (action.type === "end" || action.type === "failed") {
+      toSave.current.add(action.id);
+      setBusy(false);
+    }
+  }), []);
 
   // "Bender, …" said to the robot in the agent's mode (or while it walks): the gateway runs it
   // and the robot speaks the reply; the run shows here as a turn of its own, like a typed one.
@@ -208,7 +239,7 @@ export function AgentPage() {
     const at = Date.now();
     const run = event.run ?? 0;              // an older gateway numbers nothing: one at a time
     if (event.type === "heard") {
-      const id = nextId.current++;
+      const id = newTurnId();
       voiceRuns.current.set(run, id);
       dispatch({ type: "start", id, text: event.text ?? "", at });
       return;
@@ -224,20 +255,6 @@ export function AgentPage() {
     dispatch({ type: "event", id, event: event as unknown as AgentEvent, at });
   }), [onAgentEvents]);
   const earInAgentMode = va.robotEar && (va.earModeNow ?? va.earMode) === "agent";
-
-  // Leaving mid-run: STOP, and stop reading.
-  useEffect(() => {
-    alive.current = true;
-    return () => {
-      alive.current = false;
-      const run = runRef.current;
-      if (run) {
-        stopAgent().catch(() => {});
-        run.ctl.abort();
-        runRef.current = null;
-      }
-    };
-  }, []);
 
   // The running tool's seconds: one tick a second, only while a run is open.
   const [now, setNow] = useState(() => Date.now());
